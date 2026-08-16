@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Calendar, Users, Settings, LogOut } from 'lucide-react'
+import { initials } from '@/lib/format'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,8 +12,15 @@ const navItems = [
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
-export default function ProfessionalSidebar() {
+export default function ProfessionalSidebar({ name = 'Dra. Carolina Matos', crn = 'CRN-3 · 12.345' }: { name?: string; crn?: string } = {}) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' })
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <aside className="w-64 bg-white border-r border-gray-100 min-h-screen flex flex-col shrink-0">
@@ -25,11 +33,11 @@ export default function ProfessionalSidebar() {
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
-            CM
+            {initials(name)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">Dra. Carolina Matos</p>
-            <p className="text-xs text-gray-500">CRN-3 · 12.345</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{name}</p>
+            <p className="text-xs text-gray-500">{crn}</p>
           </div>
         </div>
       </div>
@@ -52,13 +60,13 @@ export default function ProfessionalSidebar() {
       </nav>
 
       <div className="p-4 border-t border-gray-100">
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
         >
           <LogOut size={18} />
           Sair
-        </Link>
+        </button>
       </div>
     </aside>
   )

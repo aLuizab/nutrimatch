@@ -3,16 +3,36 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, User, Stethoscope, Eye, EyeOff } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
 export default function Login() {
   const router = useRouter()
-  const [role, setRole] = useState<'paciente' | 'profissional'>('paciente')
   const [showPassword, setShowPassword] = useState(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    router.push(role === 'profissional' ? '/dashboard' : '/patient/dashboard')
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error ?? 'Não foi possível entrar')
+        return
+      }
+      router.push(data.redirectTo)
+      router.refresh()
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -43,32 +63,19 @@ export default function Login() {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Bem-vindo de volta</h1>
           <p className="text-gray-500 text-sm mb-6">Faça login para acessar sua conta</p>
 
-          {/* Tabs de papel */}
-          <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
-            <button
-              onClick={() => setRole('paciente')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                role === 'paciente' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <User size={15} /> Sou Paciente
-            </button>
-            <button
-              onClick={() => setRole('profissional')}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                role === 'profissional' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <Stethoscope size={15} /> Sou Profissional
-            </button>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">
+                {error}
+              </div>
+            )}
             <div>
               <label className="text-xs font-bold text-gray-700 block mb-1.5">E-mail</label>
               <input
                 type="email"
-                defaultValue={role === 'profissional' ? 'carolina@nutrimatch.com.br' : 'ana@email.com'}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
                 placeholder="seu@email.com"
                 className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all bg-white"
               />
@@ -78,7 +85,9 @@ export default function Login() {
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
-                  defaultValue="senha123"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
                   placeholder="••••••••"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all bg-white"
                 />
@@ -103,9 +112,10 @@ export default function Login() {
 
             <button
               type="submit"
-              className="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors"
+              disabled={loading}
+              className="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60"
             >
-              Entrar
+              {loading ? 'Entrando...' : 'Entrar'}
             </button>
           </form>
 

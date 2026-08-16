@@ -1,0 +1,128 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  PROFESSIONAL
+  ADMIN
+}
+
+enum ProfessionalStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+}
+
+enum Modality {
+  ONLINE
+  PRESENCIAL
+  AMBOS
+}
+
+enum AppointmentStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role
+  createdAt    DateTime @default(now())
+
+  professional Professional?
+  patient      Patient?
+}
+
+model Professional {
+  id          String             @id @default(cuid())
+  userId      String             @unique
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  crn         String
+  specialty   String
+  bio         String
+  city        String
+  modality    Modality
+  price       Int
+  status      ProfessionalStatus @default(ACTIVE)
+  rating      Float              @default(0)
+  reviewCount Int                @default(0)
+  createdAt   DateTime           @default(now())
+
+  availabilityRules AvailabilityRule[]
+  appointments      Appointment[]
+  reviews           Review[]
+
+  @@index([status])
+}
+
+model Patient {
+  id        String    @id @default(cuid())
+  userId    String    @unique
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birthDate DateTime?
+  goal      String?
+  city      String?
+  createdAt DateTime  @default(now())
+
+  appointments Appointment[]
+  reviews      Review[]
+}
+
+model AvailabilityRule {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  weekday        Int
+  startTime      String
+  endTime        String
+  slotMinutes    Int          @default(50)
+
+  @@index([professionalId])
+}
+
+model Appointment {
+  id             String            @id @default(cuid())
+  professionalId String
+  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patientId      String
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  scheduledAt    DateTime
+  modality       Modality
+  price          Int
+  status         AppointmentStatus @default(CONFIRMED)
+  reason         String?
+  phone          String?
+  createdAt      DateTime          @default(now())
+
+  review Review?
+
+  @@unique([professionalId, scheduledAt])
+  @@index([patientId])
+  @@index([professionalId])
+}
+
+model Review {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patientId      String
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  appointmentId  String?      @unique
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  rating         Int
+  comment        String
+  createdAt      DateTime     @default(now())
+
+  @@index([professionalId])
+}

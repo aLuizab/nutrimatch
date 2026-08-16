@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { LayoutDashboard, Calendar, User, LogOut } from 'lucide-react'
+import { initials } from '@/lib/format'
 
 const navItems = [
   { href: '/patient/dashboard', label: 'Início', icon: LayoutDashboard },
@@ -10,8 +11,15 @@ const navItems = [
   { href: '/patient/perfil', label: 'Meu Perfil', icon: User },
 ]
 
-export default function PatientSidebar() {
+export default function PatientSidebar({ name = 'Ana Silva' }: { name?: string } = {}) {
   const pathname = usePathname()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    await fetch('/api/logout', { method: 'POST' })
+    router.push('/')
+    router.refresh()
+  }
 
   return (
     <aside className="w-64 bg-white border-r border-gray-100 min-h-screen flex flex-col shrink-0">
@@ -24,10 +32,10 @@ export default function PatientSidebar() {
       <div className="px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-3 px-2 py-2">
           <div className="w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-bold text-sm shrink-0">
-            AS
+            {initials(name)}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">Ana Silva</p>
+            <p className="text-sm font-bold text-gray-900 truncate">{name}</p>
             <p className="text-xs text-gray-500">Paciente</p>
           </div>
         </div>
@@ -51,13 +59,13 @@ export default function PatientSidebar() {
       </nav>
 
       <div className="p-4 border-t border-gray-100">
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
         >
           <LogOut size={18} />
           Sair
-        </Link>
+        </button>
       </div>
     </aside>
   )

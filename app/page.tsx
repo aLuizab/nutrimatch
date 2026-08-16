@@ -1,9 +1,9 @@
-'use client'
-
-import React, { useState } from 'react'
 import Link from 'next/link'
-import { Search, Star, ArrowRight, CheckCircle, Clock, ChevronRight } from 'lucide-react'
+import { Star, ArrowRight, CheckCircle, Clock, ChevronRight, Search } from 'lucide-react'
 import PublicHeader from './components/PublicHeader'
+import HeroSearch from './HeroSearch'
+import { prisma } from '@/lib/prisma'
+import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
 
 const specialties = [
   { label: 'Esportiva', emoji: '🏃', color: 'bg-orange-50 text-orange-600 border-orange-100' },
@@ -14,23 +14,23 @@ const specialties = [
   { label: 'Oncológica', emoji: '💜', color: 'bg-purple-50 text-purple-600 border-purple-100' },
 ]
 
-const nutritionists = [
-  { name: 'Dra. Carolina Matos', specialty: 'Nutrição Esportiva', rating: 4.9, reviews: 47, price: 150, modality: 'Online e Presencial', initials: 'CM', color: 'bg-emerald-500' },
-  { name: 'Dr. Rafael Costa', specialty: 'Nutrição Clínica', rating: 4.8, reviews: 62, price: 120, modality: 'Apenas Online', initials: 'RC', color: 'bg-blue-500' },
-  { name: 'Dra. Maria Fernanda', specialty: 'Nutrição Funcional', rating: 5.0, reviews: 31, price: 180, modality: 'Presencial', initials: 'MF', color: 'bg-purple-500' },
-  { name: 'Dra. Juliana Torres', specialty: 'Nutrição Infantil', rating: 4.7, reviews: 58, price: 130, modality: 'Online e Presencial', initials: 'JT', color: 'bg-pink-500' },
-  { name: 'Dr. André Lima', specialty: 'Nutrição Esportiva', rating: 4.9, reviews: 44, price: 140, modality: 'Apenas Online', initials: 'AL', color: 'bg-orange-500' },
-  { name: 'Dra. Beatriz Oliveira', specialty: 'Nutrição Vegana', rating: 4.8, reviews: 29, price: 110, modality: 'Online e Presencial', initials: 'BO', color: 'bg-green-500' },
-]
-
 const steps = [
   { step: '1', title: 'Busque', description: 'Pesquise por especialidade, localização ou disponibilidade sem precisar de cadastro.', icon: Search },
   { step: '2', title: 'Escolha', description: 'Compare perfis, avaliações e preços para encontrar o profissional ideal para você.', icon: CheckCircle },
   { step: '3', title: 'Agende', description: 'Marque sua consulta diretamente pela plataforma. Simples, rápido e sem burocracia.', icon: Clock },
 ]
 
-export default function LandingPage() {
-  const [searchQuery, setSearchQuery] = useState('')
+export default async function LandingPage() {
+  const [featuredRows, totalActive] = await Promise.all([
+    prisma.professional.findMany({
+      where: { status: 'ACTIVE' },
+      include: PROFESSIONAL_CARD_INCLUDE,
+      orderBy: { rating: 'desc' },
+      take: 6,
+    }),
+    prisma.professional.count({ where: { status: 'ACTIVE' } }),
+  ])
+  const featured = featuredRows.map(toProfessionalCard)
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -41,7 +41,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="max-w-3xl mx-auto text-center">
             <span className="inline-block bg-emerald-100 text-emerald-700 text-xs font-bold px-4 py-1.5 rounded-full mb-6 tracking-wide uppercase">
-              Mais de 200 especialistas cadastrados
+              {totalActive > 0 ? `Mais de ${totalActive} especialistas cadastrados` : 'Encontre seu nutricionista ideal'}
             </span>
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
               Encontre o seu{' '}
@@ -51,26 +51,7 @@ export default function LandingPage() {
               Conectamos você a profissionais qualificados. Agende consultas online ou presenciais sem burocracia.
             </p>
 
-            <div className="flex gap-3 max-w-xl mx-auto">
-              <div className="relative flex-1">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (window.location.href = `/resultados?q=${searchQuery}`)}
-                  placeholder="Nome, especialidade ou cidade..."
-                  className="w-full border border-gray-200 rounded-2xl py-4 pl-12 pr-4 text-gray-700 shadow-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all bg-white"
-                />
-              </div>
-              <Link
-                href={`/resultados${searchQuery ? `?q=${encodeURIComponent(searchQuery)}` : ''}`}
-                className="bg-emerald-500 text-white px-6 py-4 rounded-2xl font-bold hover:bg-emerald-600 transition-colors shadow-sm flex items-center gap-2 whitespace-nowrap"
-              >
-                <Search size={18} />
-                <span className="hidden sm:inline">Buscar</span>
-              </Link>
-            </div>
+            <HeroSearch />
 
             <div className="flex flex-wrap gap-2 justify-center mt-6">
               {specialties.map((s) => (
@@ -91,7 +72,7 @@ export default function LandingPage() {
       <section className="border-y border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 md:grid-cols-4 gap-8">
           {[
-            { value: '200+', label: 'Nutricionistas' },
+            { value: `${totalActive}+`, label: 'Nutricionistas' },
             { value: '5.000+', label: 'Pacientes atendidos' },
             { value: '4.9', label: 'Avaliação média' },
             { value: '98%', label: 'Satisfação' },
@@ -139,8 +120,8 @@ export default function LandingPage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {nutritionists.map((n) => (
-              <div key={n.name} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group">
+            {featured.map((n) => (
+              <div key={n.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all group">
                 <div className="flex gap-4 items-start">
                   <div className={`w-14 h-14 ${n.color} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
                     {n.initials}
@@ -151,19 +132,19 @@ export default function LandingPage() {
                     <div className="flex items-center gap-1.5 mt-1.5">
                       <Star size={13} className="text-yellow-400 fill-yellow-400" />
                       <span className="text-xs font-bold text-gray-700">{n.rating}</span>
-                      <span className="text-xs text-gray-400">({n.reviews} aval.)</span>
+                      <span className="text-xs text-gray-400">({n.reviewCount} aval.)</span>
                     </div>
                   </div>
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-50 flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-gray-500">{n.modality}</p>
+                    <p className="text-xs text-gray-500">{n.modalityLabel}</p>
                     <p className="text-base font-bold text-gray-900 mt-0.5">
                       R$ {n.price} <span className="text-xs text-gray-400 font-normal">/consulta</span>
                     </p>
                   </div>
                   <Link
-                    href="/perfil"
+                    href={`/perfil/${n.id}`}
                     className="bg-emerald-500 text-white text-xs font-bold px-5 py-2.5 rounded-full hover:bg-emerald-600 transition-colors"
                   >
                     Ver perfil
