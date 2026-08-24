@@ -22,16 +22,25 @@ interface ProfessionalSummary {
   color: string
 }
 
+interface ProgramSummary {
+  price: number
+  consultationNumber: number
+  total: number
+}
+
 export default function BookingFlow({
   professional,
+  program,
   days,
   initialHorario,
 }: {
   professional: ProfessionalSummary
+  program: ProgramSummary | null
   days: DayOption[]
   initialHorario?: string
 }) {
   const router = useRouter()
+  const displayPrice = program ? program.price : professional.price
 
   const initialSelection = useMemo(() => {
     if (!initialHorario) return { dayIndex: 0, time: null as Date | null }
@@ -52,6 +61,7 @@ export default function BookingFlow({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [chargedPrice, setChargedPrice] = useState<number | null>(null)
 
   const canChooseModality = professional.modality === 'AMBOS'
 
@@ -78,8 +88,11 @@ export default function BookingFlow({
         router.refresh()
         return
       }
+      setChargedPrice(typeof data.price === 'number' ? data.price : null)
       setConfirmed(true)
-      setTimeout(() => router.push('/patient/dashboard'), 2000)
+      setTimeout(() => router.push('/patient/dashboard'), 3000)
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -96,6 +109,19 @@ export default function BookingFlow({
           <p className="text-gray-500">
             {formatDateBR(selectedTime)} às {formatTimeBR(selectedTime)} com {professional.name}
           </p>
+          {chargedPrice !== null && (
+            <>
+              <p className="text-gray-900 font-bold mt-2">{formatPrice(chargedPrice)}</p>
+              {/* The program price can stop applying between render and submit (last slot taken,
+                  program expired). Never let that change silently. */}
+              {chargedPrice !== displayPrice && (
+                <p className="text-sm text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-xl px-4 py-2.5 mt-3 max-w-sm mx-auto">
+                  O valor do programa não se aplicou a esta consulta e ela foi agendada pelo valor
+                  avulso.
+                </p>
+              )}
+            </>
+          )}
           <p className="text-sm text-gray-400 mt-4">Redirecionando para seu painel...</p>
         </div>
       </div>
@@ -113,7 +139,17 @@ export default function BookingFlow({
           <div>
             <h3 className="font-bold text-gray-900">{professional.name}</h3>
             <p className="text-sm text-gray-500">{professional.specialty}</p>
-            <p className="text-sm font-bold text-emerald-600 mt-0.5">{formatPrice(professional.price)} /consulta</p>
+            <p className="text-sm font-bold text-emerald-600 mt-0.5">
+              {formatPrice(displayPrice)} /consulta
+              {program && (
+                <span className="text-gray-400 font-normal line-through ml-2">{formatPrice(professional.price)}</span>
+              )}
+            </p>
+            {program && (
+              <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-0.5 mt-1.5 inline-block">
+                Consulta {program.consultationNumber} de {program.total} do seu programa
+              </p>
+            )}
           </div>
         </div>
 
@@ -231,7 +267,7 @@ export default function BookingFlow({
               <p className="text-emerald-700">📅 {formatDateBR(selectedTime)} às {formatTimeBR(selectedTime)}</p>
               <p className="text-emerald-700">👩‍⚕️ {professional.name}</p>
               <p className="text-emerald-700">{modality === 'ONLINE' ? '💻 Online' : '🏥 Presencial'}</p>
-              <p className="font-bold text-emerald-900 mt-1">{formatPrice(professional.price)}</p>
+              <p className="font-bold text-emerald-900 mt-1">{formatPrice(displayPrice)}</p>
             </div>
           )}
 

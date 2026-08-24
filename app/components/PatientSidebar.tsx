@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Calendar, User, LogOut } from 'lucide-react'
+import { LayoutDashboard, Calendar, User, LogOut, TrendingUp } from 'lucide-react'
 import { initials } from '@/lib/format'
 
 const navItems = [
   { href: '/patient/dashboard', label: 'Início', icon: LayoutDashboard },
   { href: '/patient/consultas', label: 'Minhas Consultas', icon: Calendar },
+  { href: '/patient/evolucao', label: 'Minha Evolução', icon: TrendingUp },
   { href: '/patient/perfil', label: 'Meu Perfil', icon: User },
 ]
 

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { User, Lock, Bell, CreditCard, Calendar, CheckCircle } from 'lucide-react'
+import { User, Lock, Bell, CreditCard, Calendar, CheckCircle, Plus, X } from 'lucide-react'
+import { SPECIALTY_NAMES } from '@/lib/specialties'
 
 const tabs = [
   { id: 'perfil', label: 'Perfil', icon: User },
@@ -20,21 +21,18 @@ export interface AvailabilityData {
   days: { weekday: number; startTime: string; endTime: string }[]
 }
 
-const SPECIALTIES = [
-  'Nutrição Esportiva',
-  'Nutrição Clínica',
-  'Nutrição Funcional',
-  'Nutrição Infantil',
-  'Nutrição Vegana',
-  'Nutrição Oncológica',
-]
+export interface NotificationPrefs {
+  notifyBooking: boolean
+  notifyCancellation: boolean
+  notifyReviews: boolean
+}
 
 export interface ProfileData {
   name: string
   crn: string
   email: string
   phone: string
-  specialty: string
+  specialties: string[]
   city: string
   price: number
   bio: string
@@ -44,9 +42,11 @@ export interface ProfileData {
 export default function ConfiguracoesClient({
   initialProfile,
   initialAvailability,
+  initialPrefs,
 }: {
   initialProfile: ProfileData
   initialAvailability: AvailabilityData
+  initialPrefs: NotificationPrefs
 }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('perfil')
@@ -57,10 +57,18 @@ export default function ConfiguracoesClient({
   const [name, setName] = useState(initialProfile.name)
   const [crn, setCrn] = useState(initialProfile.crn)
   const [phone, setPhone] = useState(initialProfile.phone)
-  const [specialty, setSpecialty] = useState(initialProfile.specialty)
+  const [specialties, setSpecialties] = useState<string[]>(initialProfile.specialties)
   const [city, setCity] = useState(initialProfile.city)
   const [price, setPrice] = useState(String(initialProfile.price))
   const [bio, setBio] = useState(initialProfile.bio)
+
+  function toggleSpecialty(s: string) {
+    setSpecialties((prev) => {
+      if (prev.includes(s)) return prev.filter((x) => x !== s)
+      if (prev.length >= 3) return prev
+      return [...prev, s]
+    })
+  }
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,7 +78,7 @@ export default function ConfiguracoesClient({
       const res = await fetch('/api/professional/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, crn, phone, specialty, city, price: Number(price), bio }),
+        body: JSON.stringify({ name, crn, phone, specialties, city, price: Number(price), bio }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -89,14 +97,18 @@ export default function ConfiguracoesClient({
 
   const [slotMinutes, setSlotMinutes] = useState(initialAvailability.slotMinutes)
   const [availDays, setAvailDays] = useState(() => {
-    const byWeekday = new Map(initialAvailability.days.map((d) => [d.weekday, d]))
+    const byWeekday = new Map<number, { startTime: string; endTime: string }[]>()
+    for (const d of initialAvailability.days) {
+      const list = byWeekday.get(d.weekday) ?? []
+      list.push({ startTime: d.startTime, endTime: d.endTime })
+      byWeekday.set(d.weekday, list)
+    }
     return Array.from({ length: 7 }, (_, weekday) => {
-      const existing = byWeekday.get(weekday)
+      const blocks = (byWeekday.get(weekday) ?? []).sort((a, b) => (a.startTime < b.startTime ? -1 : 1))
       return {
         weekday,
-        enabled: Boolean(existing),
-        startTime: existing?.startTime ?? '09:00',
-        endTime: existing?.endTime ?? '17:00',
+        enabled: blocks.length > 0,
+        blocks: blocks.length > 0 ? blocks : [{ startTime: '09:00', endTime: '17:00' }],
       }
     })
   })
@@ -108,6 +120,59 @@ export default function ConfiguracoesClient({
     setAvailDays((prev) => prev.map((d) => (d.weekday === weekday ? { ...d, ...patch } : d)))
   }
 
+  function updateBlock(weekday: number, index: number, patch: Partial<{ startTime: string; endTime: string }>) {
+    setAvailDays((prev) =>
+      prev.map((d) =>
+        d.weekday === weekday
+          ? { ...d, blocks: d.blocks.map((b, i) => (i === index ? { ...b, ...patch } : b)) }
+          : d
+      )
+    )
+  }
+
+  function addBlock(weekday: number) {
+    setAvailDays((prev) =>
+      prev.map((d) => {
+        if (d.weekday !== weekday || d.blocks.length >= 4) return d
+        const last = d.blocks[d.blocks.length - 1]
+        const [hh, mm] = last.endTime.split(':').map(Number)
+        const start = `${String(Math.min(hh + 1, 21)).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+        const end = `${String(Math.min(hh + 3, 23)).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+        return { ...d, blocks: [...d.blocks, { startTime: start, endTime: end }] }
+      })
+    )
+  }
+
+  function removeBlock(weekday: number, index: number) {
+    setAvailDays((prev) =>
+      prev.map((d) =>
+        d.weekday === weekday && d.blocks.length > 1
+          ? { ...d, blocks: d.blocks.filter((_, i) => i !== index) }
+          : d
+      )
+    )
+  }
+
+  const [prefs, setPrefs] = useState(initialPrefs)
+  const [prefsError, setPrefsError] = useState<string | null>(null)
+
+  async function togglePref(key: keyof NotificationPrefs) {
+    const next = { ...prefs, [key]: !prefs[key] }
+    setPrefs(next)
+    setPrefsError(null)
+    try {
+      const res = await fetch('/api/notification-preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: next[key] }),
+      })
+      if (!res.ok) throw new Error()
+    } catch {
+      setPrefs(prefs)
+      setPrefsError('Não foi possível salvar a preferência. Tente novamente.')
+    }
+  }
+
   const handleSaveAvailability = async (e: React.FormEvent) => {
     e.preventDefault()
     setAvailError(null)
@@ -117,9 +182,18 @@ export default function ConfiguracoesClient({
       return
     }
     for (const d of enabledDays) {
-      if (d.startTime >= d.endTime) {
-        setAvailError(`${WEEKDAY_LABELS[d.weekday]}: horário de início deve ser antes do término`)
-        return
+      const sorted = [...d.blocks].sort((a, b) => (a.startTime < b.startTime ? -1 : 1))
+      for (const b of sorted) {
+        if (b.startTime >= b.endTime) {
+          setAvailError(`${WEEKDAY_LABELS[d.weekday]}: horário de início deve ser antes do término`)
+          return
+        }
+      }
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i - 1].endTime > sorted[i].startTime) {
+          setAvailError(`${WEEKDAY_LABELS[d.weekday]}: horários sobrepostos`)
+          return
+        }
       }
     }
     setAvailLoading(true)
@@ -129,7 +203,9 @@ export default function ConfiguracoesClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slotMinutes,
-          days: enabledDays.map(({ weekday, startTime, endTime }) => ({ weekday, startTime, endTime })),
+          days: enabledDays.flatMap((d) =>
+            d.blocks.map((b) => ({ weekday: d.weekday, startTime: b.startTime, endTime: b.endTime }))
+          ),
         }),
       })
       const data = await res.json()
@@ -206,13 +282,30 @@ export default function ConfiguracoesClient({
                 <label className="text-xs font-bold text-gray-700 block mb-1.5">Cidade</label>
                 <input value={city} onChange={(e) => setCity(e.target.value)} type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
               </div>
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1.5">Especialidade</label>
-                <select value={specialty} onChange={(e) => setSpecialty(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-white">
-                  {SPECIALTIES.map((s) => (
-                    <option key={s}>{s}</option>
+              <div className="md:col-span-2">
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                  Especialidades <span className="font-normal text-gray-400">(até 3)</span>
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {SPECIALTY_NAMES.map((s) => (
+                    <label
+                      key={s}
+                      className={`flex items-center gap-2 border rounded-xl px-3 py-2.5 text-sm cursor-pointer select-none transition-colors ${
+                        specialties.includes(s)
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium'
+                          : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={specialties.includes(s)}
+                        onChange={() => toggleSpecialty(s)}
+                        className="rounded accent-emerald-500"
+                      />
+                      {s.replace('Nutrição ', '')}
+                    </label>
                   ))}
-                </select>
+                </div>
               </div>
               <div>
                 <label className="text-xs font-bold text-gray-700 block mb-1.5">Valor por consulta (R$)</label>
@@ -272,11 +365,11 @@ export default function ConfiguracoesClient({
               {availDays.map((d) => (
                 <div
                   key={d.weekday}
-                  className={`flex flex-wrap items-center gap-4 p-3 rounded-xl border ${
+                  className={`flex flex-wrap items-start gap-4 p-3 rounded-xl border ${
                     d.enabled ? 'border-emerald-100 bg-emerald-50/40' : 'border-gray-100'
                   }`}
                 >
-                  <label className="flex items-center gap-2.5 w-40 shrink-0 cursor-pointer select-none">
+                  <label className="flex items-center gap-2.5 w-40 shrink-0 cursor-pointer select-none pt-2">
                     <input
                       type="checkbox"
                       checked={d.enabled}
@@ -286,23 +379,46 @@ export default function ConfiguracoesClient({
                     <span className="text-sm font-medium text-gray-900">{WEEKDAY_LABELS[d.weekday]}</span>
                   </label>
                   {d.enabled ? (
-                    <div className="flex items-center gap-2 text-sm">
-                      <input
-                        type="time"
-                        value={d.startTime}
-                        onChange={(e) => updateDay(d.weekday, { startTime: e.target.value })}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                      />
-                      <span className="text-gray-400">até</span>
-                      <input
-                        type="time"
-                        value={d.endTime}
-                        onChange={(e) => updateDay(d.weekday, { endTime: e.target.value })}
-                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
-                      />
+                    <div className="space-y-2">
+                      {d.blocks.map((b, i) => (
+                        <div key={i} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="time"
+                            value={b.startTime}
+                            onChange={(e) => updateBlock(d.weekday, i, { startTime: e.target.value })}
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                          />
+                          <span className="text-gray-400">até</span>
+                          <input
+                            type="time"
+                            value={b.endTime}
+                            onChange={(e) => updateBlock(d.weekday, i, { endTime: e.target.value })}
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                          />
+                          {d.blocks.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeBlock(d.weekday, i)}
+                              aria-label={`Remover horário ${b.startTime}–${b.endTime} de ${WEEKDAY_LABELS[d.weekday]}`}
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {d.blocks.length < 4 && (
+                        <button
+                          type="button"
+                          onClick={() => addBlock(d.weekday)}
+                          className="flex items-center gap-1 text-xs text-emerald-600 font-medium hover:underline"
+                        >
+                          <Plus size={12} /> Adicionar horário
+                        </button>
+                      )}
                     </div>
                   ) : (
-                    <span className="text-xs text-gray-400 italic">Não atende</span>
+                    <span className="text-xs text-gray-400 italic pt-2.5">Não atende</span>
                   )}
                 </div>
               ))}
@@ -336,21 +452,45 @@ export default function ConfiguracoesClient({
       {activeTab === 'notificacoes' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
           <h2 className="text-base font-bold text-gray-900">Preferências de notificação</h2>
-          {[
-            { label: 'Novo agendamento', desc: 'Quando um paciente agenda uma consulta' },
-            { label: 'Cancelamento', desc: 'Quando uma consulta é cancelada' },
-            { label: 'Lembrete 1h antes', desc: 'Aviso antes de cada consulta' },
-            { label: 'Avaliações', desc: 'Quando receber uma nova avaliação' },
-            { label: 'Novidades da plataforma', desc: 'Atualizações e melhorias do NutriMatch' },
-          ].map((item) => (
-            <div key={item.label} className="flex items-center justify-between">
+          <p className="text-xs text-gray-500 -mt-3">Notificações são enviadas para {initialProfile.email}.</p>
+          {prefsError && (
+            <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-2.5">{prefsError}</div>
+          )}
+          {(
+            [
+              { key: 'notifyBooking' as const, label: 'Novo agendamento', desc: 'Quando um paciente agenda uma consulta' },
+              { key: 'notifyCancellation' as const, label: 'Cancelamento', desc: 'Quando uma consulta é cancelada' },
+              { key: 'notifyReviews' as const, label: 'Avaliações', desc: 'Quando receber uma nova avaliação' },
+            ]
+          ).map((item) => (
+            <div key={item.key} className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-900">{item.label}</p>
                 <p className="text-xs text-gray-500 mt-0.5">{item.desc}</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" defaultChecked className="sr-only peer" />
+                <input
+                  type="checkbox"
+                  checked={prefs[item.key]}
+                  onChange={() => togglePref(item.key)}
+                  className="sr-only peer"
+                />
                 <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 peer-focus:ring-2 peer-focus:ring-emerald-300 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-4" />
+              </label>
+            </div>
+          ))}
+          {[
+            { label: 'Lembrete 1h antes', desc: 'Aviso antes de cada consulta' },
+            { label: 'Novidades da plataforma', desc: 'Atualizações e melhorias do NutriMatch' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between opacity-50">
+              <div>
+                <p className="text-sm font-medium text-gray-900">{item.label}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{item.desc} — Em breve.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-not-allowed">
+                <input type="checkbox" disabled className="sr-only peer" />
+                <div className="w-10 h-6 bg-gray-200 rounded-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5" />
               </label>
             </div>
           ))}
@@ -359,24 +499,21 @@ export default function ConfiguracoesClient({
 
       {activeTab === 'pagamentos' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-base font-bold text-gray-900 mb-5">Métodos de recebimento</h2>
+          <h2 className="text-base font-bold text-gray-900 mb-2">Métodos de recebimento</h2>
+          <p className="text-sm text-gray-500 mb-4">
+            O pagamento das consultas ainda é combinado diretamente entre você e o paciente.
+          </p>
           <div className="space-y-3">
-            {[
-              { type: 'PIX', detail: '***. 456.789-00', active: true },
-              { type: 'Conta bancária', detail: 'Itaú · Ag 1234 · CC 56789-0', active: true },
-            ].map((m) => (
-              <div key={m.type} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{m.type}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{m.detail}</p>
-                </div>
-                <span className="text-xs font-medium bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-full">Ativo</span>
+            {['PIX', 'Conta bancária'].map((type) => (
+              <div key={type} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl opacity-50">
+                <p className="text-sm font-medium text-gray-900">{type}</p>
+                <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">Em breve</span>
               </div>
             ))}
-            <button className="w-full py-3 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-emerald-300 hover:text-emerald-600 transition-colors font-medium">
-              + Adicionar método
-            </button>
           </div>
+          <p className="text-xs text-gray-400 mt-4">
+            Recebimento pela plataforma está em desenvolvimento.
+          </p>
         </div>
       )}
     </div>

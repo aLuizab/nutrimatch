@@ -9,6 +9,12 @@ const profileSchema = z.object({
   birthDate: z.string().trim().optional(),
   goal: z.string().trim().optional(),
   city: z.string().trim().optional(),
+  // '' must become undefined before coercion — Number('') is 0, which would silently set a
+  // 0 kg target and draw the chart's goal line at zero.
+  targetWeightKg: z.preprocess(
+    (v) => (v === '' || v === null ? undefined : v),
+    z.coerce.number().min(20, 'Meta fora do intervalo').max(400, 'Meta fora do intervalo').optional()
+  ),
 })
 
 export async function PATCH(request: Request) {
@@ -35,6 +41,7 @@ export async function PATCH(request: Request) {
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         goal: data.goal || null,
         city: data.city || null,
+        targetWeightKg: data.targetWeightKg ?? null,
       },
     }),
   ])

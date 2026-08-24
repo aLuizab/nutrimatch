@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/password'
 import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, signSessionToken } from '@/lib/jwt'
+import { SPECIALTY_NAMES } from '@/lib/specialties'
 
 const baseFields = {
   name: z.string().trim().min(2, 'Nome é obrigatório'),
@@ -23,7 +24,11 @@ const professionalSchema = z.object({
   role: z.literal('PROFESSIONAL'),
   ...baseFields,
   crn: z.string().trim().min(3, 'CRN é obrigatório'),
-  specialty: z.string().trim().min(2, 'Especialidade é obrigatória'),
+  specialties: z
+    .array(z.enum(SPECIALTY_NAMES))
+    .min(1, 'Selecione ao menos uma especialidade')
+    .max(3, 'Máximo de 3 especialidades')
+    .transform((arr) => [...new Set(arr)]),
   city: z.string().trim().min(2, 'Cidade é obrigatória'),
   price: z.coerce.number().int().min(1, 'Valor inválido'),
   modality: z.enum(['ONLINE', 'PRESENCIAL', 'AMBOS']),
@@ -79,7 +84,7 @@ export async function POST(request: Request) {
             professional: {
               create: {
                 crn: data.crn,
-                specialty: data.specialty,
+                specialties: data.specialties,
                 bio: '',
                 city: data.city,
                 modality: data.modality,

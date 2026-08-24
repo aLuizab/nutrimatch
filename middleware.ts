@@ -12,6 +12,7 @@ const ROLE_PREFIXES: { prefix: string; role: Role }[] = [
   { prefix: '/dashboard', role: 'PROFESSIONAL' },
   { prefix: '/agenda', role: 'PROFESSIONAL' },
   { prefix: '/pacientes', role: 'PROFESSIONAL' },
+  { prefix: '/programas', role: 'PROFESSIONAL' },
   { prefix: '/configuracoes', role: 'PROFESSIONAL' },
 ]
 
@@ -46,6 +47,7 @@ export const config = {
     '/dashboard/:path*',
     '/agenda/:path*',
     '/pacientes/:path*',
+    '/programas/:path*',
     '/configuracoes/:path*',
   ],
 }

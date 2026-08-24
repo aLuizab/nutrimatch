@@ -3,6 +3,8 @@ import PatientConsultasClient, { type ConsultaRow } from './PatientConsultasClie
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
+import { specialtyLabel } from '@/lib/specialties'
+import DashboardShell from '../../components/DashboardShell'
 
 export default async function MinhasConsultas() {
   const user = await requireRoleOrRedirect('PATIENT')
@@ -10,16 +12,21 @@ export default async function MinhasConsultas() {
   const patientId = user.patient.id
   const now = new Date()
 
+  const include = {
+    professional: { include: { user: { select: { name: true } } } },
+    review: { select: { rating: true } },
+  } as const
+
   const [upcomingRows, pastRows] = await Promise.all([
     prisma.appointment.findMany({
       where: { patientId, status: 'CONFIRMED', scheduledAt: { gt: now } },
       orderBy: { scheduledAt: 'asc' },
-      include: { professional: { include: { user: { select: { name: true } } } } },
+      include,
     }),
     prisma.appointment.findMany({
       where: { patientId, OR: [{ scheduledAt: { lte: now } }, { status: 'CANCELLED' }] },
       orderBy: { scheduledAt: 'desc' },
-      include: { professional: { include: { user: { select: { name: true } } } } },
+      include,
     }),
   ])
 
@@ -27,28 +34,27 @@ export default async function MinhasConsultas() {
     id: a.id,
     professionalId: a.professionalId,
     professionalName: a.professional.user.name,
-    specialty: a.professional.specialty,
+    specialty: specialtyLabel(a.professional.specialties),
     dateLabel: formatDateBR(a.scheduledAt),
     timeLabel: formatTimeBR(a.scheduledAt),
     modality: a.modality,
     reason: a.reason,
     status: a.status,
+    summary: a.summary,
+    myRating: a.review?.rating ?? null,
+    canReview: a.status === 'CONFIRMED' && a.scheduledAt <= now && !a.review,
   })
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
-      <PatientSidebar name={user.name} />
+    <DashboardShell sidebar={<PatientSidebar name={user.name} />}>
+      <div className="bg-white border-b border-gray-100 px-8 py-5">
+        <h1 className="text-xl font-bold text-gray-900">Minhas Consultas</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Gerencie seus agendamentos e histórico</p>
+      </div>
 
-      <main className="flex-1 overflow-auto">
-        <div className="bg-white border-b border-gray-100 px-8 py-5">
-          <h1 className="text-xl font-bold text-gray-900">Minhas Consultas</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie seus agendamentos e histórico</p>
-        </div>
-
-        <div className="p-8">
-          <PatientConsultasClient upcoming={upcomingRows.map(toRow)} past={pastRows.map(toRow)} />
-        </div>
-      </main>
-    </div>
+      <div className="p-8">
+        <PatientConsultasClient upcoming={upcomingRows.map(toRow)} past={pastRows.map(toRow)} />
+      </div>
+    </DashboardShell>
   )
 }

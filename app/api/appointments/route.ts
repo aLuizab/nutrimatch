@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
 import { isSlotAvailable } from '@/lib/availability'
+import { notifyBookingConfirmed } from '@/lib/notifications'
+import { lockAndResolveEnrollment } from '@/lib/enrollments'
 
 const bookingSchema = z.object({
   professionalId: z.string().min(1),
@@ -29,7 +31,10 @@ export async function POST(request: Request) {
   const { professionalId, scheduledAt, modality, phone, reason } = parsed.data
   const scheduledAtDate = new Date(scheduledAt)
 
-  const professional = await prisma.professional.findUnique({ where: { id: professionalId } })
+  const professional = await prisma.professional.findUnique({
+    where: { id: professionalId },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  })
   if (!professional || professional.status !== 'ACTIVE') {
     return NextResponse.json({ error: 'Profissional indisponível' }, { status: 404 })
   }
@@ -46,21 +51,52 @@ export async function POST(request: Request) {
   }
 
   try {
-    // price is snapshotted from the professional's current price — later price edits by the
-    // professional must not retroactively change already-booked appointments.
-    const appointment = await prisma.appointment.create({
-      data: {
-        professionalId,
-        patientId: user.patient!.id,
-        scheduledAt: scheduledAtDate,
-        modality,
-        price: professional.price,
-        phone: phone || null,
-        reason: reason || null,
-        status: 'CONFIRMED',
-      },
+    // Enrollment resolution + the slot insert happen in one transaction: the row lock taken
+    // on a candidate enrollment (if any — see lib/enrollments.ts) serializes concurrent
+    // bookings against the same program, and the unique index on (professionalId, slotHeldAt)
+    // is the final guard against two people winning the same time slot. Stripe is never
+    // called inside this transaction — an external network call while holding a row lock is
+    // how a lock ends up held for minutes instead of milliseconds.
+    const appointment = await prisma.$transaction(async (tx) => {
+      const active = await lockAndResolveEnrollment(tx, user.patient!.id, professionalId, scheduledAtDate)
+      // price is snapshotted at booking time — later price edits by the professional, or the
+      // program ending, must not retroactively change already-booked appointments.
+      const price = active ? active.enrollment.pricePerConsultation : professional.price
+
+      return tx.appointment.create({
+        data: {
+          professionalId,
+          patientId: user.patient!.id,
+          scheduledAt: scheduledAtDate,
+          slotHeldAt: scheduledAtDate,
+          modality,
+          price,
+          phone: phone || null,
+          reason: reason || null,
+          status: 'CONFIRMED',
+          enrollmentId: active?.enrollment.id ?? null,
+        },
+      })
     })
-    return NextResponse.json({ id: appointment.id })
+
+    notifyBookingConfirmed({
+      scheduledAt: scheduledAtDate,
+      modality,
+      price: appointment.price,
+      patientName: user.name,
+      patientEmail: user.email,
+      professionalName: professional.user.name,
+      professionalEmail: professional.user.email,
+      professionalUserId: professional.user.id,
+    })
+
+    // price is echoed back so the confirmation screen can show what was actually charged —
+    // the program price can stop applying between page render and submit.
+    return NextResponse.json({
+      id: appointment.id,
+      price: appointment.price,
+      enrollmentApplied: appointment.enrollmentId != null,
+    })
   } catch (e: unknown) {
     if (typeof e === 'object' && e !== null && 'code' in e && e.code === 'P2002') {
       return NextResponse.json({ error: 'Esse horário acabou de ser reservado. Escolha outro.' }, { status: 409 })

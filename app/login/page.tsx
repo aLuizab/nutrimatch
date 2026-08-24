@@ -1,12 +1,16 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { Suspense, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, Eye, EyeOff } from 'lucide-react'
 
-export default function Login() {
+function LoginForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  // Only same-origin paths — never redirect to an attacker-supplied absolute URL.
+  const nextParam = searchParams.get('next')
+  const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : null
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -28,8 +32,10 @@ export default function Login() {
         setError(data.error ?? 'Não foi possível entrar')
         return
       }
-      router.push(data.redirectTo)
+      router.push(safeNext ?? data.redirectTo)
       router.refresh()
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -128,5 +134,14 @@ export default function Login() {
         </div>
       </div>
     </div>
+  )
+}
+
+// useSearchParams needs a Suspense boundary or the build fails.
+export default function Login() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-50" />}>
+      <LoginForm />
+    </Suspense>
   )
 }

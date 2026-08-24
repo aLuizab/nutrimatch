@@ -33,6 +33,26 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Dados inválidos' }, { status: 400 })
   }
   const { slotMinutes, days } = parsed.data
+
+  const WEEKDAY_LABELS = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado']
+  const byWeekday = new Map<number, { startTime: string; endTime: string }[]>()
+  for (const d of days) {
+    const list = byWeekday.get(d.weekday) ?? []
+    list.push({ startTime: d.startTime, endTime: d.endTime })
+    byWeekday.set(d.weekday, list)
+  }
+  for (const [weekday, blocks] of byWeekday) {
+    if (blocks.length > 4) {
+      return NextResponse.json({ error: `Máximo de 4 blocos de horário por dia (${WEEKDAY_LABELS[weekday]})` }, { status: 400 })
+    }
+    const sorted = [...blocks].sort((a, b) => (a.startTime < b.startTime ? -1 : 1))
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i - 1].endTime > sorted[i].startTime) {
+        return NextResponse.json({ error: `Horários sobrepostos na ${WEEKDAY_LABELS[weekday]}` }, { status: 400 })
+      }
+    }
+  }
+
   const professionalId = user.professional!.id
 
   // Simplest correct way to apply a full weekly schedule: replace the set. No other model

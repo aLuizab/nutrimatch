@@ -2,6 +2,7 @@ import ProfessionalSidebar from '../components/ProfessionalSidebar'
 import AgendaGrid from './AgendaGrid'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
+import DashboardShell from '../components/DashboardShell'
 
 export default async function Agenda() {
   const user = await requireRoleOrRedirect('PROFESSIONAL')
@@ -18,15 +19,12 @@ export default async function Agenda() {
     patientName: a.patient.user.name,
     reason: a.reason,
     modality: a.modality,
+    summary: a.summary,
   }))
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
-      <ProfessionalSidebar name={user.name} crn={user.professional.crn} />
-
-      <main className="flex-1 overflow-auto">
-        <AgendaGrid appointments={appointments} />
-      </main>
-    </div>
+    <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
+      <AgendaGrid appointments={appointments} />
+    </DashboardShell>
   )
 }

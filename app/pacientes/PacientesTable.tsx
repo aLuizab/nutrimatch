@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { Search, Video, MapPin } from 'lucide-react'
 import { initials, avatarColor } from '@/lib/format'
 
@@ -73,15 +74,15 @@ export default function PacientesTable({ patients }: { patients: PatientRow[] })
             {filtered.map((p) => (
               <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                 <td className="py-4 px-5">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/pacientes/${p.id}`} className="flex items-center gap-3 group">
                     <div className={`w-9 h-9 ${avatarColor(p.id)} text-white rounded-full flex items-center justify-center text-xs font-bold shrink-0`}>
                       {initials(p.name)}
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{p.name}</p>
+                      <p className="text-sm font-medium text-gray-900 group-hover:text-emerald-600 transition-colors">{p.name}</p>
                       <p className="text-xs text-gray-400">{p.sessions} sessões</p>
                     </div>
-                  </div>
+                  </Link>
                 </td>
                 <td className="py-4 px-4 hidden lg:table-cell">
                   <span className="text-sm text-gray-600">{p.lastVisitLabel ?? '—'}</span>

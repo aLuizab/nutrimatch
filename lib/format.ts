@@ -42,8 +42,11 @@ export function avatarColor(id: string) {
   return AVATAR_COLORS[hash % AVATAR_COLORS.length]
 }
 
+const BRL_WHOLE = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+
+// price is whole reais (Int) everywhere in this app except Payment.amountCents (see lib/money.ts).
 export function formatPrice(price: number) {
-  return `R$ ${price}`
+  return BRL_WHOLE.format(price)
 }
 
 export function formatDateBR(date: Date) {

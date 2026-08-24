@@ -14,6 +14,7 @@ export interface PatientProfileData {
   birthDate: string
   goal: string
   city: string
+  targetWeightKg: string
 }
 
 export default function PatientPerfilForm({ initialProfile }: { initialProfile: PatientProfileData }) {
@@ -23,6 +24,7 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
   const [birthDate, setBirthDate] = useState(initialProfile.birthDate)
   const [goal, setGoal] = useState(initialProfile.goal || GOALS[0])
   const [city, setCity] = useState(initialProfile.city)
+  const [targetWeightKg, setTargetWeightKg] = useState(initialProfile.targetWeightKg)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -35,7 +37,9 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
       const res = await fetch('/api/patient/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, phone, birthDate, goal, city }),
+        // targetWeightKg must be in this body: the route nulls anything absent, so omitting
+        // it here would wipe the patient's goal on every profile save.
+        body: JSON.stringify({ name, phone, birthDate, goal, city, targetWeightKg }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -45,6 +49,8 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
       setSaved(true)
       router.refresh()
       setTimeout(() => setSaved(false), 2500)
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
       setLoading(false)
     }
@@ -91,6 +97,18 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
                 <option key={g}>{g}</option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="text-xs font-bold text-gray-700 block mb-1.5">Peso desejado (kg)</label>
+            <input
+              value={targetWeightKg}
+              onChange={(e) => setTargetWeightKg(e.target.value)}
+              type="number"
+              step="0.1"
+              placeholder="Opcional"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            />
+            <p className="text-xs text-gray-400 mt-1.5">Aparece como meta no seu gráfico de evolução.</p>
           </div>
         </div>
       </div>

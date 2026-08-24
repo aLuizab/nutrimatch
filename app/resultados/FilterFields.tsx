@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { SPECIALTIES as SPECIALTY_DEFS } from '@/lib/specialties'
 
-const SPECIALTIES = ['Todas', 'Esportiva', 'Clínica', 'Funcional', 'Infantil', 'Vegana', 'Oncológica']
+const SPECIALTIES = ['Todas', ...SPECIALTY_DEFS.map((s) => s.short)]
 const MODALITIES = ['Todas', 'Online', 'Presencial']
 const MIN_RATINGS = [
   { value: 0, label: 'Qualquer avaliação' },
@@ -36,18 +37,21 @@ export default function FilterFields({ initial, onNavigate }: { initial: FilterV
   const router = useRouter()
   const pathname = usePathname()
   const [displayPrice, setDisplayPrice] = useState(initial.precoMax)
+  const [isPending, startTransition] = useTransition()
 
   useEffect(() => setDisplayPrice(initial.precoMax), [initial.precoMax])
 
   function navigate(overrides: Partial<FilterValues>) {
     const values: FilterValues = { ...initial, ...overrides }
     const qs = buildQueryString(values)
-    router.push(qs ? `${pathname}?${qs}` : pathname)
+    // Inside a transition the current results stay on screen while the server re-renders,
+    // so filtering never flashes a skeleton.
+    startTransition(() => router.push(qs ? `${pathname}?${qs}` : pathname))
     onNavigate?.()
   }
 
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity ${isPending ? 'opacity-60' : ''}`}>
       <div>
         <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">Especialidade</h3>
         <div className="space-y-0.5">
@@ -100,10 +104,11 @@ export default function FilterFields({ initial, onNavigate }: { initial: FilterV
       </div>
 
       <div>
-        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
+        <label htmlFor="preco-max" className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-3">
           Preço máximo: <span className="text-emerald-600 normal-case font-bold">R$ {displayPrice}</span>
-        </h3>
+        </label>
         <input
+          id="preco-max"
           type="range"
           min={50}
           max={250}

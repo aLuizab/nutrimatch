@@ -5,7 +5,9 @@ import PublicHeader from '../../components/PublicHeader'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { avatarColor, initials } from '@/lib/format'
+import { specialtyLabel } from '@/lib/specialties'
 import { getAvailableSlots } from '@/lib/availability'
+import { resolveActiveEnrollment } from '@/lib/enrollments'
 import BookingFlow from './BookingFlow'
 
 export default async function Agendamento({
@@ -18,7 +20,7 @@ export default async function Agendamento({
   const { id } = await params
   const { horario } = await searchParams
 
-  await requireRoleOrRedirect('PATIENT')
+  const user = await requireRoleOrRedirect('PATIENT')
 
   const professional = await prisma.professional.findUnique({
     where: { id },
@@ -30,6 +32,14 @@ export default async function Agendamento({
   }
 
   const days = await getAvailableSlots(id, 5)
+
+  // Resolved against the first bookable slot via the same helper the booking API uses, so the
+  // price shown here can't drift from the price actually charged.
+  const firstSlot = days[0]?.times[0]
+  const active =
+    user.patient && firstSlot
+      ? await resolveActiveEnrollment(user.patient.id, professional.id, firstSlot)
+      : null
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -47,12 +57,21 @@ export default async function Agendamento({
           professional={{
             id: professional.id,
             name: professional.user.name,
-            specialty: professional.specialty,
+            specialty: specialtyLabel(professional.specialties),
             price: professional.price,
             modality: professional.modality,
             initials: initials(professional.user.name),
             color: avatarColor(professional.id),
           }}
+          program={
+            active
+              ? {
+                  price: active.enrollment.pricePerConsultation,
+                  consultationNumber: active.used + 1,
+                  total: active.enrollment.consultations,
+                }
+              : null
+          }
           days={days}
           initialHorario={horario}
         />

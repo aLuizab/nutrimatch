@@ -3,6 +3,7 @@ import ConfiguracoesClient from './ConfiguracoesClient'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { initials } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
+import DashboardShell from '../components/DashboardShell'
 
 export default async function Configuracoes() {
   const user = await requireRoleOrRedirect('PROFESSIONAL')
@@ -13,7 +14,7 @@ export default async function Configuracoes() {
     crn: user.professional.crn,
     email: user.email,
     phone: user.phone ?? '',
-    specialty: user.professional.specialty,
+    specialties: user.professional.specialties,
     city: user.professional.city,
     price: user.professional.price,
     bio: user.professional.bio,
@@ -27,22 +28,26 @@ export default async function Configuracoes() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50 font-sans">
-      <ProfessionalSidebar name={user.name} crn={user.professional.crn} />
+    <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
+      <div className="bg-white border-b border-gray-100 px-8 py-5">
+        <h1 className="text-xl font-bold text-gray-900">Configurações</h1>
+        <p className="text-sm text-gray-500 mt-0.5">Gerencie seu perfil e preferências</p>
+        {user.professional.status === 'PENDING' && (
+          <p className="text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-lg px-3 py-2 mt-3 inline-block">
+            Seu perfil está em análise e ainda não aparece nas buscas.
+          </p>
+        )}
+      </div>
 
-      <main className="flex-1 overflow-auto">
-        <div className="bg-white border-b border-gray-100 px-8 py-5">
-          <h1 className="text-xl font-bold text-gray-900">Configurações</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie seu perfil e preferências</p>
-          {user.professional.status === 'PENDING' && (
-            <p className="text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-lg px-3 py-2 mt-3 inline-block">
-              Seu perfil está em análise e ainda não aparece nas buscas.
-            </p>
-          )}
-        </div>
-
-        <ConfiguracoesClient initialProfile={profile} initialAvailability={availability} />
-      </main>
-    </div>
+      <ConfiguracoesClient
+        initialProfile={profile}
+        initialAvailability={availability}
+        initialPrefs={{
+          notifyBooking: user.notifyBooking,
+          notifyCancellation: user.notifyCancellation,
+          notifyReviews: user.notifyReviews,
+        }}
+      />
+    </DashboardShell>
   )
 }

@@ -31,6 +31,13 @@ enum AppointmentStatus {
   CANCELLED
 }
 
+// No COMPLETED member: completion is derivable (consultas usadas >= incluídas, or past endsAt),
+// and an enum value no code path can produce is dead weight.
+enum EnrollmentStatus {
+  ACTIVE
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -39,6 +46,12 @@ model User {
   phone        String?
   role         Role
   createdAt    DateTime @default(now())
+
+  // E-mail notification preferences. Currently only honored for PROFESSIONAL recipients —
+  // patient-facing e-mails (booking/cancel confirmations) are transactional and always sent.
+  notifyBooking      Boolean @default(true)
+  notifyCancellation Boolean @default(true)
+  notifyReviews      Boolean @default(true)
 
   professional Professional?
   patient      Patient?
@@ -49,7 +62,7 @@ model Professional {
   userId      String             @unique
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   crn         String
-  specialty   String
+  specialties String[]
   bio         String
   city        String
   modality    Modality
@@ -62,21 +75,26 @@ model Professional {
   availabilityRules AvailabilityRule[]
   appointments      Appointment[]
   reviews           Review[]
+  carePlans         CarePlan[]
+  enrollments       Enrollment[]
 
   @@index([status])
 }
 
 model Patient {
-  id        String    @id @default(cuid())
-  userId    String    @unique
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  birthDate DateTime?
-  goal      String?
-  city      String?
-  createdAt DateTime  @default(now())
+  id             String    @id @default(cuid())
+  userId         String    @unique
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birthDate      DateTime?
+  goal           String?
+  city           String?
+  targetWeightKg Float?
+  createdAt      DateTime  @default(now())
 
-  appointments Appointment[]
-  reviews      Review[]
+  appointments   Appointment[]
+  reviews        Review[]
+  enrollments    Enrollment[]
+  progressEntries ProgressEntry[]
 }
 
 model AvailabilityRule {
@@ -98,18 +116,93 @@ model Appointment {
   patientId      String
   patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
   scheduledAt    DateTime
+  // Mirrors scheduledAt while this row occupies the slot (CONFIRMED); set back to null once it
+  // doesn't (CANCELLED). Postgres treats NULLs as distinct within a unique index, so a
+  // cancelled appointment's slot becomes bookable again — the unique constraint lives on this
+  // column, never on scheduledAt itself, which stays untouched for history.
+  slotHeldAt     DateTime?
   modality       Modality
   price          Int
   status         AppointmentStatus @default(CONFIRMED)
   reason         String?
   phone          String?
+  // Post-consultation notes written by the professional, visible to the patient.
+  summary        String?
+  // Set when the consultation was booked inside a care program. SetNull (not Cascade) —
+  // deleting an enrollment must never destroy consultation history.
+  enrollmentId   String?
+  enrollment     Enrollment?       @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
   createdAt      DateTime          @default(now())
 
   review Review?
 
-  @@unique([professionalId, scheduledAt])
+  @@unique([professionalId, slotHeldAt])
   @@index([patientId])
   @@index([professionalId])
+  @@index([enrollmentId])
+}
+
+// A care program offered by a professional: N consultations over M months at a per-consultation
+// price below their one-off price. The platform does not process payment — this records the
+// agreed terms, the money is still arranged directly between patient and professional.
+model CarePlan {
+  id                   String       @id @default(cuid())
+  professionalId       String
+  professional         Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  name                 String
+  description          String
+  durationMonths       Int
+  consultations        Int
+  pricePerConsultation Int
+  active               Boolean      @default(true)
+  createdAt            DateTime     @default(now())
+
+  enrollments Enrollment[]
+
+  @@index([professionalId, active])
+}
+
+model Enrollment {
+  id             String           @id @default(cuid())
+  carePlanId     String
+  carePlan       CarePlan         @relation(fields: [carePlanId], references: [id], onDelete: Cascade)
+  patientId      String
+  patient        Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  professionalId String
+  professional   Professional     @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  status         EnrollmentStatus @default(ACTIVE)
+
+  // Snapshots taken at enrollment: editing the plan later must not change anyone already on it,
+  // and listPriceAtEnrollment keeps the "programa vs avulso" comparison stable even if the
+  // professional edits their one-off price afterwards.
+  pricePerConsultation  Int
+  consultations         Int
+  listPriceAtEnrollment Int
+
+  startedAt DateTime @default(now())
+  endsAt    DateTime
+  createdAt DateTime @default(now())
+
+  appointments Appointment[]
+
+  @@index([patientId])
+  @@index([professionalId])
+}
+
+// Patient-recorded measurements. Sensitive health data under LGPD — see the notice on the
+// progress form about visibility to professionals the patient has consultations with.
+model ProgressEntry {
+  id         String   @id @default(cuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  recordedAt DateTime
+  weightKg   Float?
+  waistCm    Float?
+  note       String?
+  createdAt  DateTime @default(now())
+
+  @@unique([patientId, recordedAt])
+  @@index([patientId, recordedAt])
 }
 
 model Review {

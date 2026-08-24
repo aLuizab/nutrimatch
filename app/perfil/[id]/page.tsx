@@ -5,22 +5,28 @@ import PublicHeader from '../../components/PublicHeader'
 import { prisma } from '@/lib/prisma'
 import { avatarColor, formatDateBR, formatPrice, formatTimeBR, initials, modalityLabel, relativeTimeBR } from '@/lib/format'
 import { getAvailableSlots } from '@/lib/availability'
+import { getCurrentUser } from '@/lib/session'
+import EnrollButton from './EnrollButton'
 
 export default async function PerfilProfissional({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
 
-  const professional = await prisma.professional.findUnique({
-    where: { id },
-    include: {
-      user: { select: { name: true } },
-      reviews: {
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-        include: { patient: { include: { user: { select: { name: true } } } } },
+  const [professional, viewer] = await Promise.all([
+    prisma.professional.findUnique({
+      where: { id },
+      include: {
+        user: { select: { name: true } },
+        reviews: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+          include: { patient: { include: { user: { select: { name: true } } } } },
+        },
+        availabilityRules: true,
+        carePlans: { where: { active: true }, orderBy: { pricePerConsultation: 'asc' }, take: 4 },
       },
-      availabilityRules: true,
-    },
-  })
+    }),
+    getCurrentUser(),
+  ])
 
   // Guard repeated here (not just in search) so a suspended professional's page/booking
   // flow isn't reachable by anyone who has or guesses the URL.
@@ -32,6 +38,14 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
   const slotMinutes = professional.availabilityRules[0]?.slotMinutes ?? 50
   const name = professional.user.name
   const color = avatarColor(professional.id)
+
+  const isLoggedInPatient = viewer?.role === 'PATIENT'
+  const existingEnrollment = viewer?.patient
+    ? await prisma.enrollment.findFirst({
+        where: { patientId: viewer.patient.id, professionalId: professional.id, status: 'ACTIVE' },
+        select: { carePlanId: true },
+      })
+    : null
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -63,11 +77,17 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                 <p className="text-gray-500 mt-1">{professional.crn} · Nutricionista</p>
 
                 <div className="flex flex-wrap items-center gap-4 mt-3">
-                  <div className="flex items-center gap-1.5">
-                    <Star size={16} className="text-yellow-400 fill-yellow-400" />
-                    <span className="font-bold text-gray-900">{professional.rating.toFixed(1)}</span>
-                    <span className="text-sm text-gray-500">{professional.reviewCount} avaliações</span>
-                  </div>
+                  {professional.reviewCount === 0 ? (
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full">
+                      Novo na plataforma
+                    </span>
+                  ) : (
+                    <div className="flex items-center gap-1.5">
+                      <Star size={16} className="text-yellow-400 fill-yellow-400" />
+                      <span className="font-bold text-gray-900">{professional.rating.toFixed(1)}</span>
+                      <span className="text-sm text-gray-500">{professional.reviewCount} avaliações</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1.5 text-sm text-gray-500">
                     <MapPin size={14} /> {professional.city}
                   </div>
@@ -77,9 +97,11 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-4">
-                  <span className="bg-emerald-50 text-emerald-700 text-xs font-medium px-3 py-1 rounded-full border border-emerald-100">
-                    {professional.specialty}
-                  </span>
+                  {professional.specialties.map((s) => (
+                    <span key={s} className="bg-emerald-50 text-emerald-700 text-xs font-medium px-3 py-1 rounded-full border border-emerald-100">
+                      {s}
+                    </span>
+                  ))}
                 </div>
               </div>
             </div>
@@ -91,14 +113,69 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
               </div>
             )}
 
+            {professional.carePlans.length > 0 && (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <h2 className="text-base font-bold text-gray-900 mb-1">Programas de acompanhamento</h2>
+                <p className="text-sm text-gray-500 mb-5">
+                  Consultas com valor menor que o avulso e acompanhamento da sua evolução entre elas.
+                </p>
+                <div className="space-y-3">
+                  {professional.carePlans.map((plan) => (
+                    <div key={plan.id} className="border border-gray-100 rounded-xl p-4">
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-bold text-gray-900">{plan.name}</h3>
+                          {plan.description && (
+                            <p className="text-sm text-gray-500 mt-1 leading-relaxed">{plan.description}</p>
+                          )}
+                          <div className="flex items-baseline gap-2 mt-3 flex-wrap">
+                            <span className="text-xl font-bold text-emerald-600">
+                              {formatPrice(plan.pricePerConsultation)}
+                            </span>
+                            <span className="text-sm text-gray-500">por consulta</span>
+                            {/* Comparison of two prices the platform actually published — not a
+                                claim about money, which never passes through the platform. */}
+                            {plan.pricePerConsultation < professional.price && (
+                              <span className="text-sm text-gray-400 line-through">
+                                {formatPrice(professional.price)}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1.5">
+                            {plan.consultations} consultas em {plan.durationMonths}{' '}
+                            {plan.durationMonths === 1 ? 'mês' : 'meses'}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          <EnrollButton
+                            carePlanId={plan.id}
+                            planName={plan.name}
+                            profileHref={`/perfil/${professional.id}`}
+                            isLoggedInPatient={isLoggedInPatient}
+                            alreadyEnrolled={existingEnrollment != null}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-4">
+                  O pagamento das consultas é combinado diretamente com o profissional. A NutriMatch
+                  não processa pagamentos.
+                </p>
+              </div>
+            )}
+
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-base font-bold text-gray-900">Avaliações dos pacientes</h2>
-                <div className="flex items-center gap-2">
-                  <Star size={18} className="text-yellow-400 fill-yellow-400" />
-                  <span className="font-bold text-gray-900 text-lg">{professional.rating.toFixed(1)}</span>
-                  <span className="text-sm text-gray-500">· {professional.reviewCount} avaliações</span>
-                </div>
+                {professional.reviewCount > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Star size={18} className="text-yellow-400 fill-yellow-400" />
+                    <span className="font-bold text-gray-900 text-lg">{professional.rating.toFixed(1)}</span>
+                    <span className="text-sm text-gray-500">· {professional.reviewCount} avaliações</span>
+                  </div>
+                )}
               </div>
               {professional.reviews.length === 0 ? (
                 <p className="text-sm text-gray-400">Ainda não há avaliações públicas.</p>

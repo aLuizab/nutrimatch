@@ -2,13 +2,14 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Calendar, Users, Settings, LogOut } from 'lucide-react'
+import { LayoutDashboard, Calendar, Users, Settings, LogOut, Repeat } from 'lucide-react'
 import { initials } from '@/lib/format'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/pacientes', label: 'Pacientes', icon: Users },
+  { href: '/programas', label: 'Programas', icon: Repeat },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
@@ -48,7 +49,8 @@ export default function ProfessionalSidebar({ name = 'Dra. Carolina Matos', crn 
             key={href}
             href={href}
             className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-              pathname === href
+              // startsWith so detail routes like /pacientes/[id] keep the parent item active
+              pathname === href || pathname.startsWith(`${href}/`)
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             }`}

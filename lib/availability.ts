@@ -18,8 +18,9 @@ export async function getAvailableSlots(professionalId: string, daysWanted = 5):
   const existing = await prisma.appointment.findMany({
     where: {
       professionalId,
-      status: 'CONFIRMED',
-      scheduledAt: { gte: now, lte: searchWindowEnd },
+      // slotHeldAt (not status) is the source of truth for "is this time taken" — it's null
+      // the moment a booking is cancelled, freeing the slot immediately.
+      slotHeldAt: { not: null, gte: now, lte: searchWindowEnd },
     },
     select: { scheduledAt: true },
   })
@@ -32,16 +33,22 @@ export async function getAvailableSlots(professionalId: string, daysWanted = 5):
     if (dayRules.length === 0) continue
 
     const times: Date[] = []
+    const seen = new Set<number>()
     for (const rule of dayRules) {
       const end = instantAt(dateStr, rule.endTime)
+      const step = rule.slotMinutes * 60 * 1000
       let cursor = instantAt(dateStr, rule.startTime)
-      while (cursor.getTime() < end.getTime()) {
-        if (cursor.getTime() > now.getTime() && !bookedTimes.has(cursor.getTime())) {
+      // The whole slot must fit inside the block — a slot that merely *starts* before the
+      // block ends would spill into the next block and allow overlapping bookings.
+      while (cursor.getTime() + step <= end.getTime()) {
+        if (cursor.getTime() > now.getTime() && !bookedTimes.has(cursor.getTime()) && !seen.has(cursor.getTime())) {
+          seen.add(cursor.getTime())
           times.push(new Date(cursor))
         }
-        cursor = new Date(cursor.getTime() + rule.slotMinutes * 60 * 1000)
+        cursor = new Date(cursor.getTime() + step)
       }
     }
+    times.sort((a, b) => a.getTime() - b.getTime())
     if (times.length > 0) {
       result.push({ dateStr, date: instantAt(dateStr, '00:00'), times })
     }

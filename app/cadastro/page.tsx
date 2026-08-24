@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, User, Stethoscope, Check } from 'lucide-react'
+import { SPECIALTY_NAMES } from '@/lib/specialties'
 
 type Role = 'PATIENT' | 'PROFESSIONAL'
 
@@ -23,8 +24,16 @@ export default function Cadastro() {
   const [patientCity, setPatientCity] = useState('')
 
   const [crn, setCrn] = useState('')
-  const [specialty, setSpecialty] = useState('Nutrição Esportiva')
+  const [specialties, setSpecialties] = useState<string[]>(['Nutrição Esportiva'])
   const [price, setPrice] = useState('150')
+
+  function toggleSpecialty(name: string) {
+    setSpecialties((prev) => {
+      if (prev.includes(name)) return prev.filter((s) => s !== name)
+      if (prev.length >= 3) return prev
+      return [...prev, name]
+    })
+  }
   const [modality, setModality] = useState<'AMBOS' | 'ONLINE' | 'PRESENCIAL'>('AMBOS')
   const [professionalCity, setProfessionalCity] = useState('')
 
@@ -41,7 +50,7 @@ export default function Cadastro() {
       const body =
         role === 'PATIENT'
           ? { role, name, email, password, birthDate: birthDate || undefined, goal, city: patientCity }
-          : { role, name, email, password, crn, specialty, city: professionalCity, price: Number(price), modality }
+          : { role, name, email, password, crn, specialties, city: professionalCity, price: Number(price), modality }
 
       const res = await fetch('/api/register', {
         method: 'POST',
@@ -200,19 +209,32 @@ export default function Cadastro() {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-bold text-gray-700 block mb-1.5">Especialidade principal</label>
-                    <select
-                      value={specialty}
-                      onChange={(e) => setSpecialty(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-white"
-                    >
-                      <option>Nutrição Esportiva</option>
-                      <option>Nutrição Clínica</option>
-                      <option>Nutrição Funcional</option>
-                      <option>Nutrição Infantil</option>
-                      <option>Nutrição Vegana</option>
-                      <option>Nutrição Oncológica</option>
-                    </select>
+                    <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                      Especialidades <span className="font-normal text-gray-400">(até 3)</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {SPECIALTY_NAMES.map((s) => (
+                        <label
+                          key={s}
+                          className={`flex items-center gap-2 border rounded-xl px-3 py-2.5 text-sm cursor-pointer select-none transition-colors ${
+                            specialties.includes(s)
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700 font-medium'
+                              : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={specialties.includes(s)}
+                            onChange={() => toggleSpecialty(s)}
+                            className="rounded accent-emerald-500"
+                          />
+                          {s.replace('Nutrição ', '')}
+                        </label>
+                      ))}
+                    </div>
+                    {specialties.length === 0 && (
+                      <p className="text-xs text-red-500 mt-1.5">Selecione ao menos uma especialidade</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1.5">Cidade</label>

@@ -33,6 +33,16 @@ export function addDaysToDateString(dateStr: string, days: number) {
   return dt.toISOString().slice(0, 10)
 }
 
+// Clamps to the last valid day of the target month: adding 1 month to 31/01 gives 28/02, not
+// 03/03 the way Date.setMonth would.
+export function addMonthsToDateString(dateStr: string, months: number) {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const target = new Date(Date.UTC(y, m - 1 + months, 1))
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate()
+  target.setUTCDate(Math.min(d, lastDay))
+  return target.toISOString().slice(0, 10)
+}
+
 export function weekdayOf(dateStr: string) {
   const [y, m, d] = dateStr.split('-').map(Number)
   return new Date(Date.UTC(y, m - 1, d)).getUTCDay()

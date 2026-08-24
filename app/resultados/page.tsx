@@ -1,9 +1,11 @@
 import Link from 'next/link'
-import { Star, MapPin, Video, Users } from 'lucide-react'
+import { MapPin, Video, Users } from 'lucide-react'
+import RatingStat from '../components/RatingStat'
 import type { Prisma } from '@prisma/client'
 import PublicHeader from '../components/PublicHeader'
 import { prisma } from '@/lib/prisma'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
+import { matchSpecialties } from '@/lib/specialties'
 import FilterFields, { type FilterValues } from './FilterFields'
 import MobileFilterDrawer from './MobileFilterDrawer'
 import SearchBar from './SearchBar'
@@ -45,19 +47,24 @@ export default async function Resultados({
     filters.precoMax !== 250,
   ].filter(Boolean).length
 
+  // Scalar-list filters are exact-match only, so free text and short chip labels are
+  // resolved to canonical long names before they reach the query.
+  const especialidadeMatches = filters.especialidade !== 'Todas' ? matchSpecialties(filters.especialidade) : []
+  const qSpecialtyMatches = filters.q ? matchSpecialties(filters.q) : []
+
   const where: Prisma.ProfessionalWhereInput = {
     status: 'ACTIVE',
     price: { lte: filters.precoMax },
     rating: { gte: filters.avaliacaoMin },
-    ...(filters.especialidade !== 'Todas' ? { specialty: { contains: filters.especialidade } } : {}),
+    ...(filters.especialidade !== 'Todas' ? { specialties: { hasSome: especialidadeMatches } } : {}),
     ...(filters.modalidade === 'Online' ? { modality: { in: ['ONLINE', 'AMBOS'] } } : {}),
     ...(filters.modalidade === 'Presencial' ? { modality: { in: ['PRESENCIAL', 'AMBOS'] } } : {}),
     ...(filters.q
       ? {
           OR: [
-            { user: { name: { contains: filters.q } } },
-            { specialty: { contains: filters.q } },
-            { city: { contains: filters.q } },
+            { user: { name: { contains: filters.q, mode: 'insensitive' } } },
+            { city: { contains: filters.q, mode: 'insensitive' } },
+            ...(qSpecialtyMatches.length > 0 ? [{ specialties: { hasSome: qSpecialtyMatches } }] : []),
           ],
         }
       : {}),
@@ -131,13 +138,9 @@ export default async function Resultados({
                       <div className="flex items-start justify-between gap-4 flex-wrap">
                         <div>
                           <h3 className="font-bold text-gray-900">{n.name}</h3>
-                          <p className="text-sm text-gray-500">{n.specialty}</p>
+                          <p className="text-sm text-gray-500">{n.specialtyLabel}</p>
                           <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                            <div className="flex items-center gap-1">
-                              <Star size={13} className="text-yellow-400 fill-yellow-400" />
-                              <span className="text-xs font-bold text-gray-700">{n.rating}</span>
-                              <span className="text-xs text-gray-400">({n.reviewCount})</span>
-                            </div>
+                            <RatingStat rating={n.rating} reviewCount={n.reviewCount} />
                             <div className="flex items-center gap-1 text-xs text-gray-500">
                               <MapPin size={12} /> {n.city}
                             </div>

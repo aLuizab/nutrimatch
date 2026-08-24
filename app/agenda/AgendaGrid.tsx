@@ -1,9 +1,10 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Video, MapPin } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { ChevronLeft, ChevronRight, Video, MapPin, FileText } from 'lucide-react'
 import { addDaysToDateString, mondayOfWeek, spDateString, spHour } from '@/lib/spdate'
-import { initials, avatarColor } from '@/lib/format'
+import { initials, avatarColor, formatDateBR, formatTimeBR } from '@/lib/format'
 import type { Modality } from '@prisma/client'
 
 export interface AgendaAppointment {
@@ -12,11 +13,73 @@ export interface AgendaAppointment {
   patientName: string
   reason: string | null
   modality: Modality
+  summary: string | null
 }
 
-const HOURS = Array.from({ length: 11 }, (_, i) => 8 + i) // 08:00–18:00
+function SummaryEditor({ appointment, onSaved }: { appointment: AgendaAppointment; onSaved: () => void }) {
+  const [text, setText] = useState(appointment.summary ?? '')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  async function save() {
+    setError(null)
+    if (!text.trim()) {
+      setError('O resumo não pode ficar vazio')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/appointments/${appointment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ summary: text.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Não foi possível salvar o resumo')
+        return
+      }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+      onSaved()
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="w-full mt-4 border-t border-gray-100 pt-4">
+      <p className="flex items-center gap-1.5 text-xs font-bold text-gray-700 uppercase tracking-wide mb-2">
+        <FileText size={13} className="text-emerald-500" /> Resumo da consulta
+        <span className="normal-case font-normal text-gray-400">— visível para o paciente</span>
+      </p>
+      {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-2.5 mb-2">{error}</div>}
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Orientações, plano alimentar resumido, próximos passos..."
+        rows={3}
+        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+      />
+      <div className="flex items-center justify-between mt-2">
+        <span className="text-sm text-emerald-600 font-medium">{saved && 'Resumo salvo!'}</span>
+        <button
+          onClick={save}
+          disabled={saving}
+          className="px-4 py-2 text-sm bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors disabled:opacity-60"
+        >
+          {saving ? 'Salvando...' : 'Salvar resumo'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 export default function AgendaGrid({ appointments }: { appointments: AgendaAppointment[] }) {
+  const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -25,13 +88,30 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
   const weekDates = useMemo(() => Array.from({ length: 5 }, (_, i) => addDaysToDateString(mondayStr, i)), [mondayStr])
 
   const byCell = useMemo(() => {
-    const map = new Map<string, AgendaAppointment>()
+    const map = new Map<string, AgendaAppointment[]>()
     for (const a of appointments) {
-      const dateStr = spDateString(a.scheduledAt)
-      const hour = spHour(a.scheduledAt)
-      map.set(`${dateStr}|${hour}`, a)
+      const key = `${spDateString(a.scheduledAt)}|${spHour(a.scheduledAt)}`
+      const list = map.get(key) ?? []
+      list.push(a)
+      map.set(key, list)
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.scheduledAt.getTime() - b.scheduledAt.getTime())
     }
     return map
+  }, [appointments])
+
+  // Base range 8h–18h, stretched to cover any booked hour (evening blocks etc.) so no
+  // appointment is ever outside the grid.
+  const hours = useMemo(() => {
+    let min = 8
+    let max = 18
+    for (const a of appointments) {
+      const h = spHour(a.scheduledAt)
+      if (h < min) min = h
+      if (h > max) max = h
+    }
+    return Array.from({ length: max - min + 1 }, (_, i) => min + i)
   }, [appointments])
 
   const selected = appointments.find((a) => a.id === selectedId) ?? null
@@ -45,13 +125,13 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-            <button onClick={() => setWeekOffset(weekOffset - 1)} className="p-2 rounded-lg hover:bg-white transition-colors">
+            <button onClick={() => setWeekOffset(weekOffset - 1)} aria-label="Semana anterior" className="p-2 rounded-lg hover:bg-white transition-colors">
               <ChevronLeft size={18} className="text-gray-600" />
             </button>
             <span className="text-sm font-medium text-gray-700 px-2">
               {weekOffset === 0 ? 'Esta semana' : weekOffset < 0 ? `${Math.abs(weekOffset)} sem. atrás` : `${weekOffset} sem. à frente`}
             </span>
-            <button onClick={() => setWeekOffset(weekOffset + 1)} className="p-2 rounded-lg hover:bg-white transition-colors">
+            <button onClick={() => setWeekOffset(weekOffset + 1)} aria-label="Próxima semana" className="p-2 rounded-lg hover:bg-white transition-colors">
               <ChevronRight size={18} className="text-gray-600" />
             </button>
           </div>
@@ -87,17 +167,18 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
           </div>
 
           <div className="overflow-y-auto" style={{ maxHeight: '560px' }}>
-            {HOURS.map((h) => (
+            {hours.map((h) => (
               <div key={h} className="grid border-b border-gray-50 last:border-0" style={{ gridTemplateColumns: '64px repeat(5, 1fr)', minHeight: '72px' }}>
                 <div className="border-r border-gray-100 flex items-start justify-end pr-3 pt-2">
                   <span className="text-xs text-gray-400 font-medium">{String(h).padStart(2, '0')}:00</span>
                 </div>
                 {weekDates.map((dateStr) => {
-                  const appt = byCell.get(`${dateStr}|${h}`)
+                  const appts = byCell.get(`${dateStr}|${h}`) ?? []
                   return (
-                    <div key={dateStr} className={`border-r border-gray-50 last:border-0 p-1.5 ${dateStr === todayStr ? 'bg-emerald-50/30' : ''}`}>
-                      {appt && (
+                    <div key={dateStr} className={`border-r border-gray-50 last:border-0 p-1.5 space-y-1 ${dateStr === todayStr ? 'bg-emerald-50/30' : ''}`}>
+                      {appts.map((appt) => (
                         <button
+                          key={appt.id}
                           onClick={() => setSelectedId(appt.id === selectedId ? null : appt.id)}
                           className={`w-full text-left p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm bg-white ${
                             appt.modality === 'PRESENCIAL' ? 'border-emerald-300 text-emerald-800 bg-emerald-50' : 'border-blue-300 text-blue-800 bg-blue-50'
@@ -106,10 +187,10 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                           <p className="font-bold truncate">{appt.patientName}</p>
                           <p className="opacity-70 mt-0.5 flex items-center gap-1">
                             {appt.modality === 'PRESENCIAL' ? <MapPin size={10} /> : <Video size={10} />}
-                            {appt.reason ?? 'Consulta'}
+                            {formatTimeBR(appt.scheduledAt)} · {appt.reason ?? 'Consulta'}
                           </p>
                         </button>
-                      )}
+                      ))}
                     </div>
                   )
                 })}
@@ -119,7 +200,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
         </div>
 
         {selected && (
-          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center justify-between flex-wrap gap-3">
+          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 ${avatarColor(selected.id)} text-white rounded-full flex items-center justify-center text-sm font-bold`}>
                 {initials(selected.patientName)}
@@ -128,18 +209,17 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                 <p className="font-bold text-gray-900">{selected.patientName}</p>
                 <p className="text-xs text-gray-500">
                   {selected.reason ?? 'Consulta'} · {selected.modality === 'PRESENCIAL' ? 'Presencial' : 'Online'} ·{' '}
-                  {spDateString(selected.scheduledAt)} às {String(spHour(selected.scheduledAt)).padStart(2, '0')}:00
+                  {formatDateBR(selected.scheduledAt)} às {formatTimeBR(selected.scheduledAt)}
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <button className="px-4 py-2 text-sm border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50">
-                Ver prontuário
-              </button>
-              <button className="px-4 py-2 text-sm bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600">
-                Iniciar consulta
-              </button>
-            </div>
+            {selected.scheduledAt.getTime() <= Date.now() ? (
+              <SummaryEditor appointment={selected} onSaved={() => router.refresh()} />
+            ) : (
+              <p className="mt-3 text-xs text-gray-400">
+                Após a consulta, você poderá escrever aqui um resumo que fica visível para o paciente.
+              </p>
+            )}
           </div>
         )}
       </div>
