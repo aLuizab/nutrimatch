@@ -4,14 +4,14 @@ import RatingStat from '../../components/RatingStat'
 import PatientSidebar from '../../components/PatientSidebar'
 import PatientQuickSearch from './PatientQuickSearch'
 import { prisma } from '@/lib/prisma'
-import { requireRoleOrRedirect } from '@/lib/session'
+import { requirePatientProfileOrRedirect } from '@/lib/session'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
 import { avatarColor, formatDateBR, formatTimeBR, initials } from '@/lib/format'
 import { specialtyLabel } from '@/lib/specialties'
 import DashboardShell from '../../components/DashboardShell'
 
 export default async function PatientDashboard() {
-  const user = await requireRoleOrRedirect('PATIENT')
+  const user = await requirePatientProfileOrRedirect()
   if (!user.patient) return null
   const patientId = user.patient.id
 
@@ -19,7 +19,7 @@ export default async function PatientDashboard() {
 
   const [nextAppointment, pastAppointments, suggestionsRows] = await Promise.all([
     prisma.appointment.findFirst({
-      where: { patientId, status: 'CONFIRMED', scheduledAt: { gt: now } },
+      where: { patientId, status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] }, scheduledAt: { gt: now } },
       orderBy: { scheduledAt: 'asc' },
       include: { professional: { include: { user: { select: { name: true } } } } },
     }),
@@ -41,7 +41,7 @@ export default async function PatientDashboard() {
   const todayName = new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' }).format(now)
 
   return (
-    <DashboardShell sidebar={<PatientSidebar name={user.name} />}>
+    <DashboardShell sidebar={<PatientSidebar name={user.name} primaryRole={user.role} />}>
       <div className="bg-white border-b border-gray-100 px-8 py-5 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Olá, {user.name.split(' ')[0]}! 👋</h1>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
+import { guardMutation } from '@/lib/rate-limit'
 
 const planSchema = z.object({
   name: z.string().trim().min(3, 'Dê um nome ao programa'),
@@ -19,6 +20,9 @@ export async function POST(request: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 })
     throw e
   }
+
+  const limited = guardMutation(user.id, 'care-plan-create')
+  if (limited) return limited
 
   const json = await request.json().catch(() => null)
   const parsed = planSchema.safeParse(json)

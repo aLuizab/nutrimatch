@@ -85,17 +85,75 @@ export function relativeTimeBR(date: Date, now: Date = new Date()) {
   return `Há ${diffMonths} meses`
 }
 
-export type AppointmentDisplayStatus = 'concluido' | 'proximo' | 'pendente' | 'cancelado'
+export type AppointmentDisplayStatus =
+  | 'concluido'
+  | 'proximo'
+  | 'pendente'
+  | 'cancelado'
+  | 'aguardando'
+  | 'expirado'
 
-// Display status is derived from time, not stored — the DB only tracks CONFIRMED/CANCELLED.
+export const APPOINTMENT_STATUS_LABELS: Record<AppointmentDisplayStatus, string> = {
+  concluido: 'Concluída',
+  proximo: 'Em breve',
+  pendente: 'Agendada',
+  cancelado: 'Cancelada',
+  aguardando: 'Aguardando confirmação',
+  expirado: 'Não confirmada',
+}
+
+// Time-derived where it can be ('concluído' is just "in the past"), stored where it can't —
+// waiting on the professional is a real state, not a function of the clock. Note 'pendente'
+// already meant "confirmed, still in the future", so awaiting gets its own label rather than
+// overloading a word that already means something else here.
 export function appointmentDisplayStatus(
   scheduledAt: Date,
-  status: 'CONFIRMED' | 'CANCELLED',
+  status: 'CONFIRMED' | 'CANCELLED' | 'AWAITING_CONFIRMATION' | 'EXPIRED',
   now: Date = new Date()
 ): AppointmentDisplayStatus {
   if (status === 'CANCELLED') return 'cancelado'
+  if (status === 'EXPIRED') return 'expirado'
+  if (status === 'AWAITING_CONFIRMATION') return 'aguardando'
   const diffMs = scheduledAt.getTime() - now.getTime()
   if (diffMs < 0) return 'concluido'
   if (diffMs < 1000 * 60 * 60 * 2) return 'proximo'
   return 'pendente'
+}
+
+/**
+ * How a payment state reads to a human. The distinction that matters most is AUTHORIZED:
+ * "reservado" is not "pago", and a patient who sees a hold on their bank app needs the product
+ * to use the same word the bank does rather than claiming the consultation is paid for.
+ */
+export const PAYMENT_LABELS: Record<string, { label: string; tone: string; hint: string }> = {
+  NOT_REQUIRED: {
+    label: 'Pagamento direto',
+    tone: 'bg-gray-50 text-gray-600 border-gray-100',
+    hint: 'Combinado diretamente com o profissional, fora da plataforma.',
+  },
+  PENDING: {
+    label: 'Aguardando pagamento',
+    tone: 'bg-amber-50 text-amber-700 border-amber-100',
+    hint: 'O horário fica reservado por poucos minutos até o pagamento ser concluído.',
+  },
+  AUTHORIZED: {
+    label: 'Valor reservado',
+    tone: 'bg-blue-50 text-blue-700 border-blue-100',
+    hint: 'O valor está reservado no cartão e só será cobrado quando o profissional confirmar.',
+  },
+  PAID: {
+    label: 'Pago',
+    tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    hint: 'Cobrança efetivada.',
+  },
+  VOIDED: {
+    label: 'Reserva liberada',
+    tone: 'bg-gray-50 text-gray-500 border-gray-100',
+    hint: 'A reserva no cartão foi cancelada e nada foi cobrado.',
+  },
+  REFUNDED: {
+    label: 'Estornado',
+    tone: 'bg-gray-50 text-gray-500 border-gray-100',
+    hint: 'O valor foi devolvido na forma de pagamento original.',
+  },
 }

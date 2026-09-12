@@ -27,13 +27,61 @@ enum Modality {
 }
 
 enum AppointmentStatus {
+  // Booked by the patient, waiting for the professional to accept. Holds the slot, but is
+  // not a real booking yet — and the time it sits here is what "tempo de resposta" measures.
+  AWAITING_CONFIRMATION
   CONFIRMED
+  CANCELLED
+  // The professional let the confirmation deadline pass. Distinct from CANCELLED so the
+  // ranking can tell "declined by inaction" apart from "cancelled by someone".
+  EXPIRED
+}
+
+// Quem apareceu na consulta. Separado de AppointmentStatus de propósito: uma consulta pode
+// estar CONFIRMED (combinada, paga, horário ocupado) e mesmo assim ninguém ter aparecido —
+// são duas perguntas diferentes sobre o mesmo compromisso.
+enum AttendanceStatus {
+  // Ainda não avaliada. Passados ATTENDANCE_AUTO_RESOLVE_DAYS, lib/reputation.ts trata como
+  // ATTENDED na leitura: ninguém pode ser penalizado porque o outro lado não marcou nada.
+  PENDING
+  ATTENDED
+  NO_SHOW
+  // O paciente contestou a falta. Para de contar contra qualquer um dos dois até alguém
+  // resolver — uma marcação em disputa não é evidência de nada.
+  CONTESTED
+}
+
+// O ciclo do dinheiro de uma consulta. NOT_REQUIRED é o estado de quem nunca tocou no Stripe:
+// profissional sem conta conectada, ou consulta já coberta por um pacote pago. Manter esse
+// estado explícito é o que preserva a degradação graciosa — sem chave do Stripe o app segue
+// funcionando exatamente como antes de existir pagamento.
+enum PaymentStatus {
+  NOT_REQUIRED
+  // Checkout aberto, ainda não pago. O horário fica preso, mas por pouco tempo.
+  PENDING
+  // Cartão autorizado: o valor está reservado e ainda não saiu da conta do paciente.
+  AUTHORIZED
+  // Capturado de verdade, no momento em que o profissional confirmou.
+  PAID
+  // Autorização cancelada sem nunca virar cobrança — o profissional recusou ou deixou vencer.
+  VOIDED
+  REFUNDED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  // Stripe could not collect. The professional keeps access during Stripe's own retry window
+  // — cutting them off on the first failed card would punish an expired card like a churn.
+  PAST_DUE
   CANCELLED
 }
 
 // No COMPLETED member: completion is derivable (consultas usadas >= incluídas, or past endsAt),
 // and an enum value no code path can produce is dead weight.
 enum EnrollmentStatus {
+  // Checkout do pacote aberto e ainda não pago. Não vale como acompanhamento ativo: não
+  // libera consulta, não conta como matrícula, e some sozinho se o pagamento não vier.
+  PENDING_PAYMENT
   ACTIVE
   CANCELLED
 }
@@ -47,6 +95,11 @@ model User {
   role         Role
   createdAt    DateTime @default(now())
 
+  // Session revocation epoch: lib/session.ts rejects any token issued before this instant,
+  // so changing the password logs out every other device. Without it a stolen cookie is
+  // valid for its full 7-day life with no way to kill it.
+  passwordChangedAt DateTime?
+
   // E-mail notification preferences. Currently only honored for PROFESSIONAL recipients —
   // patient-facing e-mails (booking/cancel confirmations) are transactional and always sent.
   notifyBooking      Boolean @default(true)
@@ -55,6 +108,7 @@ model User {
 
   professional Professional?
   patient      Patient?
+  resetTokens  PasswordResetToken[]
 }
 
 model Professional {
@@ -72,6 +126,47 @@ model Professional {
   reviewCount Int                @default(0)
   createdAt   DateTime           @default(now())
 
+  // Weighted ranking score, materialised because Postgres can't ORDER BY / paginate over a
+  // score computed in application memory. Recomputed by lib/ranking.ts whenever an input
+  // changes (new review, new confirmation). Paid subscriptions deliberately do NOT feed this
+  // — sponsored placement is a separate, labelled slot, never a hidden boost.
+  rankScore            Float     @default(0)
+  // Median seconds from booking to the professional accepting it, over recent bookings.
+  // Null until they have enough samples to be meaningful.
+  medianResponseSecs   Int?
+  rankUpdatedAt        DateTime?
+
+  // ── Reputação ────────────────────────────────────────────────────────────────────────
+  // Composto de qualidade (avaliações), resposta e confiabilidade — 0..1. Materializado
+  // pela mesma razão de rankScore: é entrada de ordenação e de filtro, e recalcular em
+  // memória a cada busca não escala. Ver lib/reputation.ts.
+  reputationScore Float  @default(0)
+  // Nível exibido (NOVO / CONFIAVEL / DESTAQUE / REFERENCIA). String e não enum porque as
+  // faixas são regra de produto e mudam sem migração — o enum obrigaria uma a cada ajuste.
+  tier            String @default("NOVO")
+  // Consultas que efetivamente aconteceram. É o "volume mínimo" que impede uma nota alta
+  // com 3 consultas de virar nível máximo.
+  fulfilledCount  Int    @default(0)
+
+  // Audit trail for CRN verification. There is no official CRN API (see lib/crn.ts), so an
+  // admin confirms the registration against the CFN portal manually; these record who did it
+  // and when, so an approval is never anonymous.
+  crnVerifiedAt DateTime?
+  crnVerifiedBy String?
+
+  // Stripe Connect (Express). A professional without stripeChargesEnabled is simply not a
+  // "paid" professional — the app keeps treating their consultations as arranged directly
+  // with the patient, exactly as before payments existed. This one flag is the whole
+  // gradual-adoption story; see lib/stripe-connect.ts#isPaidProfessional.
+  stripeAccountId       String?  @unique
+  stripeChargesEnabled  Boolean  @default(false)
+  stripePayoutsEnabled  Boolean  @default(false)
+  stripeDisabledReason  String?
+  // Requirements Stripe still needs from them (documents, etc). Non-empty means the account
+  // works today but will stop unless they act — surfaced as a banner, not a silent failure.
+  stripeRequirementsDue String[] @default([])
+
+  subscription      ProfessionalSubscription?
   availabilityRules AvailabilityRule[]
   appointments      Appointment[]
   reviews           Review[]
@@ -123,11 +218,50 @@ model Appointment {
   slotHeldAt     DateTime?
   modality       Modality
   price          Int
-  status         AppointmentStatus @default(CONFIRMED)
+  status         AppointmentStatus @default(AWAITING_CONFIRMATION)
+  // When the professional accepted. createdAt → confirmedAt is the response-time sample
+  // that feeds lib/ranking.ts.
+  confirmedAt    DateTime?
+  // Past this instant with no confirmation, the slot is treated as free. Derived at read
+  // time (see lib/availability.ts) — no cron required, matching how the rest of this
+  // codebase handles time-based state.
+  confirmationDeadline DateTime?
   reason         String?
   phone          String?
   // Post-consultation notes written by the professional, visible to the patient.
   summary        String?
+  // Jitsi room for ONLINE consultations. The room name IS the access control on public
+  // Jitsi, so it must be unpredictable — a sequential or derivable id would let anyone walk
+  // into someone else's health consultation.
+  meetingRoom    String?   @unique
+  // ── Pagamento ────────────────────────────────────────────────────────────────────────
+  paymentStatus  PaymentStatus @default(NOT_REQUIRED)
+  // O PaymentIntent é criado com captura manual: autoriza no agendamento, captura só quando o
+  // profissional confirma. Se ele recusar, a autorização é cancelada e nada é cobrado — sem
+  // estorno, sem dinheiro parado na conta de ninguém.
+  paymentIntentId   String? @unique
+  checkoutSessionId String? @unique
+  // Enquanto o checkout está aberto o horário fica preso, mas por minutos e não por 24h: um
+  // carrinho abandonado não pode bloquear a agenda de alguém.
+  paymentDeadline DateTime?
+  paidAt          DateTime?
+  // Em centavos, ao contrário de price (reais inteiros) — a API do Stripe é em centavos e a
+  // taxa de 10% precisa de arredondamento exato. Ver lib/money.ts.
+  amountCents Int?
+  feeCents    Int?
+
+  // ── Comparecimento e reputação ───────────────────────────────────────────────────────
+  attendance            AttendanceStatus @default(PENDING)
+  attendanceMarkedAt    DateTime?
+  attendanceContestedAt DateTime?
+  // Justificativa que o paciente escreve ao contestar uma falta.
+  attendanceNote        String?
+  // Quem cancelou. Antes isto existia só como argumento do e-mail (lib/notifications.ts) e
+  // se perdia — sem persistir, não há como distinguir "o profissional desmarcou" de "o
+  // paciente desmarcou", e confiabilidade do profissional deixa de ser calculável.
+  cancelledAt           DateTime?
+  cancelledBy           Role?
+
   // Set when the consultation was booked inside a care program. SetNull (not Cascade) —
   // deleting an enrollment must never destroy consultation history.
   enrollmentId   String?
@@ -140,6 +274,11 @@ model Appointment {
   @@index([patientId])
   @@index([professionalId])
   @@index([enrollmentId])
+  // Every trend aggregation (lib/trends.ts) filters by period and groups by status; without
+  // these both the admin dashboard and /admin/tendencias fall back to a full table scan.
+  @@index([scheduledAt])
+  @@index([status, scheduledAt])
+  @@index([createdAt])
 }
 
 // A care program offered by a professional: N consultations over M months at a per-consultation
@@ -179,6 +318,20 @@ model Enrollment {
   consultations         Int
   listPriceAtEnrollment Int
 
+  // ── Pagamento do pacote ──────────────────────────────────────────────────────────────
+  // O pacote é cobrado de uma vez, na compra. Diferente da consulta avulsa, aqui a captura é
+  // imediata: não há um profissional para confirmar a compra de um programa.
+  paymentIntentId   String? @unique
+  checkoutSessionId String? @unique
+  paidAmountCents   Int?
+  feeCents          Int?
+  paidAt            DateTime?
+  // Estorno proporcional das consultas não usadas ao fim do prazo. Guardado em vez de
+  // recalculado para que a devolução aconteça uma vez só, e para que o valor devolvido fique
+  // registrado mesmo se o preço do programa mudar depois.
+  refundedCents Int       @default(0)
+  refundedAt    DateTime?
+
   startedAt DateTime @default(now())
   endsAt    DateTime
   createdAt DateTime @default(now())
@@ -203,6 +356,101 @@ model ProgressEntry {
 
   @@unique([patientId, recordedAt])
   @@index([patientId, recordedAt])
+}
+
+// Single-use password reset tokens. Only the SHA-256 hash is stored: a leaked database dump
+// then yields nothing usable, the same reasoning as never storing raw passwords.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// Who read whose health data, and when. LGPD Art. 37 requires records of processing
+// operations over sensitive data; before this the only audit trail in the whole system was
+// CRN verification.
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  Role
+  action     String
+  subjectId  String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  @@index([subjectId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+// Stripe retries the same event id for up to 3 days; recording it makes every handler
+// idempotent. The insert doubles as the "have I seen this?" check — a P2002 means duplicate.
+model WebhookEvent {
+  id         String   @id
+  type       String
+  receivedAt DateTime @default(now())
+}
+
+// The tiers on offer. A row per tier rather than constants in code, so the price and the Stripe
+// price id can change without a deploy, and so an admin can see what is actually being sold.
+model SubscriptionPlan {
+  id           String  @id @default(cuid())
+  slug         String  @unique
+  name         String
+  description  String
+  // Cents per month. 0 for the free tier, which exists as a real row so a professional always
+  // has a plan and the "no subscription" case doesn't need special handling everywhere.
+  monthlyPrice Int
+  // Null on the free tier and until the admin creates the recurring price in Stripe.
+  stripePriceId String? @unique
+  // Whether this tier is eligible for the labelled "Patrocinado" band. Deliberately a plan
+  // property and NOT an input to Professional.rankScore — see lib/subscription.ts.
+  sponsored    Boolean @default(false)
+  canReceiveBookings Boolean @default(true)
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+  createdAt    DateTime @default(now())
+
+  subscriptions ProfessionalSubscription[]
+}
+
+model ProfessionalSubscription {
+  id             String             @id @default(cuid())
+  professionalId String             @unique
+  professional   Professional       @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  planId         String
+  plan           SubscriptionPlan   @relation(fields: [planId], references: [id])
+  status         SubscriptionStatus @default(ACTIVE)
+
+  stripeCustomerId     String?
+  stripeSubscriptionId String? @unique
+  // When the paid period runs out. Null on the free tier, which never expires.
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// One row per (appointment, reminder kind) that has actually been sent. The unique key IS the
+// idempotency mechanism: the cron inserts before sending, so a second run in the same window
+// hits the constraint and skips instead of e-mailing the patient twice. Same reasoning as
+// WebhookEvent — recording the intent is what makes the handler safe to retry.
+model SentReminder {
+  id            String   @id @default(cuid())
+  appointmentId String
+  kind          String
+  sentAt        DateTime @default(now())
+
+  @@unique([appointmentId, kind])
+  @@index([sentAt])
 }
 
 model Review {

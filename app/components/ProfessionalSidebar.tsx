@@ -1,27 +1,22 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Calendar, Users, Settings, LogOut, Repeat } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { LayoutDashboard, Calendar, Users, Settings, Repeat, CreditCard } from 'lucide-react'
 import { initials } from '@/lib/format'
+import LogoutButton from './LogoutButton'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/pacientes', label: 'Pacientes', icon: Users },
   { href: '/programas', label: 'Programas', icon: Repeat },
+  { href: '/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
 export default function ProfessionalSidebar({ name = 'Dra. Carolina Matos', crn = 'CRN-3 · 12.345' }: { name?: string; crn?: string } = {}) {
   const pathname = usePathname()
-  const router = useRouter()
-
-  const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' })
-    router.push('/')
-    router.refresh()
-  }
 
   return (
     <aside className="w-64 bg-white border-r border-gray-100 min-h-screen flex flex-col shrink-0">
@@ -62,13 +57,7 @@ export default function ProfessionalSidebar({ name = 'Dra. Carolina Matos', crn 
       </nav>
 
       <div className="p-4 border-t border-gray-100">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-        >
-          <LogOut size={18} />
-          Sair
-        </button>
+        <LogoutButton className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors" />
       </div>
     </aside>
   )

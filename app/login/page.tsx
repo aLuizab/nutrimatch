@@ -111,9 +111,7 @@ function LoginForm() {
               <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
                 <input type="checkbox" className="rounded" /> Lembrar de mim
               </label>
-              <button type="button" className="text-xs text-emerald-600 font-medium hover:underline">
-                Esqueci minha senha
-              </button>
+              <Link href="/esqueci-senha" className="text-xs text-emerald-600 font-medium hover:underline">Esqueci minha senha</Link>
             </div>
 
             <button

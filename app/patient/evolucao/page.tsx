@@ -4,14 +4,15 @@ import DashboardShell from '../../components/DashboardShell'
 import PatientSidebar from '../../components/PatientSidebar'
 import WeightChart from './WeightChart'
 import ProgressForm, { type EntryRow } from './ProgressForm'
+import EnrollmentCard from './EnrollmentCard'
 import { prisma } from '@/lib/prisma'
-import { requireRoleOrRedirect } from '@/lib/session'
-import { formatDateBR, formatPrice } from '@/lib/format'
+import { requirePatientProfileOrRedirect } from '@/lib/session'
+import { formatDateBR } from '@/lib/format'
 import { spDateString } from '@/lib/spdate'
 import { getActiveEnrollmentSummary } from '@/lib/enrollments'
 
 export default async function Evolucao() {
-  const user = await requireRoleOrRedirect('PATIENT')
+  const user = await requirePatientProfileOrRedirect()
   if (!user.patient) return null
   const patientId = user.patient.id
 
@@ -48,50 +49,14 @@ export default async function Evolucao() {
   const DeltaIcon = totalDelta === null || totalDelta === 0 ? Minus : totalDelta < 0 ? TrendingDown : TrendingUp
 
   return (
-    <DashboardShell sidebar={<PatientSidebar name={user.name} />}>
+    <DashboardShell sidebar={<PatientSidebar name={user.name} primaryRole={user.role} />}>
       <div className="bg-white border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Minha Evolução</h1>
         <p className="text-sm text-gray-500 mt-0.5">Acompanhe seu progresso entre as consultas</p>
       </div>
 
       <div className="p-8 space-y-6">
-        {program && (
-          <div className="bg-emerald-500 rounded-2xl p-6 text-white">
-            <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-3">
-              Acompanhamento ativo
-            </p>
-            <div className="flex items-start justify-between gap-6 flex-wrap">
-              <div>
-                <h2 className="text-lg font-bold">{program.planName}</h2>
-                <p className="text-emerald-100 text-sm mt-0.5">com {program.professionalName}</p>
-                <p className="text-emerald-100 text-sm mt-2">
-                  {formatPrice(program.pricePerConsultation)} por consulta · até{' '}
-                  {formatDateBR(program.endsAt)}
-                </p>
-              </div>
-              <div className="min-w-[180px]">
-                <div className="flex justify-between text-sm text-emerald-100 mb-1.5">
-                  <span>{program.used} de {program.total} consultas</span>
-                  <span>{program.remaining} restantes</span>
-                </div>
-                <div className="h-2 bg-white/25 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-white rounded-full"
-                    style={{ width: `${Math.min(100, (program.used / program.total) * 100)}%` }}
-                  />
-                </div>
-                {program.remaining > 0 && (
-                  <Link
-                    href={`/agendamento/${program.professionalId}`}
-                    className="inline-block mt-3 bg-white text-emerald-600 text-sm font-bold px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors"
-                  >
-                    Agendar próxima
-                  </Link>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {program && <EnrollmentCard program={program} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

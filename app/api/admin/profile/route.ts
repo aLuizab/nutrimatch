@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
+import { guardMutation } from '@/lib/rate-limit'
 
 const profileSchema = z.object({
   name: z.string().trim().min(2, 'Nome é obrigatório'),
@@ -16,6 +17,9 @@ export async function PATCH(request: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 })
     throw e
   }
+
+  const limited = guardMutation(user.id, 'admin-profile')
+  if (limited) return limited
 
   const json = await request.json().catch(() => null)
   const parsed = profileSchema.safeParse(json)

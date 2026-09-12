@@ -1,13 +1,15 @@
 import PatientSidebar from '../../components/PatientSidebar'
 import PatientConsultasClient, { type ConsultaRow } from './PatientConsultasClient'
 import { prisma } from '@/lib/prisma'
-import { requireRoleOrRedirect } from '@/lib/session'
+import { requirePatientProfileOrRedirect } from '@/lib/session'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
 import { specialtyLabel } from '@/lib/specialties'
+import { isMeetingOpen, meetingUrl, minutesUntilOpen } from '@/lib/meeting'
+import { isWithinCancelRefundWindow, isWithinRescheduleWindow } from '@/lib/appointment-status'
 import DashboardShell from '../../components/DashboardShell'
 
 export default async function MinhasConsultas() {
-  const user = await requireRoleOrRedirect('PATIENT')
+  const user = await requirePatientProfileOrRedirect()
   if (!user.patient) return null
   const patientId = user.patient.id
   const now = new Date()
@@ -19,7 +21,7 @@ export default async function MinhasConsultas() {
 
   const [upcomingRows, pastRows] = await Promise.all([
     prisma.appointment.findMany({
-      where: { patientId, status: 'CONFIRMED', scheduledAt: { gt: now } },
+      where: { patientId, status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] }, scheduledAt: { gt: now } },
       orderBy: { scheduledAt: 'asc' },
       include,
     }),
@@ -41,12 +43,20 @@ export default async function MinhasConsultas() {
     reason: a.reason,
     status: a.status,
     summary: a.summary,
+    meetingUrl: a.meetingRoom ? meetingUrl(a.meetingRoom) : null,
+    meetingOpen: a.meetingRoom != null && isMeetingOpen(a.scheduledAt, now),
+    minutesUntilMeeting: minutesUntilOpen(a.scheduledAt, now),
     myRating: a.review?.rating ?? null,
     canReview: a.status === 'CONFIRMED' && a.scheduledAt <= now && !a.review,
+    // Só uma consulta CONFIRMED e paga tem reembolso em jogo ao cancelar — ver a rota de
+    // cancelamento para as duas janelas (paciente vs. profissional cancelando).
+    refundsIfCancelledNow: a.status === 'CONFIRMED' && a.paymentStatus === 'PAID' && isWithinCancelRefundWindow(a.scheduledAt, now),
+    canReschedule: a.status === 'CONFIRMED' && isWithinRescheduleWindow(a.scheduledAt, now),
+    attendance: a.attendance,
   })
 
   return (
-    <DashboardShell sidebar={<PatientSidebar name={user.name} />}>
+    <DashboardShell sidebar={<PatientSidebar name={user.name} primaryRole={user.role} />}>
       <div className="bg-white border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Minhas Consultas</h1>
         <p className="text-sm text-gray-500 mt-0.5">Gerencie seus agendamentos e histórico</p>

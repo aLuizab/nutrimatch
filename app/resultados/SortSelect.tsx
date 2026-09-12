@@ -23,6 +23,7 @@ export default function SortSelect({ initial }: { initial: FilterValues }) {
         isPending ? 'opacity-60' : ''
       }`}
     >
+      <option value="relevancia">Mais relevantes</option>
       <option value="avaliacao">Melhor avaliação</option>
       <option value="preco">Menor preço</option>
     </select>

@@ -63,6 +63,40 @@ export function appointmentCancelled(d: AppointmentEmailData & { recipientName: 
   }
 }
 
+export function appointmentRescheduled(
+  d: AppointmentEmailData & { recipientName: string; oldDateLabel: string; oldTimeLabel: string }
+) {
+  return {
+    subject: `Consulta remarcada: agora ${d.dateLabel} às ${d.timeLabel}`,
+    html: wrap(
+      'Consulta remarcada 🗓️',
+      `<p>Olá, ${d.recipientName}.</p>
+       <p>A consulta entre <strong>${d.patientName}</strong> e <strong>${d.professionalName}</strong>,
+          que estava marcada para <strong>${d.oldDateLabel}</strong> às <strong>${d.oldTimeLabel}</strong>,
+          foi remarcada para:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}</p>`
+    ),
+  }
+}
+
+export function markedNoShow(d: AppointmentEmailData & { contestUrl: string }) {
+  return {
+    subject: `Falta registrada na consulta de ${d.dateLabel}`,
+    html: wrap(
+      'Registramos uma falta na sua consulta',
+      `<p>Olá, ${d.patientName}.</p>
+       <p><strong>${d.professionalName}</strong> registrou que você não compareceu à consulta de
+          <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong>.</p>
+       <p>Se isso está errado, você pode contestar — é rápido e a falta deixa de contar enquanto
+          a contestação estiver em análise:</p>
+       <p><a href="${d.contestUrl}" style="color: #10b981; font-weight: 600;">Contestar em Minhas Consultas</a></p>
+       <p style="color: #6b7280;">Faltas sem aviso limitam quantas consultas você pode manter
+          agendadas ao mesmo tempo — nada além disso, e nenhum profissional vê essa informação.</p>`
+    ),
+  }
+}
+
 export function professionalApproved(name: string) {
   return {
     subject: 'Seu perfil foi aprovado no NutriMatch! 🎉',
@@ -84,6 +118,157 @@ export function reviewReceived(professionalName: string, patientFirstName: strin
       `<p>Olá, ${professionalName}!</p>
        <p><strong>${patientFirstName}</strong> avaliou uma consulta com nota <strong>${rating}/5</strong>.</p>
        <p>Veja o comentário completo no seu perfil público.</p>`
+    ),
+  }
+}
+
+export function passwordResetEmail(name: string, link: string) {
+  return {
+    subject: 'Redefinir sua senha do NutriMatch',
+    html: wrap(
+      'Redefinição de senha',
+      `<p>Olá, ${name}.</p>
+       <p>Recebemos um pedido para redefinir a senha da sua conta. O link abaixo vale por
+          <strong>30 minutos</strong> e só pode ser usado uma vez:</p>
+       <p style="margin: 24px 0;">
+         <a href="${link}" style="background: #10b981; color: #ffffff; text-decoration: none; font-weight: 700; padding: 12px 20px; border-radius: 10px; display: inline-block;">
+           Redefinir minha senha
+         </a>
+       </p>
+       <p style="font-size: 13px; color: #6b7280;">
+         Se você não pediu isso, pode ignorar este e-mail — sua senha continua a mesma.
+       </p>`
+    ),
+  }
+}
+
+export function bookingRequestedPatient(d: AppointmentEmailData) {
+  return {
+    subject: `Solicitação enviada para ${d.professionalName}`,
+    html: wrap(
+      'Solicitação enviada ⏳',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>Sua solicitação de consulta com <strong>${d.professionalName}</strong> foi enviada:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}<br/>
+          💰 ${d.priceLabel}</p>
+       <p>O horário está reservado para você. Assim que o profissional confirmar, avisamos por
+          e-mail. Se não houver confirmação em até 24 horas, o horário é liberado e você não
+          paga nada.</p>`
+    ),
+  }
+}
+
+export function bookingRequestProfessional(d: AppointmentEmailData) {
+  return {
+    subject: `⏳ Nova solicitação: ${d.patientName} — ${d.dateLabel} às ${d.timeLabel}`,
+    html: wrap(
+      'Você tem uma solicitação de consulta',
+      `<p><strong>${d.patientName}</strong> pediu uma consulta:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}<br/>
+          💰 ${d.priceLabel}</p>
+       <p><strong>Confirme em até 24 horas</strong>, na sua Agenda. Passado o prazo, o horário
+          volta a ficar disponível para outros pacientes.</p>
+       <p style="font-size: 13px; color: #6b7280;">
+         A rapidez das suas confirmações conta pontos no seu posicionamento nas buscas.
+       </p>`
+    ),
+  }
+}
+
+export function appointmentReminderPatient(d: AppointmentEmailData & { meetingUrl?: string | null }) {
+  return {
+    subject: `Lembrete: consulta amanhã com ${d.professionalName}`,
+    html: wrap(
+      'Sua consulta é amanhã ⏰',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>Passando para lembrar da sua consulta com <strong>${d.professionalName}</strong>:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}</p>
+       ${
+         d.meetingUrl
+           ? `<p>O link da chamada abre 15 minutos antes do horário:<br/>
+              <a href="${d.meetingUrl}" style="color: #10b981;">${d.meetingUrl}</a></p>`
+           : ''
+       }
+       <p>Se não puder comparecer, cancele em <em>Minhas Consultas</em> para liberar o horário.</p>`
+    ),
+  }
+}
+
+export function appointmentReminderProfessional(d: AppointmentEmailData & { meetingUrl?: string | null }) {
+  return {
+    subject: `Lembrete: consulta amanhã com ${d.patientName}`,
+    html: wrap(
+      'Você tem consulta amanhã ⏰',
+      `<p>Olá, ${d.professionalName}!</p>
+       <p>Sua consulta com <strong>${d.patientName}</strong> é amanhã:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}</p>
+       ${
+         d.meetingUrl
+           ? `<p>Link da chamada:<br/>
+              <a href="${d.meetingUrl}" style="color: #10b981;">${d.meetingUrl}</a></p>`
+           : ''
+       }`
+    ),
+  }
+}
+
+export function confirmationNudge(d: AppointmentEmailData & { hoursLeft: number }) {
+  return {
+    subject: `Ainda aguardando sua confirmação: ${d.patientName} — ${d.dateLabel}`,
+    html: wrap(
+      'Um agendamento está esperando você ⏳',
+      `<p>Olá, ${d.professionalName}!</p>
+       <p><strong>${d.patientName}</strong> pediu uma consulta e ela ainda não foi confirmada:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}</p>
+       <p>Faltam cerca de <strong>${d.hoursLeft}h</strong> para o prazo. Passando disso, o horário
+          volta a ficar disponível para outros pacientes.</p>
+       <p>Confirme pela <em>Agenda</em> na plataforma.</p>`
+    ),
+  }
+}
+
+export function packageRefunded(d: {
+  patientName: string
+  planName: string
+  professionalName: string
+  unused: number
+  total: number
+  amountLabel: string
+}) {
+  return {
+    subject: `Devolução do seu acompanhamento com ${d.professionalName}`,
+    html: wrap(
+      'Devolvemos o que não foi usado 💸',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>Seu acompanhamento <strong>${d.planName}</strong> com <strong>${d.professionalName}</strong>
+          chegou ao fim do prazo.</p>
+       <p>Das <strong>${d.total}</strong> consultas do pacote, <strong>${d.unused}</strong>
+          não ${d.unused === 1 ? 'foi realizada' : 'foram realizadas'}. Estamos devolvendo
+          <strong>${d.amountLabel}</strong> na forma de pagamento original.</p>
+       <p>O valor costuma aparecer na fatura em até 10 dias úteis, conforme o banco emissor.</p>
+       <p>Se quiser continuar o acompanhamento, é só contratar um novo pacote pela plataforma.</p>`
+    ),
+  }
+}
+
+export function paymentAuthorizedPatient(d: AppointmentEmailData) {
+  return {
+    subject: `Pagamento reservado: consulta com ${d.professionalName}`,
+    html: wrap(
+      'Recebemos seu pagamento 🔒',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>O valor de <strong>${d.priceLabel}</strong> foi <strong>reservado</strong> no seu cartão para a
+          consulta com <strong>${d.professionalName}</strong>:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}</p>
+       <p><strong>Ainda não houve cobrança.</strong> O valor só sai do seu cartão quando o profissional
+          confirmar a consulta, o que costuma acontecer em até 24h. Se ele não confirmar, a reserva
+          é liberada e nada é cobrado.</p>`
     ),
   }
 }

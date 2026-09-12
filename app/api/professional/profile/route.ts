@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
+import { guardMutation } from '@/lib/rate-limit'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
+import { extractUf, isCrnValidationError, validateCrn } from '@/lib/crn'
 
 const profileSchema = z.object({
   name: z.string().trim().min(2, 'Nome é obrigatório'),
@@ -27,6 +29,9 @@ export async function PATCH(request: Request) {
     throw e
   }
 
+  const limited = guardMutation(user.id, 'professional-profile')
+  if (limited) return limited
+
   const json = await request.json().catch(() => null)
   const parsed = profileSchema.safeParse(json)
   if (!parsed.success) {
@@ -34,19 +39,32 @@ export async function PATCH(request: Request) {
   }
   const data = parsed.data
 
+  const crn = validateCrn(data.crn, extractUf(data.city))
+  if (isCrnValidationError(crn)) {
+    return NextResponse.json({ error: crn.error }, { status: 400 })
+  }
+
+  // Changing the CRN after approval invalidates the verification and sends the profile back
+  // for review — otherwise someone could get approved with a real CRN and then swap it.
+  const crnChanged = crn.formatted !== user.professional!.crn
+  const needsReview = crnChanged && user.professional!.crnVerifiedAt != null
+
   await prisma.$transaction([
     prisma.user.update({ where: { id: user.id }, data: { name: data.name, phone: data.phone || null } }),
     prisma.professional.update({
       where: { id: user.professional!.id },
       data: {
-        crn: data.crn,
+        crn: crn.formatted,
         specialties: data.specialties,
         city: data.city,
         price: data.price,
         bio: data.bio || '',
+        ...(needsReview
+          ? { status: 'PENDING', crnVerifiedAt: null, crnVerifiedBy: null }
+          : {}),
       },
     }),
   ])
 
-  return NextResponse.json({ ok: true })
+  return NextResponse.json({ ok: true, sentForReview: needsReview })
 }

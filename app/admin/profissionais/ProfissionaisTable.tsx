@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, Star, MapPin } from 'lucide-react'
-import { initials } from '@/lib/format'
+import { Search, Star, MapPin, ExternalLink, BadgeCheck } from 'lucide-react'
+import { initials, formatPrice } from '@/lib/format'
+import { CFN_CONSULTA_URL } from '@/lib/crn'
 
 export interface ProfessionalRow {
   id: string
@@ -15,6 +16,8 @@ export interface ProfessionalRow {
   reviewCount: number
   status: 'PENDING' | 'ACTIVE' | 'SUSPENDED'
   crn: string
+  crnVerifiedAt: string | null
+  crnVerifiedBy: string | null
 }
 
 const statusLabels: Record<ProfessionalRow['status'], string> = {
@@ -34,23 +37,33 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<'todos' | ProfessionalRow['status']>('todos')
   const [pendingId, setPendingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const filtered = professionals.filter((p) => {
+    const q = search.toLowerCase()
     const matchSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) || p.specialty.toLowerCase().includes(search.toLowerCase())
+      p.name.toLowerCase().includes(q) || p.specialty.toLowerCase().includes(q) || p.crn.toLowerCase().includes(q)
     const matchStatus = statusFilter === 'todos' || p.status === statusFilter
     return matchSearch && matchStatus
   })
 
   async function updateStatus(id: string, status: ProfessionalRow['status']) {
     setPendingId(id)
+    setError(null)
     try {
-      await fetch(`/api/admin/professionals/${id}`, {
+      const res = await fetch(`/api/admin/professionals/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Não foi possível atualizar o profissional')
+        return
+      }
       router.refresh()
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
       setPendingId(null)
     }
@@ -58,6 +71,10 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
 
   return (
     <>
+      {error && (
+        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>
+      )}
+
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -106,6 +123,14 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{p.name}</p>
                       <p className="text-xs text-gray-400">{p.specialty}</p>
+                      <p className="flex items-center gap-1 text-xs font-medium text-gray-600 mt-0.5">
+                        {p.crn}
+                        {p.crnVerifiedAt && (
+                          <span title={`Conferido por ${p.crnVerifiedBy ?? 'admin'}`}>
+                            <BadgeCheck size={13} className="text-emerald-500" />
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
                 </td>
@@ -115,7 +140,7 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
                   </span>
                 </td>
                 <td className="py-4 px-4 hidden sm:table-cell">
-                  <span className="text-sm text-gray-700">R$ {p.price}</span>
+                  <span className="text-sm text-gray-700">{formatPrice(p.price)}</span>
                 </td>
                 <td className="py-4 px-4 hidden sm:table-cell">
                   <span className="flex items-center gap-1 text-sm text-gray-600">
@@ -130,6 +155,17 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex items-center gap-2 justify-end">
+                    {/* No official CRN API exists, so approval means the admin confirms the
+                        registration on the CFN portal first. This opens it in a new tab. */}
+                    <a
+                      href={CFN_CONSULTA_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Conferir ${p.crn} na consulta pública do CFN`}
+                      className="flex items-center gap-1 text-xs font-medium text-gray-600 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors whitespace-nowrap"
+                    >
+                      Conferir no CFN <ExternalLink size={11} />
+                    </a>
                     {p.status !== 'ACTIVE' && (
                       <button
                         disabled={pendingId === p.id}

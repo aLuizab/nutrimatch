@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { Menu, X } from 'lucide-react'
+import LogoutButton from './LogoutButton'
 
 // Shared frame for every authenticated page: fixed sidebar on md+, top bar + slide-over
 // drawer below. Takes the sidebar as a ReactNode slot (not a config object) because nav
@@ -29,9 +30,12 @@ export default function DashboardShell({ sidebar, children }: { sidebar: ReactNo
         <Link href="/" className="text-lg font-bold text-gray-900">
           Nutri<span className="text-emerald-500">Match</span>
         </Link>
-        <button onClick={() => setOpen(true)} aria-label="Abrir menu" className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
-          <Menu size={22} className="text-gray-700" />
-        </button>
+        <div className="flex items-center gap-1">
+          <LogoutButton iconOnly className="p-2 rounded-lg text-red-500 hover:bg-red-50 transition-colors" />
+          <button onClick={() => setOpen(true)} aria-label="Abrir menu" className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+            <Menu size={22} className="text-gray-700" />
+          </button>
+        </div>
       </div>
 
       <div className="flex min-h-screen">

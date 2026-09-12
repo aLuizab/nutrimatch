@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle } from 'lucide-react'
 import { initials } from '@/lib/format'
+import LocationPicker from '../../components/LocationPicker'
 
 const GOALS = ['Emagrecimento', 'Ganho de massa muscular', 'Melhora da saúde geral', 'Controle de doenças', 'Nutrição esportiva']
 
@@ -86,9 +87,9 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
             <label className="text-xs font-bold text-gray-700 block mb-1.5">Data de nascimento</label>
             <input value={birthDate} onChange={(e) => setBirthDate(e.target.value)} type="date" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
           </div>
-          <div>
+          <div className="md:col-span-2">
             <label className="text-xs font-bold text-gray-700 block mb-1.5">Cidade</label>
-            <input value={city} onChange={(e) => setCity(e.target.value)} type="text" placeholder="São Paulo, SP" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+            <LocationPicker value={city} onChange={setCity} />
           </div>
           <div>
             <label className="text-xs font-bold text-gray-700 block mb-1.5">Objetivo principal</label>

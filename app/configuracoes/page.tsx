@@ -3,6 +3,8 @@ import ConfiguracoesClient from './ConfiguracoesClient'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { initials } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
+import { stripeEnabled } from '@/lib/stripe'
+import { platformFeePercent } from '@/lib/fees'
 import DashboardShell from '../components/DashboardShell'
 
 export default async function Configuracoes() {
@@ -47,6 +49,15 @@ export default async function Configuracoes() {
           notifyCancellation: user.notifyCancellation,
           notifyReviews: user.notifyReviews,
         }}
+        stripe={{
+          enabled: stripeEnabled,
+          connected: user.professional.stripeAccountId != null,
+          chargesEnabled: user.professional.stripeChargesEnabled,
+          payoutsEnabled: user.professional.stripePayoutsEnabled,
+          disabledReason: user.professional.stripeDisabledReason,
+          requirementsDue: user.professional.stripeRequirementsDue,
+        }}
+        feePercent={platformFeePercent()}
       />
     </DashboardShell>
   )

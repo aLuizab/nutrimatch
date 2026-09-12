@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Calendar, Video, MapPin, Clock, Star, FileText } from 'lucide-react'
+import { Calendar, Video, MapPin, Clock, Star, FileText, X, CalendarClock } from 'lucide-react'
 import { avatarColor, initials } from '@/lib/format'
 
 export interface ConsultaRow {
@@ -15,10 +15,70 @@ export interface ConsultaRow {
   timeLabel: string
   modality: 'ONLINE' | 'PRESENCIAL' | 'AMBOS'
   reason: string | null
-  status: 'CONFIRMED' | 'CANCELLED'
+  status: 'CONFIRMED' | 'CANCELLED' | 'AWAITING_CONFIRMATION' | 'EXPIRED'
   summary: string | null
+  meetingUrl: string | null
+  meetingOpen: boolean
+  minutesUntilMeeting: number
   myRating: number | null
   canReview: boolean
+  refundsIfCancelledNow: boolean
+  canReschedule: boolean
+  attendance: 'PENDING' | 'ATTENDED' | 'NO_SHOW' | 'CONTESTED'
+}
+
+/** Contestação de uma falta registrada pelo profissional. */
+function ContestForm({ appointmentId, onDone }: { appointmentId: string; onDone: () => void }) {
+  const [note, setNote] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setError(null)
+    if (!note.trim()) {
+      setError('Conte o que aconteceu')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/appointments/${appointmentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contestAttendance: note.trim() }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Não foi possível contestar')
+        return
+      }
+      onDone()
+    } catch {
+      setError('Não foi possível conectar ao servidor. Tente novamente.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-3 space-y-2">
+      {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-2.5">{error}</div>}
+      <textarea
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Ex: eu estava na sala e o profissional não entrou..."
+        rows={2}
+        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+      />
+      <button
+        type="submit"
+        disabled={saving}
+        className="text-sm font-bold text-white bg-gray-900 px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-60"
+      >
+        {saving ? 'Enviando...' : 'Enviar contestação'}
+      </button>
+    </form>
+  )
 }
 
 function ReviewForm({ appointmentId, onDone }: { appointmentId: string; onDone: () => void }) {
@@ -98,9 +158,12 @@ function ReviewForm({ appointmentId, onDone }: { appointmentId: string; onDone: 
 export default function PatientConsultasClient({ upcoming, past }: { upcoming: ConsultaRow[]; past: ConsultaRow[] }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'proximas' | 'historico'>('proximas')
+  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null)
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [cancelError, setCancelError] = useState<string | null>(null)
+  const [cancelResult, setCancelResult] = useState<{ id: string; refunded: boolean; refundedLabel: string | null } | null>(null)
   const [reviewingId, setReviewingId] = useState<string | null>(null)
+  const [contestingId, setContestingId] = useState<string | null>(null)
 
   async function handleCancel(id: string) {
     setCancellingId(id)
@@ -111,11 +174,13 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'CANCELLED' }),
       })
+      const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
         setCancelError(data.error ?? 'Não foi possível cancelar a consulta')
         return
       }
+      setConfirmingCancelId(null)
+      setCancelResult({ id, refunded: Boolean(data.refunded), refundedLabel: data.refundedLabel ?? null })
       router.refresh()
     } catch {
       setCancelError('Não foi possível conectar ao servidor. Tente novamente.')
@@ -148,6 +213,22 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
       {cancelError && (
         <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{cancelError}</div>
       )}
+      {/* Banner de página, não por linha: a consulta cancelada some da lista "Próximas" assim
+          que router.refresh() atualiza os dados, então uma mensagem presa à linha nunca chegaria
+          a ser vista. */}
+      {cancelResult && (
+        <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-sm rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+          <span>
+            Consulta cancelada.{' '}
+            {cancelResult.refunded
+              ? `${cancelResult.refundedLabel} serão devolvidos ao seu método de pagamento em alguns minutos.`
+              : 'Nenhum valor foi devolvido — fora da janela de reembolso ou nada havia sido cobrado.'}
+          </span>
+          <button onClick={() => setCancelResult(null)} className="text-emerald-500 hover:text-emerald-700 shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+      )}
 
       {activeTab === 'proximas' && (
         <div className="space-y-4">
@@ -169,21 +250,91 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-2 shrink-0">
+                <div className="flex flex-col items-end gap-2 shrink-0">
+                  {appt.status === 'AWAITING_CONFIRMATION' && (
+                    <span className="flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-100 px-2.5 py-1 rounded-full">
+                      <Clock size={11} /> Aguardando confirmação
+                    </span>
+                  )}
+                  <div className="flex gap-2">
+                  {appt.status === 'CONFIRMED' && appt.canReschedule && (
+                    <Link
+                      href={`/agendamento/${appt.professionalId}?remarcar=${appt.id}`}
+                      className="flex items-center gap-1.5 text-sm font-medium text-gray-600 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
+                    >
+                      <CalendarClock size={14} /> Remarcar
+                    </Link>
+                  )}
                   <button
                     disabled={cancellingId === appt.id}
-                    onClick={() => handleCancel(appt.id)}
+                    onClick={() =>
+                      // Sem prejuízo em jogo antes da confirmação (ver a rota de cancelamento) —
+                      // só a consulta já confirmada tem um "sem reembolso" possível, e é aí que
+                      // vale parar para confirmar antes de agir.
+                      appt.status === 'CONFIRMED' ? setConfirmingCancelId(appt.id) : handleCancel(appt.id)
+                    }
                     className="text-sm font-medium text-red-500 border border-red-100 px-4 py-2.5 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50"
                   >
                     {cancellingId === appt.id ? 'Cancelando...' : 'Cancelar'}
                   </button>
-                  {appt.modality === 'ONLINE' && (
-                    <button className="text-sm font-bold text-white bg-emerald-500 px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors">
-                      Entrar
-                    </button>
+                  {appt.modality === 'ONLINE' && appt.status === 'CONFIRMED' && appt.meetingUrl && (
+                    appt.meetingOpen ? (
+                      <a
+                        href={appt.meetingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-sm font-bold text-white bg-emerald-500 px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors"
+                      >
+                        <Video size={14} /> Entrar na consulta
+                      </a>
+                    ) : (
+                      <span
+                        title={`A sala abre 15 minutos antes do horário`}
+                        className="text-sm font-medium text-gray-400 border border-gray-200 px-4 py-2.5 rounded-xl cursor-default"
+                      >
+                        {appt.minutesUntilMeeting > 60
+                          ? 'Sala abre no dia'
+                          : `Abre em ${appt.minutesUntilMeeting}min`}
+                      </span>
+                    )
                   )}
+                  </div>
                 </div>
               </div>
+
+              {confirmingCancelId === appt.id && (
+                <div className="mt-4 pt-4 border-t border-gray-100 bg-gray-50/60 -mx-6 -mb-6 px-6 py-4 rounded-b-2xl">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {appt.refundsIfCancelledNow
+                      ? 'Você está dentro do prazo de reembolso: o valor pago será devolvido integralmente.'
+                      : 'Fora do prazo de reembolso — cancelar agora não devolve o valor pago.'}
+                    {appt.canReschedule && !appt.refundsIfCancelledNow && ' Prefere remarcar em vez de cancelar?'}
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <button
+                      onClick={() => setConfirmingCancelId(null)}
+                      className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg hover:bg-white transition-colors"
+                    >
+                      Voltar
+                    </button>
+                    {appt.canReschedule && !appt.refundsIfCancelledNow && (
+                      <Link
+                        href={`/agendamento/${appt.professionalId}?remarcar=${appt.id}`}
+                        className="text-sm font-medium text-gray-700 border border-gray-200 bg-white px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Remarcar
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => handleCancel(appt.id)}
+                      disabled={cancellingId === appt.id}
+                      className="text-sm font-bold text-white bg-red-500 px-4 py-2 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60"
+                    >
+                      {cancellingId === appt.id ? 'Cancelando...' : 'Confirmar cancelamento'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
 
@@ -240,6 +391,41 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
                   </Link>
                 </div>
               </div>
+
+              {appt.attendance === 'NO_SHOW' && (
+                <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                  <p className="text-sm font-bold text-amber-900">Falta registrada nesta consulta</p>
+                  <p className="text-sm text-amber-800 mt-1 leading-relaxed">
+                    O profissional registrou que você não compareceu. Faltas limitam quantas
+                    consultas você mantém agendadas ao mesmo tempo — nenhum profissional vê essa
+                    informação. Se foi um engano, conte o que aconteceu:
+                  </p>
+                  {contestingId === appt.id ? (
+                    <ContestForm
+                      appointmentId={appt.id}
+                      onDone={() => {
+                        setContestingId(null)
+                        router.refresh()
+                      }}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setContestingId(appt.id)}
+                      className="mt-2 text-sm font-medium text-amber-900 underline hover:no-underline"
+                    >
+                      Contestar esta falta
+                    </button>
+                  )}
+                </div>
+              )}
+              {appt.attendance === 'CONTESTED' && (
+                <div className="mt-4 bg-gray-50 border border-gray-200 rounded-xl p-4">
+                  <p className="text-sm text-gray-700">
+                    Sua contestação foi registrada. Enquanto isso, esta falta não conta no seu
+                    histórico.
+                  </p>
+                </div>
+              )}
 
               {appt.summary && (
                 <div className="mt-4 bg-emerald-50/60 border border-emerald-100 rounded-xl p-4">

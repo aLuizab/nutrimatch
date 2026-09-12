@@ -4,6 +4,10 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Lock, Bell, CreditCard, Calendar, CheckCircle, Plus, X } from 'lucide-react'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
+import PagamentosTab, { type StripeStatus } from './PagamentosTab'
+import SegurancaTab from './SegurancaTab'
+import LocationPicker from '../components/LocationPicker'
+import PricingGuide from '../components/PricingGuide'
 
 const tabs = [
   { id: 'perfil', label: 'Perfil', icon: User },
@@ -43,10 +47,14 @@ export default function ConfiguracoesClient({
   initialProfile,
   initialAvailability,
   initialPrefs,
+  stripe,
+  feePercent,
 }: {
   initialProfile: ProfileData
   initialAvailability: AvailabilityData
   initialPrefs: NotificationPrefs
+  stripe: StripeStatus
+  feePercent: number
 }) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('perfil')
@@ -278,9 +286,9 @@ export default function ConfiguracoesClient({
                 <label className="text-xs font-bold text-gray-700 block mb-1.5">Telefone</label>
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
               </div>
-              <div>
+              <div className="md:col-span-2">
                 <label className="text-xs font-bold text-gray-700 block mb-1.5">Cidade</label>
-                <input value={city} onChange={(e) => setCity(e.target.value)} type="text" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+                <LocationPicker value={city} onChange={setCity} required />
               </div>
               <div className="md:col-span-2">
                 <label className="text-xs font-bold text-gray-700 block mb-1.5">
@@ -307,10 +315,13 @@ export default function ConfiguracoesClient({
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="text-xs font-bold text-gray-700 block mb-1.5">Valor por consulta (R$)</label>
-                <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min={1} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
-                <p className="text-xs text-gray-400 mt-1.5">Esse é o valor que aparece na busca, no seu perfil e no agendamento.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-bold text-gray-700 block mb-1.5">Valor por consulta (R$)</label>
+                  <input value={price} onChange={(e) => setPrice(e.target.value)} type="number" min={1} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100" />
+                  <p className="text-xs text-gray-400 mt-1.5">Esse é o valor que aparece na busca, no seu perfil e no agendamento.</p>
+                </div>
+                <PricingGuide specialties={specialties} />
               </div>
             </div>
 
@@ -436,18 +447,7 @@ export default function ConfiguracoesClient({
         </form>
       )}
 
-      {activeTab === 'seguranca' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h2 className="text-base font-bold text-gray-900 mb-5">Alterar senha</h2>
-          {['Senha atual', 'Nova senha', 'Confirmar nova senha'].map((label) => (
-            <div key={label}>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">{label}</label>
-              <input type="password" placeholder="••••••••" disabled className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-400 cursor-not-allowed" />
-            </div>
-          ))}
-          <p className="text-xs text-gray-400">Em breve.</p>
-        </div>
-      )}
+      {activeTab === 'seguranca' && <SegurancaTab />}
 
       {activeTab === 'notificacoes' && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
@@ -498,23 +498,7 @@ export default function ConfiguracoesClient({
       )}
 
       {activeTab === 'pagamentos' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-          <h2 className="text-base font-bold text-gray-900 mb-2">Métodos de recebimento</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            O pagamento das consultas ainda é combinado diretamente entre você e o paciente.
-          </p>
-          <div className="space-y-3">
-            {['PIX', 'Conta bancária'].map((type) => (
-              <div key={type} className="flex items-center justify-between p-4 border border-gray-100 rounded-xl opacity-50">
-                <p className="text-sm font-medium text-gray-900">{type}</p>
-                <span className="text-xs font-medium bg-gray-100 text-gray-500 px-2.5 py-1 rounded-full">Em breve</span>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400 mt-4">
-            Recebimento pela plataforma está em desenvolvimento.
-          </p>
-        </div>
+        <PagamentosTab stripe={stripe} price={initialProfile.price} feePercent={feePercent} />
       )}
     </div>
   )

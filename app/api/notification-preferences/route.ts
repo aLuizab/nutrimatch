@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { AuthError, requireUser } from '@/lib/session'
+import { guardMutation } from '@/lib/rate-limit'
 
 const prefsSchema = z
   .object({
@@ -19,6 +20,9 @@ export async function PATCH(request: Request) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 })
     throw e
   }
+
+  const limited = guardMutation(user.id, 'notification-prefs')
+  if (limited) return limited
 
   const json = await request.json().catch(() => null)
   const parsed = prefsSchema.safeParse(json)

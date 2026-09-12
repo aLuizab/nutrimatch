@@ -29,7 +29,7 @@ export function buildQueryString(values: FilterValues) {
   if (values.modalidade && values.modalidade !== 'Todas') params.set('modalidade', values.modalidade)
   if (values.precoMax && values.precoMax !== 250) params.set('precoMax', String(values.precoMax))
   if (values.avaliacaoMin) params.set('avaliacaoMin', String(values.avaliacaoMin))
-  if (values.ordenar && values.ordenar !== 'avaliacao') params.set('ordenar', values.ordenar)
+  if (values.ordenar && values.ordenar !== 'relevancia') params.set('ordenar', values.ordenar)
   return params.toString()
 }
 

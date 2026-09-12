@@ -1,9 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Calendar, User, LogOut, TrendingUp } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { LayoutDashboard, Calendar, User, TrendingUp, ArrowLeft } from 'lucide-react'
 import { initials } from '@/lib/format'
+import LogoutButton from './LogoutButton'
+import type { Role } from '@/lib/jwt'
 
 const navItems = [
   { href: '/patient/dashboard', label: 'Início', icon: LayoutDashboard },
@@ -12,15 +14,20 @@ const navItems = [
   { href: '/patient/perfil', label: 'Meu Perfil', icon: User },
 ]
 
-export default function PatientSidebar({ name = 'Ana Silva' }: { name?: string } = {}) {
-  const pathname = usePathname()
-  const router = useRouter()
+// Para onde volta quem está aqui só como paciente "de passagem". Um nutricionista que se
+// consulta pela plataforma continua sendo nutricionista — sem esta volta, entrar na área do
+// paciente vira um beco sem saída até ele reparar na logo do topo.
+const WORKSPACE_HOME: Partial<Record<Role, { href: string; label: string }>> = {
+  PROFESSIONAL: { href: '/dashboard', label: 'Voltar ao painel profissional' },
+  ADMIN: { href: '/admin/dashboard', label: 'Voltar ao painel do admin' },
+}
 
-  const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' })
-    router.push('/')
-    router.refresh()
-  }
+export default function PatientSidebar({
+  name = 'Ana Silva',
+  primaryRole = 'PATIENT',
+}: { name?: string; primaryRole?: Role } = {}) {
+  const pathname = usePathname()
+  const workspace = WORKSPACE_HOME[primaryRole]
 
   return (
     <aside className="w-64 bg-white border-r border-gray-100 min-h-screen flex flex-col shrink-0">
@@ -42,6 +49,17 @@ export default function PatientSidebar({ name = 'Ana Silva' }: { name?: string }
         </div>
       </div>
 
+      {workspace && (
+        <div className="px-4 pt-3">
+          <Link
+            href={workspace.href}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 border border-gray-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft size={14} /> {workspace.label}
+          </Link>
+        </div>
+      )}
+
       <nav className="flex-1 p-4 space-y-0.5">
         {navItems.map(({ href, label, icon: Icon }) => (
           <Link
@@ -60,13 +78,7 @@ export default function PatientSidebar({ name = 'Ana Silva' }: { name?: string }
       </nav>
 
       <div className="p-4 border-t border-gray-100">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-        >
-          <LogOut size={18} />
-          Sair
-        </button>
+        <LogoutButton className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors" />
       </div>
     </aside>
   )

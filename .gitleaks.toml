@@ -1,0 +1,33 @@
+# gitleaks config. Extends the default ruleset (which already covers Stripe keys, AWS,
+# generic API keys, private keys) and adds the credential shapes specific to this project.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "neon-postgres-url"
+description = "Connection string do Postgres com senha"
+regex = '''postgres(?:ql)?://[^\s:@]+:[^\s:@]+@[^\s/]+'''
+tags = ["database", "credential"]
+
+[[rules]]
+id = "jwt-secret-assignment"
+description = "JWT_SECRET com valor real"
+regex = '''JWT_SECRET\s*=\s*["']?[A-Za-z0-9+/=_-]{32,}["']?'''
+tags = ["secret"]
+
+[allowlist]
+description = "Placeholders de documentação e build — não são credenciais reais"
+paths = [
+  '''\.gitleaks\.toml''',
+  '''\.env\.example''',
+  '''MVP\.md''',
+  '''DEPLOY\.md''',
+  '''SECURITY\.md''',
+  '''README\.md''',
+]
+regexes = [
+  # Deliberate non-connecting placeholder in the Docker build stages.
+  '''postgresql://build:build@localhost:5432/build''',
+  '''postgresql://ci:ci@localhost:5432/ci''',
+  '''postgresql://user:password@host:5432/dbname''',
+]

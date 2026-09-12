@@ -6,13 +6,20 @@
     "build": "next build",
     "start": "next start",
     "postinstall": "prisma generate",
-    "create-admin": "tsx scripts/create-admin.ts"
+    "create-admin": "tsx scripts/create-admin.ts",
+    "seed": "tsx prisma/seed.ts",
+    "lint": "eslint .",
+    "prepare": "husky",
+    "check-secrets": "node scripts/check-secrets.mjs",
+    "audit-gate": "node scripts/audit-gate.mjs",
+    "ensure-plans": "tsx scripts/ensure-plans.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "overrides": {
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "deepmerge-ts": "^8.0.2"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -23,13 +30,18 @@
     "prisma": "^6.19.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "stripe": "^22.5.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.6",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "25.9.1",
     "@types/react": "19.2.15",
     "autoprefixer": "^10",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.3.3",
+    "husky": "^9.1.7",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.23.12",

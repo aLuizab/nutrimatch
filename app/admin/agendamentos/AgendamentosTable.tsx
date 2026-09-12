@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { APPOINTMENT_STATUS_LABELS, type AppointmentDisplayStatus } from '@/lib/format'
 import { Search, Video, Users as UsersIcon } from 'lucide-react'
 
 export interface AppointmentRow {
@@ -10,22 +11,19 @@ export interface AppointmentRow {
   scheduledAtLabel: string
   modality: 'ONLINE' | 'PRESENCIAL' | 'AMBOS'
   price: number
-  status: 'CONFIRMED' | 'CANCELLED'
-  displayStatus: 'concluido' | 'proximo' | 'pendente' | 'cancelado'
+  status: 'CONFIRMED' | 'CANCELLED' | 'AWAITING_CONFIRMATION' | 'EXPIRED'
+  displayStatus: AppointmentDisplayStatus
 }
 
-const displayStatusLabels: Record<AppointmentRow['displayStatus'], string> = {
-  concluido: 'Concluída',
-  proximo: 'Em breve',
-  pendente: 'Agendada',
-  cancelado: 'Cancelada',
-}
+const displayStatusLabels: Record<AppointmentRow['displayStatus'], string> = APPOINTMENT_STATUS_LABELS
 
 const displayStatusColors: Record<AppointmentRow['displayStatus'], string> = {
   concluido: 'bg-gray-100 text-gray-500',
   proximo: 'bg-emerald-100 text-emerald-700',
   pendente: 'bg-yellow-50 text-yellow-700',
   cancelado: 'bg-red-50 text-red-600',
+  aguardando: 'bg-orange-50 text-orange-700',
+  expirado: 'bg-gray-100 text-gray-400',
 }
 
 export default function AgendamentosTable({ appointments }: { appointments: AppointmentRow[] }) {

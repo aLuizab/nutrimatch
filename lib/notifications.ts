@@ -2,12 +2,17 @@ import { prisma } from './prisma'
 import { sendEmail } from './email'
 import {
   appointmentCancelled,
+  appointmentRescheduled,
   bookingConfirmedPatient,
   bookingReceivedProfessional,
+  bookingRequestedPatient,
+  bookingRequestProfessional,
+  markedNoShow,
   professionalApproved,
   reviewReceived,
   type AppointmentEmailData,
 } from './email-templates'
+import { appUrl } from './stripe'
 import { formatDateBR, formatPrice, formatTimeBR, modalityLabel } from './format'
 import type { Modality } from '@prisma/client'
 
@@ -38,6 +43,18 @@ function toEmailData(ctx: AppointmentContext): AppointmentEmailData {
     modalityLabel: modalityLabel(ctx.modality),
     priceLabel: formatPrice(ctx.price),
   }
+}
+
+/**
+ * Booking created, waiting on the professional. The professional's e-mail is the one that
+ * matters here — it's the call to action that starts their response-time clock — so it is
+ * NOT gated on notifyBooking: a professional who silenced booking notifications would
+ * otherwise silently miss requests and have their ranking punished for it.
+ */
+export function notifyBookingRequested(ctx: AppointmentContext) {
+  const data = toEmailData(ctx)
+  fire(sendEmail({ to: ctx.patientEmail, ...bookingRequestedPatient(data) }))
+  fire(sendEmail({ to: ctx.professionalEmail, ...bookingRequestProfessional(data) }))
 }
 
 export function notifyBookingConfirmed(ctx: AppointmentContext) {
@@ -83,6 +100,36 @@ export function notifyCancelled(ctx: AppointmentContext, cancelledBy: 'PATIENT' 
       })
     )
   }
+}
+
+/**
+ * A consulta mudou de horário — nem paciente nem profissional podem descobrir isso depois, por
+ * acaso, então nenhuma das duas cópias é filtrada por preferência de notificação (diferente de
+ * notifyBookingConfirmed, que é uma confirmação de algo que o profissional já esperava).
+ */
+export function notifyRescheduled(ctx: AppointmentContext & { oldScheduledAt: Date }) {
+  const data = toEmailData(ctx)
+  const timing = {
+    oldDateLabel: formatDateBR(ctx.oldScheduledAt),
+    oldTimeLabel: formatTimeBR(ctx.oldScheduledAt),
+  }
+  fire(sendEmail({ to: ctx.patientEmail, ...appointmentRescheduled({ ...data, ...timing, recipientName: ctx.patientName }) }))
+  fire(sendEmail({ to: ctx.professionalEmail, ...appointmentRescheduled({ ...data, ...timing, recipientName: ctx.professionalName }) }))
+}
+
+/**
+ * Uma falta foi registrada. Sempre enviado, sem filtro de preferência: é o único aviso que o
+ * paciente recebe de algo que restringe a conta dele, e sem ele o direito de contestar existe
+ * só no papel — ninguém contesta o que não sabe que aconteceu.
+ */
+export function notifyMarkedNoShow(ctx: AppointmentContext & { appointmentId: string }) {
+  const data = toEmailData(ctx)
+  fire(
+    sendEmail({
+      to: ctx.patientEmail,
+      ...markedNoShow({ ...data, contestUrl: `${appUrl()}/patient/consultas` }),
+    })
+  )
 }
 
 export function notifyProfessionalApproved(name: string, email: string) {

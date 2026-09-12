@@ -1,27 +1,23 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Stethoscope, Calendar, Users, Settings, LogOut } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { LayoutDashboard, Stethoscope, Calendar, Users, Settings, TrendingUp, ShieldCheck } from 'lucide-react'
 import { initials } from '@/lib/format'
+import LogoutButton from './LogoutButton'
 
 const navItems = [
   { href: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/tendencias', label: 'Tendências', icon: TrendingUp },
   { href: '/admin/profissionais', label: 'Profissionais', icon: Stethoscope },
   { href: '/admin/agendamentos', label: 'Agendamentos', icon: Calendar },
   { href: '/admin/pacientes', label: 'Pacientes', icon: Users },
+  { href: '/admin/auditoria', label: 'Auditoria', icon: ShieldCheck },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
 ]
 
 export default function AdminSidebar({ name = 'Admin NutriMatch' }: { name?: string } = {}) {
   const pathname = usePathname()
-  const router = useRouter()
-
-  const handleLogout = async () => {
-    await fetch('/api/logout', { method: 'POST' })
-    router.push('/')
-    router.refresh()
-  }
 
   return (
     <aside className="w-64 bg-white border-r border-gray-100 min-h-screen flex flex-col shrink-0">
@@ -61,13 +57,7 @@ export default function AdminSidebar({ name = 'Admin NutriMatch' }: { name?: str
       </nav>
 
       <div className="p-4 border-t border-gray-100">
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors"
-        >
-          <LogOut size={18} />
-          Sair
-        </button>
+        <LogoutButton className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors" />
       </div>
     </aside>
   )

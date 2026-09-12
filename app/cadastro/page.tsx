@@ -5,6 +5,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, User, Stethoscope, Check } from 'lucide-react'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
+import LocationPicker from '../components/LocationPicker'
+import PricingGuide from '../components/PricingGuide'
 
 type Role = 'PATIENT' | 'PROFESSIONAL'
 
@@ -203,10 +205,14 @@ export default function Cadastro() {
                       type="text"
                       value={crn}
                       onChange={(e) => setCrn(e.target.value)}
-                      placeholder="Ex: CRN-3 · 12.345"
+                      placeholder="Ex: CRN-3 12345"
                       required
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
                     />
+                    <p className="text-xs text-gray-400 mt-1.5">
+                      Informe a regional (1 a 11) e seu número. Conferimos seu registro na consulta
+                      pública do CFN antes de aprovar o perfil.
+                    </p>
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1.5">
@@ -238,14 +244,7 @@ export default function Cadastro() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1.5">Cidade</label>
-                    <input
-                      type="text"
-                      value={professionalCity}
-                      onChange={(e) => setProfessionalCity(e.target.value)}
-                      placeholder="São Paulo, SP"
-                      required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
-                    />
+                    <LocationPicker value={professionalCity} onChange={setProfessionalCity} required />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1.5">Valor por consulta (R$)</label>
@@ -258,6 +257,7 @@ export default function Cadastro() {
                       className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
                     />
                   </div>
+                  <PricingGuide specialties={specialties} />
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1.5">Modalidade de atendimento</label>
                     <select
@@ -301,13 +301,7 @@ export default function Cadastro() {
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-700 block mb-1.5">Cidade</label>
-                    <input
-                      type="text"
-                      value={patientCity}
-                      onChange={(e) => setPatientCity(e.target.value)}
-                      placeholder="São Paulo, SP"
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
-                    />
+                    <LocationPicker value={patientCity} onChange={setPatientCity} />
                   </div>
                 </>
               )}
@@ -324,8 +318,8 @@ export default function Cadastro() {
 
           <p className="text-center text-xs text-gray-400 mt-6">
             Ao criar sua conta, você concorda com nossos{' '}
-            <span className="text-emerald-600 cursor-pointer hover:underline">Termos de Uso</span> e{' '}
-            <span className="text-emerald-600 cursor-pointer hover:underline">Política de Privacidade</span>
+            <Link href="/termos" target="_blank" className="text-emerald-600 hover:underline">Termos de Uso</Link> e{' '}
+            <Link href="/privacidade" target="_blank" className="text-emerald-600 hover:underline">Política de Privacidade</Link>
           </p>
         </div>
       </div>

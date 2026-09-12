@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Clock, Video, Users, CheckCircle } from 'lucide-react'
 import { formatDateBR, formatPrice, formatTimeBR, formatWeekdayShortBR } from '@/lib/format'
+import { RESCHEDULE_CUTOFF_HOURS } from '@/lib/appointment-status'
 import type { Modality } from '@prisma/client'
 
 interface DayOption {
@@ -28,16 +29,26 @@ interface ProgramSummary {
   total: number
 }
 
+interface RescheduleTarget {
+  appointmentId: string
+  oldDateLabel: string
+  oldTimeLabel: string
+}
+
 export default function BookingFlow({
   professional,
   program,
+  paymentRequired,
   days,
   initialHorario,
+  reschedule,
 }: {
   professional: ProfessionalSummary
   program: ProgramSummary | null
+  paymentRequired: boolean
   days: DayOption[]
   initialHorario?: string
+  reschedule?: RescheduleTarget | null
 }) {
   const router = useRouter()
   const displayPrice = program ? program.price : professional.price
@@ -61,6 +72,7 @@ export default function BookingFlow({
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [redirecting, setRedirecting] = useState(false)
   const [chargedPrice, setChargedPrice] = useState<number | null>(null)
 
   const canChooseModality = professional.modality === 'AMBOS'
@@ -71,21 +83,42 @@ export default function BookingFlow({
     setError(null)
     setLoading(true)
     try {
-      const res = await fetch('/api/appointments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          professionalId: professional.id,
-          scheduledAt: selectedTime.toISOString(),
-          modality,
-          phone: phone || undefined,
-          reason: reason || undefined,
-        }),
-      })
+      // Remarcação: mesmo horário, mesma consulta, PATCH em vez de criar um agendamento novo —
+      // não passa por pagamento nem confirmação de novo, só o horário muda.
+      const res = reschedule
+        ? await fetch(`/api/appointments/${reschedule.appointmentId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reschedule: selectedTime.toISOString() }),
+          })
+        : await fetch('/api/appointments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              professionalId: professional.id,
+              scheduledAt: selectedTime.toISOString(),
+              modality,
+              phone: phone || undefined,
+              reason: reason || undefined,
+            }),
+          })
       const data = await res.json()
       if (!res.ok) {
-        setError(data.error ?? 'Não foi possível confirmar o agendamento')
+        setError(data.error ?? (reschedule ? 'Não foi possível remarcar a consulta' : 'Não foi possível confirmar o agendamento'))
         router.refresh()
+        return
+      }
+      if (reschedule) {
+        setConfirmed(true)
+        setTimeout(() => router.push('/patient/consultas'), 3000)
+        return
+      }
+      // Payment is what secures the slot, so the browser leaves for Stripe here. `redirecting`
+      // keeps the button disabled while the navigation happens — the `finally` below would
+      // otherwise re-enable it and let a second click create a second booking on the same slot.
+      if (data.paymentRequired && data.checkoutUrl) {
+        setRedirecting(true)
+        window.location.href = data.checkoutUrl
         return
       }
       setChargedPrice(typeof data.price === 'number' ? data.price : null)
@@ -105,11 +138,13 @@ export default function BookingFlow({
           <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="text-emerald-500" size={40} />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Consulta agendada!</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {reschedule ? 'Consulta remarcada!' : 'Consulta agendada!'}
+          </h2>
           <p className="text-gray-500">
             {formatDateBR(selectedTime)} às {formatTimeBR(selectedTime)} com {professional.name}
           </p>
-          {chargedPrice !== null && (
+          {!reschedule && chargedPrice !== null && (
             <>
               <p className="text-gray-900 font-bold mt-2">{formatPrice(chargedPrice)}</p>
               {/* The program price can stop applying between render and submit (last slot taken,
@@ -122,7 +157,9 @@ export default function BookingFlow({
               )}
             </>
           )}
-          <p className="text-sm text-gray-400 mt-4">Redirecionando para seu painel...</p>
+          <p className="text-sm text-gray-400 mt-4">
+            {reschedule ? 'Redirecionando para Minhas Consultas...' : 'Redirecionando para seu painel...'}
+          </p>
         </div>
       </div>
     )
@@ -153,7 +190,7 @@ export default function BookingFlow({
           </div>
         </div>
 
-        {canChooseModality && (
+        {!reschedule && canChooseModality && (
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-700 mb-3">Modalidade de atendimento</h3>
             <div className="flex gap-3">
@@ -234,51 +271,101 @@ export default function BookingFlow({
       {/* Coluna direita: formulário */}
       <div className="w-full lg:w-96 shrink-0">
         <form onSubmit={handleConfirm} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
-          <h3 className="text-base font-bold text-gray-900">Seus dados</h3>
+          <h3 className="text-base font-bold text-gray-900">{reschedule ? 'Novo horário' : 'Seus dados'}</h3>
 
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
           )}
 
-          <div>
-            <label className="text-xs font-bold text-gray-700 block mb-1.5">Telefone</label>
-            <input
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="(11) 99999-9999"
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
-            />
-          </div>
-          <div>
-            <label className="text-xs font-bold text-gray-700 block mb-1.5">Motivo da consulta</label>
-            <textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder="Descreva brevemente seu objetivo..."
-              rows={3}
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
-            />
-          </div>
+          {!reschedule && (
+            <>
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">Telefone</label>
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(11) 99999-9999"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">Motivo da consulta</label>
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="Descreva brevemente seu objetivo..."
+                  rows={3}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 resize-none"
+                />
+              </div>
+            </>
+          )}
 
           {selectedTime && (
             <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 space-y-1.5 text-sm">
-              <p className="font-bold text-emerald-800">Resumo do agendamento</p>
+              <p className="font-bold text-emerald-800">
+                {reschedule ? 'Novo horário' : 'Resumo do agendamento'}
+              </p>
               <p className="text-emerald-700">📅 {formatDateBR(selectedTime)} às {formatTimeBR(selectedTime)}</p>
               <p className="text-emerald-700">👩‍⚕️ {professional.name}</p>
-              <p className="text-emerald-700">{modality === 'ONLINE' ? '💻 Online' : '🏥 Presencial'}</p>
-              <p className="font-bold text-emerald-900 mt-1">{formatPrice(displayPrice)}</p>
+              {reschedule ? (
+                <p className="text-emerald-700">💳 Sem cobrança nova — só o horário muda.</p>
+              ) : (
+                <>
+                  <p className="text-emerald-700">{modality === 'ONLINE' ? '💻 Online' : '🏥 Presencial'}</p>
+                  <p className="font-bold text-emerald-900 mt-1">{formatPrice(displayPrice)}</p>
+                </>
+              )}
             </div>
           )}
 
           <button
             type="submit"
-            disabled={!selectedTime || loading}
+            disabled={!selectedTime || loading || redirecting}
             className="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {loading ? 'Confirmando...' : selectedTime ? 'Confirmar Agendamento' : 'Selecione um horário'}
+            {redirecting
+              ? 'Abrindo pagamento...'
+              : loading
+                ? reschedule
+                  ? 'Remarcando...'
+                  : 'Confirmando...'
+                : !selectedTime
+                  ? 'Selecione um horário'
+                  : reschedule
+                    ? 'Confirmar novo horário'
+                    : paymentRequired
+                      ? 'Ir para o pagamento'
+                      : 'Confirmar Agendamento'}
           </button>
-          <p className="text-center text-xs text-gray-400">Sem cobranças até confirmar</p>
+          {reschedule ? (
+            <p className="text-center text-xs text-gray-400 leading-relaxed">
+              Você pode remarcar até {RESCHEDULE_CUTOFF_HOURS} horas antes do horário original.
+              Depois disso, ainda dá para cancelar em Minhas Consultas.
+            </p>
+          ) : (
+            <>
+              {/* The distinction the patient most needs, and it differs by method: card reserves
+                  now and charges later, Pix charges immediately and is refunded if declined.
+                  Saying "sem cobranças" alone would be false for Pix, and describing only the
+                  card's hold would be misleading for whoever pays with the other one. */}
+              <p className="text-center text-xs text-gray-400 leading-relaxed">
+                {program
+                  ? 'Esta consulta já está paga no seu pacote.'
+                  : paymentRequired
+                    ? 'No cartão, o valor fica reservado e só é cobrado quando o profissional confirmar. No Pix, o valor é debitado na hora e devolvido automaticamente se o profissional não confirmar.'
+                    : 'Sem cobranças até confirmar'}
+              </p>
+              {paymentRequired && !program && (
+                <p className="text-center text-xs text-gray-400">
+                  <a href="/politica-de-cancelamento" target="_blank" className="underline hover:text-gray-600">
+                    Veja a política completa de cancelamento e reembolso
+                  </a>
+                </p>
+              )}
+            </>
+          )}
         </form>
       </div>
     </div>

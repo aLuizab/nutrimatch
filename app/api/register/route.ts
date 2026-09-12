@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { hashPassword } from '@/lib/password'
 import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, signSessionToken } from '@/lib/jwt'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
+import { extractUf, isCrnValidationError, validateCrn } from '@/lib/crn'
+import { LIMITS, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 const baseFields = {
   name: z.string().trim().min(2, 'Nome é obrigatório'),
@@ -23,6 +25,8 @@ const patientSchema = z.object({
 const professionalSchema = z.object({
   role: z.literal('PROFESSIONAL'),
   ...baseFields,
+  // Deep-validated below against the declared state — a bare length check would let anyone
+  // type anything into a field that claims professional credentials.
   crn: z.string().trim().min(3, 'CRN é obrigatório'),
   specialties: z
     .array(z.enum(SPECIALTY_NAMES))
@@ -47,6 +51,11 @@ const DEFAULT_AVAILABILITY = [
 ]
 
 export async function POST(request: Request) {
+  const limit = rateLimit(`register:${clientIp(request)}`, LIMITS.register.limit, LIMITS.register.windowMs)
+  if (!limit.allowed) {
+    return tooManyRequests(limit, 'Muitas tentativas de cadastro. Tente novamente mais tarde.')
+  }
+
   const json = await request.json().catch(() => null)
   const parsed = registerSchema.safeParse(json)
   if (!parsed.success) {
@@ -54,6 +63,24 @@ export async function POST(request: Request) {
   }
   const data = parsed.data
 
+  // CRN is checked before anything is written: format, valid regional council, and whether
+  // that council actually covers the state the professional declared.
+  let crnFormatted: string | null = null
+  if (data.role === 'PROFESSIONAL') {
+    const crn = validateCrn(data.crn, extractUf(data.city))
+    if (isCrnValidationError(crn)) {
+      return NextResponse.json({ error: crn.error }, { status: 400 })
+    }
+    crnFormatted = crn.formatted
+  }
+
+  // This response does tell an unauthenticated caller that an email is registered. Hiding it
+  // would mean dropping the auto-login after signup (the Set-Cookie header differs between the
+  // two cases, so a "generic" response body alone would be security theatre — trivially
+  // defeated by looking at the headers). Accepted trade-off: keep the clear message, which
+  // users genuinely need, and make bulk probing impractical via the rate limit above
+  // (5/hour/IP). Revisit if signup ever moves to email confirmation, which removes the
+  // Set-Cookie tell and makes a generic response actually generic.
   const existing = await prisma.user.findUnique({ where: { email: data.email } })
   if (existing) {
     return NextResponse.json({ error: 'Já existe uma conta com este e-mail' }, { status: 409 })
@@ -83,7 +110,7 @@ export async function POST(request: Request) {
             // until an admin approves them in /admin/profissionais.
             professional: {
               create: {
-                crn: data.crn,
+                crn: crnFormatted!,
                 specialties: data.specialties,
                 bio: '',
                 city: data.city,

@@ -6,6 +6,7 @@ import { requireRoleOrRedirect } from '@/lib/session'
 import { addDaysToDateString, instantAt, spDateString, startOfMonthInstant } from '@/lib/spdate'
 import { appointmentDisplayStatus, avatarColor, formatDateBR, formatPrice, formatTimeBR, initials } from '@/lib/format'
 import DashboardShell from '../components/DashboardShell'
+import ReputationCard from './ReputationCard'
 
 export default async function DashboardProfissional() {
   const user = await requireRoleOrRedirect('PROFESSIONAL')
@@ -95,6 +96,12 @@ export default async function DashboardProfissional() {
             </div>
           ))}
         </div>
+
+        <ReputationCard
+          reputationScore={user.professional.reputationScore}
+          fulfilledCount={user.professional.fulfilledCount}
+          tier={user.professional.tier}
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

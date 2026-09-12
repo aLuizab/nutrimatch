@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { AuthError, requireRole } from '@/lib/session'
+import { AuthError, requirePatientActor } from '@/lib/session'
+import { guardMutation } from '@/lib/rate-limit'
 import { notifyReviewReceived } from '@/lib/notifications'
+import { recomputeRankScore } from '@/lib/ranking'
 
 const reviewSchema = z.object({
   appointmentId: z.string().min(1),
@@ -14,11 +16,14 @@ const reviewSchema = z.object({
 export async function POST(request: Request) {
   let user
   try {
-    user = await requireRole('PATIENT')
+    user = await requirePatientActor()
   } catch (e) {
     if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 })
     throw e
   }
+
+  const limited = guardMutation(user.id, 'review-create')
+  if (limited) return limited
 
   const json = await request.json().catch(() => null)
   const parsed = reviewSchema.safeParse(json)
@@ -70,6 +75,9 @@ export async function POST(request: Request) {
         },
       })
     })
+    // Rating is a ranking input, so the score is stale the moment a review lands. Outside the
+    // transaction: it reads several tables and must not extend the lock.
+    await recomputeRankScore(appointment.professionalId)
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
       return NextResponse.json({ error: 'Você já avaliou esta consulta' }, { status: 409 })

@@ -22,13 +22,22 @@ export default async function AdminProfissionais() {
     reviewCount: p.reviewCount,
     status: p.status,
     crn: p.crn,
+    crnVerifiedAt: p.crnVerifiedAt ? p.crnVerifiedAt.toISOString() : null,
+    crnVerifiedBy: p.crnVerifiedBy,
   }))
+
+  const pendingCount = professionals.filter((p) => p.status === 'PENDING').length
 
   return (
     <DashboardShell sidebar={<AdminSidebar name={admin.name} />}>
       <div className="bg-white border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Profissionais</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{professionals.length} profissionais cadastrados</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          {professionals.length} cadastrados
+          {pendingCount > 0 && (
+            <span className="text-yellow-700 font-medium"> · {pendingCount} aguardando aprovação</span>
+          )}
+        </p>
       </div>
 
       <div className="p-8">

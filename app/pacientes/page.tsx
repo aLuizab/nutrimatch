@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { formatDateBR } from '@/lib/format'
 import DashboardShell from '../components/DashboardShell'
+import { audit } from '@/lib/audit'
 
 export default async function Pacientes() {
   const user = await requireRoleOrRedirect('PROFESSIONAL')
@@ -13,6 +14,16 @@ export default async function Pacientes() {
     where: { professionalId: user.professional.id, status: 'CONFIRMED' },
     include: { patient: { include: { user: { select: { name: true } } } } },
     orderBy: { scheduledAt: 'desc' },
+  })
+
+  // The roster itself is health-adjacent: it names who is under this professional's care. The
+  // per-patient record has its own PATIENT_HEALTH_DATA_VIEWED entry; this one records the
+  // list view, which is the access LGPD Art. 37 was otherwise missing.
+  audit({
+    actorId: user.id,
+    actorRole: user.role,
+    action: 'PATIENT_LIST_VIEWED',
+    metadata: { patientCount: new Set(appointments.map((a) => a.patientId)).size },
   })
 
   const now = new Date()

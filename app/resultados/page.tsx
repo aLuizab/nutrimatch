@@ -1,6 +1,5 @@
 import Link from 'next/link'
-import { MapPin, Video, Users } from 'lucide-react'
-import RatingStat from '../components/RatingStat'
+import { Info } from 'lucide-react'
 import type { Prisma } from '@prisma/client'
 import PublicHeader from '../components/PublicHeader'
 import { prisma } from '@/lib/prisma'
@@ -10,6 +9,8 @@ import FilterFields, { type FilterValues } from './FilterFields'
 import MobileFilterDrawer from './MobileFilterDrawer'
 import SearchBar from './SearchBar'
 import SortSelect from './SortSelect'
+import ResultCard from './ResultCard'
+import { pickSponsored, sponsoredCandidates, SPONSORED_SLOTS } from '@/lib/subscription'
 
 const PAGE_SIZE = 9
 
@@ -36,7 +37,7 @@ export default async function Resultados({
     modalidade: params.modalidade ?? 'Todas',
     precoMax: params.precoMax ? Number(params.precoMax) : 250,
     avaliacaoMin: params.avaliacaoMin ? Number(params.avaliacaoMin) : 0,
-    ordenar: params.ordenar === 'preco' ? 'preco' : 'avaliacao',
+    ordenar: params.ordenar === 'preco' ? 'preco' : params.ordenar === 'avaliacao' ? 'avaliacao' : 'relevancia',
   }
   const page = params.pagina ? Math.max(1, Number(params.pagina)) : 1
 
@@ -74,7 +75,14 @@ export default async function Resultados({
     prisma.professional.findMany({
       where,
       include: PROFESSIONAL_CARD_INCLUDE,
-      orderBy: filters.ordenar === 'preco' ? { price: 'asc' } : { rating: 'desc' },
+      // Default is the weighted score from lib/ranking.ts, materialised on Professional so
+      // Postgres can order and paginate by it. The explicit rating/price sorts stay available.
+      orderBy:
+        filters.ordenar === 'preco'
+          ? { price: 'asc' as const }
+          : filters.ordenar === 'avaliacao'
+            ? { rating: 'desc' as const }
+            : [{ rankScore: 'desc' as const }, { reviewCount: 'desc' as const }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
     }),
@@ -84,6 +92,24 @@ export default async function Resultados({
   const results = rows.map(toProfessionalCard)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  // The sponsored band. Three constraints make it honest rather than an ad dropped on the page:
+  // it obeys the same filters as the search (a sponsor who doesn't match what the patient asked
+  // for is worse than no result), it excludes anyone already visible in the organic list below
+  // (showing the same person twice wastes the slot), and it only appears on the first page.
+  // What it never does is change the organic ordering — that comes from rankScore alone.
+  let sponsored: typeof results = []
+  if (page === 1) {
+    const candidateIds = await sponsoredCandidates(rows.map((r) => r.id))
+    if (candidateIds.length > 0) {
+      const matching = await prisma.professional.findMany({
+        where: { ...where, id: { in: candidateIds } },
+        include: PROFESSIONAL_CARD_INCLUDE,
+        orderBy: [{ rankScore: 'desc' as const }],
+      })
+      sponsored = pickSponsored(matching, SPONSORED_SLOTS).map(toProfessionalCard)
+    }
+  }
+
   const pageHref = (p: number) => {
     const qs = new URLSearchParams()
     if (filters.q) qs.set('q', filters.q)
@@ -91,7 +117,7 @@ export default async function Resultados({
     if (filters.modalidade !== 'Todas') qs.set('modalidade', filters.modalidade)
     if (filters.precoMax !== 250) qs.set('precoMax', String(filters.precoMax))
     if (filters.avaliacaoMin) qs.set('avaliacaoMin', String(filters.avaliacaoMin))
-    if (filters.ordenar !== 'avaliacao') qs.set('ordenar', filters.ordenar)
+    if (filters.ordenar !== 'relevancia') qs.set('ordenar', filters.ordenar)
     if (p > 1) qs.set('pagina', String(p))
     const qsStr = qs.toString()
     return qsStr ? `/resultados?${qsStr}` : '/resultados'
@@ -127,45 +153,30 @@ export default async function Resultados({
               </div>
             </div>
 
+            {sponsored.length > 0 && (
+              <div className="mb-6">
+                <div className="flex items-center gap-1.5 mb-3">
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Patrocinado</p>
+                  <span className="group relative inline-flex">
+                    <Info size={12} className="text-gray-300" />
+                    <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-56 bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg px-3 py-2 z-10">
+                      Profissionais que assinam um plano pago. A posição é comprada e não influencia
+                      a ordem dos resultados abaixo.
+                    </span>
+                  </span>
+                </div>
+                <div className="space-y-4">
+                  {sponsored.map((n) => (
+                    <ResultCard key={n.id} n={n} sponsored />
+                  ))}
+                </div>
+                <div className="border-b border-gray-200 mt-6" />
+              </div>
+            )}
+
             <div className="space-y-4">
               {results.map((n) => (
-                <div key={n.id} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 ${n.color} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
-                      {n.initials}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div>
-                          <h3 className="font-bold text-gray-900">{n.name}</h3>
-                          <p className="text-sm text-gray-500">{n.specialtyLabel}</p>
-                          <div className="flex flex-wrap items-center gap-3 mt-1.5">
-                            <RatingStat rating={n.rating} reviewCount={n.reviewCount} />
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              <MapPin size={12} /> {n.city}
-                            </div>
-                            <div className="flex items-center gap-1 text-xs text-gray-500">
-                              {n.modality !== 'PRESENCIAL' ? <Video size={12} /> : <Users size={12} />}
-                              {n.modalityLabel}
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4 shrink-0">
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-gray-900">R$ {n.price}</p>
-                            <p className="text-xs text-gray-400">/consulta</p>
-                          </div>
-                          <Link
-                            href={`/perfil/${n.id}`}
-                            className="bg-emerald-500 text-white text-sm font-bold px-5 py-2.5 rounded-full hover:bg-emerald-600 transition-colors"
-                          >
-                            Ver perfil
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <ResultCard key={n.id} n={n} />
               ))}
 
               {results.length === 0 && (

@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: nothing here needs write access to the repo.
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Scanner de secrets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so a secret committed earlier and later removed is still caught —
+          # rotating it is what matters, and it's only actionable if we know it happened.
+          fetch-depth: 0
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    name: Typecheck, lint e build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # These are placeholders: the build must never reach a real database or a real Stripe
+      # account from CI. They only need to be well-formed enough to satisfy lib/env.ts.
+      - name: Typecheck
+        run: npx tsc --noEmit
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-only-placeholder-secret-at-least-32-chars-long
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-only-placeholder-secret-at-least-32-chars-long
+
+  audit:
+    name: Vulnerabilidades em dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      # Fails on high/critical, minus explicitly justified exceptions recorded in the
+      # script (each with a reason and a review date). A gate that always fails on
+      # unfixable transitive noise is a gate everyone learns to ignore.
+      - name: npm audit
+        run: npm run audit-gate

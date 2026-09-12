@@ -8,6 +8,7 @@ export const SPECIALTY_NAMES = [
   'Nutrição Infantil',
   'Nutrição Vegana',
   'Nutrição Oncológica',
+  'Nutrição Estética',
 ] as const
 
 export type SpecialtyName = (typeof SPECIALTY_NAMES)[number]
@@ -19,6 +20,7 @@ export const SPECIALTIES: { long: SpecialtyName; short: string; emoji: string; c
   { long: 'Nutrição Infantil', short: 'Infantil', emoji: '👶', color: 'bg-pink-50 text-pink-600 border-pink-100' },
   { long: 'Nutrição Vegana', short: 'Vegana', emoji: '🥦', color: 'bg-green-50 text-green-600 border-green-100' },
   { long: 'Nutrição Oncológica', short: 'Oncológica', emoji: '💜', color: 'bg-purple-50 text-purple-600 border-purple-100' },
+  { long: 'Nutrição Estética', short: 'Estética', emoji: '✨', color: 'bg-rose-50 text-rose-600 border-rose-100' },
 ]
 
 function normalize(s: string) {

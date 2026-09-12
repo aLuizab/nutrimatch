@@ -26,7 +26,7 @@ export default async function Programas() {
         carePlan: { select: { name: true } },
         patient: { include: { user: { select: { name: true } } } },
         // Filtered relation count in the same query — a count() per row would be an N+1.
-        _count: { select: { appointments: { where: { status: 'CONFIRMED' } } } },
+        _count: { select: { appointments: { where: { status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] } } } } },
       },
     }),
   ])

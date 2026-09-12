@@ -2,11 +2,15 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Star, CheckCircle2, MapPin, Video, Clock, Users } from 'lucide-react'
 import PublicHeader from '../../components/PublicHeader'
+import TierBadge from '../../components/TierBadge'
 import { prisma } from '@/lib/prisma'
 import { avatarColor, formatDateBR, formatPrice, formatTimeBR, initials, modalityLabel, relativeTimeBR } from '@/lib/format'
 import { getAvailableSlots } from '@/lib/availability'
 import { getCurrentUser } from '@/lib/session'
+import { tierDefinition } from '@/lib/reputation'
+import { responseLabel } from '@/lib/ranking'
 import EnrollButton from './EnrollButton'
+import { paymentRequirementFor } from '@/lib/payments'
 
 export default async function PerfilProfissional({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -39,7 +43,12 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
   const name = professional.user.name
   const color = avatarColor(professional.id)
 
-  const isLoggedInPatient = viewer?.role === 'PATIENT'
+  // Qualquer sessão pode contratar — nutricionista e admin também se consultam. Só não consigo
+  // contratar comigo mesmo.
+  const isSelf = viewer?.id === professional.userId
+  const isLoggedInPatient = viewer != null && !isSelf
+  // Um pacote só passa pelo caixa quando o profissional tem conta conectada no Stripe.
+  const packagePaymentRequired = paymentRequirementFor(professional, false).required
   const existingEnrollment = viewer?.patient
     ? await prisma.enrollment.findFirst({
         where: { patientId: viewer.patient.id, professionalId: professional.id, status: 'ACTIVE' },
@@ -73,7 +82,10 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                   </div>
                 </div>
 
-                <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-2xl font-bold text-gray-900">{name}</h1>
+                  <TierBadge tier={professional.tier} size="md" />
+                </div>
                 <p className="text-gray-500 mt-1">{professional.crn} · Nutricionista</p>
 
                 <div className="flex flex-wrap items-center gap-4 mt-3">
@@ -104,6 +116,55 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Reputação pública. O paciente vê o nível, o que ele significa e em que ele se
+                baseia — um selo sem explicação é só um adesivo bonito, e num serviço de saúde
+                quem vai escolher merece saber o que está sendo medido. */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h2 className="text-base font-bold text-gray-900 mb-3">Reputação na plataforma</h2>
+              {professional.tier === 'NOVO' ? (
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  Profissional novo na NutriMatch, ainda construindo histórico de consultas por
+                  aqui. O CRN já foi conferido pela nossa equipe.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <TierBadge tier={professional.tier} size="md" />
+                    <span className="text-sm text-gray-500">
+                      {tierDefinition(professional.tier).description}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mt-5">
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">{professional.fulfilledCount}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">consultas realizadas</p>
+                    </div>
+                    <div>
+                      <p className="text-xl font-bold text-gray-900">
+                        {Math.round(professional.reputationScore * 100)}
+                        <span className="text-sm font-normal text-gray-400">/100</span>
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">nota de reputação</p>
+                    </div>
+                    {professional.medianResponseSecs != null && (
+                      <div>
+                        <p className="text-xl font-bold text-gray-900">
+                          {responseLabel(professional.medianResponseSecs)?.replace('Responde em ', '') ?? '—'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">tempo de resposta</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+              <Link
+                href="/como-funciona-profissional#reputacao"
+                className="inline-block mt-4 text-xs text-emerald-600 hover:underline"
+              >
+                Como a reputação é calculada →
+              </Link>
             </div>
 
             {professional.bio && (
@@ -153,6 +214,10 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                             profileHref={`/perfil/${professional.id}`}
                             isLoggedInPatient={isLoggedInPatient}
                             alreadyEnrolled={existingEnrollment != null}
+                            paymentRequired={packagePaymentRequired}
+                            totalReais={plan.pricePerConsultation * plan.consultations}
+                            consultations={plan.consultations}
+                            durationMonths={plan.durationMonths}
                           />
                         </div>
                       </div>
@@ -250,14 +315,22 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                 </div>
               )}
 
-              <Link
-                href={`/agendamento/${id}`}
-                className="w-full block text-center bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
-              >
-                Agendar consulta
-              </Link>
+              {isSelf ? (
+                <p className="text-center text-sm text-gray-500 bg-gray-50 border border-gray-100 rounded-xl py-3">
+                  Este é o seu perfil, como os pacientes o veem.
+                </p>
+              ) : (
+                <>
+                  <Link
+                    href={`/agendamento/${id}`}
+                    className="w-full block text-center bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
+                  >
+                    Agendar consulta
+                  </Link>
 
-              <p className="text-center text-xs text-gray-400">Sem cobranças até confirmar</p>
+                  <p className="text-center text-xs text-gray-400">Sem cobranças até confirmar</p>
+                </>
+              )}
             </div>
           </div>
         </div>

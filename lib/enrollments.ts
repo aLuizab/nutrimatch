@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client'
 import { prisma } from './prisma'
+import { isWithinWithdrawalWindow } from './payments'
+import { formatCents } from './money'
 
 // Single source of truth for "does this booking fall inside an active program?".
 // Both the booking API and the /agendamento page call this — if they each implemented the
@@ -21,7 +23,9 @@ export async function resolveActiveEnrollment(patientId: string, professionalId:
   if (!enrollment) return null
 
   const used = await prisma.appointment.count({
-    where: { enrollmentId: enrollment.id, status: 'CONFIRMED' },
+    // Awaiting counts too: a pending request already claims one of the program's
+    // consultations, and letting it slip through would overshoot the allowance.
+    where: { enrollmentId: enrollment.id, status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] } },
   })
   if (used >= enrollment.consultations) return null
 
@@ -55,7 +59,9 @@ export async function lockAndResolveEnrollment(
   await tx.$queryRaw`SELECT id FROM "Enrollment" WHERE id = ${enrollment.id} FOR UPDATE`
 
   const used = await tx.appointment.count({
-    where: { enrollmentId: enrollment.id, status: 'CONFIRMED' },
+    // Awaiting counts too: a pending request already claims one of the program's
+    // consultations, and letting it slip through would overshoot the allowance.
+    where: { enrollmentId: enrollment.id, status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] } },
   })
   if (used >= enrollment.consultations) return null
 
@@ -71,7 +77,7 @@ export async function getActiveEnrollmentSummary(patientId: string) {
     include: {
       carePlan: { select: { name: true } },
       professional: { include: { user: { select: { name: true } } } },
-      _count: { select: { appointments: { where: { status: 'CONFIRMED' } } } },
+      _count: { select: { appointments: { where: { status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] } } } } },
     },
   })
   if (!enrollment) return null
@@ -88,5 +94,9 @@ export async function getActiveEnrollmentSummary(patientId: string) {
     endsAt: enrollment.endsAt,
     pricePerConsultation: enrollment.pricePerConsultation,
     listPriceAtEnrollment: enrollment.listPriceAtEnrollment,
+    // Direito de arrependimento (CDC art. 49) — só existe para quem pagou pela plataforma, e só
+    // dentro dos 7 dias corridos da compra. Ver refundEnrollmentWithdrawal em lib/payments.ts.
+    withinWithdrawalWindow: enrollment.paymentIntentId != null && isWithinWithdrawalWindow(enrollment.paidAt),
+    paidAmountLabel: enrollment.paidAmountCents != null ? formatCents(enrollment.paidAmountCents) : null,
   }
 }

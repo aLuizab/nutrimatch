@@ -16,6 +16,9 @@ export interface PlanRow {
   activeEnrollments: number
 }
 
+// Os dois prazos que a plataforma oferece como pacote.
+export const PACKAGE_DURATIONS: number[] = [3, 6]
+
 const EMPTY = { name: '', description: '', durationMonths: '3', consultations: '4', pricePerConsultation: '' }
 
 export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]; listPrice: number }) {
@@ -148,15 +151,35 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">Duração (meses)</label>
-              <input
-                type="number"
-                min={1}
-                max={24}
-                value={form.durationMonths}
-                onChange={(e) => setForm({ ...form, durationMonths: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
-              />
+              <label className="text-xs font-bold text-gray-700 block mb-1.5">Duração</label>
+              {/* 3 e 6 meses são os formatos que a plataforma vende; a duração livre continua
+                  disponível para quem já tinha um programa com outro prazo. */}
+              <div className="flex gap-1.5">
+                {PACKAGE_DURATIONS.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setForm({ ...form, durationMonths: String(m) })}
+                    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-medium transition-colors ${
+                      Number(form.durationMonths) === m
+                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                        : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                    }`}
+                  >
+                    {m} meses
+                  </button>
+                ))}
+              </div>
+              {!PACKAGE_DURATIONS.includes(Number(form.durationMonths)) && (
+                <input
+                  type="number"
+                  min={1}
+                  max={24}
+                  value={form.durationMonths}
+                  onChange={(e) => setForm({ ...form, durationMonths: e.target.value })}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500 mt-1.5"
+                />
+              )}
             </div>
             <div>
               <label className="text-xs font-bold text-gray-700 block mb-1.5">Consultas incluídas</label>

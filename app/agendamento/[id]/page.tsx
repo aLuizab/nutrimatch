@@ -1,26 +1,31 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import PublicHeader from '../../components/PublicHeader'
 import { prisma } from '@/lib/prisma'
-import { requireRoleOrRedirect } from '@/lib/session'
-import { avatarColor, initials } from '@/lib/format'
+import { getCurrentUser } from '@/lib/session'
+import { avatarColor, formatDateBR, formatTimeBR, initials } from '@/lib/format'
 import { specialtyLabel } from '@/lib/specialties'
 import { getAvailableSlots } from '@/lib/availability'
 import { resolveActiveEnrollment } from '@/lib/enrollments'
+import { isWithinRescheduleWindow } from '@/lib/appointment-status'
 import BookingFlow from './BookingFlow'
+import { paymentRequirementFor } from '@/lib/payments'
 
 export default async function Agendamento({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ horario?: string }>
+  searchParams: Promise<{ horario?: string; remarcar?: string }>
 }) {
   const { id } = await params
-  const { horario } = await searchParams
+  const { horario, remarcar } = await searchParams
 
-  const user = await requireRoleOrRedirect('PATIENT')
+  // Qualquer sessão pode abrir o agendamento — nutricionista e admin também se consultam. O
+  // perfil de paciente só é criado quando a consulta é de fato marcada (POST /api/appointments).
+  const user = await getCurrentUser()
+  if (!user) redirect('/login')
 
   const professional = await prisma.professional.findUnique({
     where: { id },
@@ -29,6 +34,27 @@ export default async function Agendamento({
 
   if (!professional || professional.status !== 'ACTIVE') {
     notFound()
+  }
+
+  // Remarcação de uma consulta já confirmada: mesma tela de escolher horário, mas o rodapé do
+  // BookingFlow troca o PATCH de reagendamento em vez de criar um agendamento novo. Validado
+  // aqui, não só no cliente — a rota de PATCH revalida tudo de novo antes de mexer no banco.
+  let reschedule: { appointmentId: string; oldDateLabel: string; oldTimeLabel: string } | null = null
+  if (remarcar) {
+    const target = await prisma.appointment.findUnique({ where: { id: remarcar } })
+    if (
+      target &&
+      target.patientId === user.patient?.id &&
+      target.professionalId === id &&
+      target.status === 'CONFIRMED' &&
+      isWithinRescheduleWindow(target.scheduledAt)
+    ) {
+      reschedule = {
+        appointmentId: target.id,
+        oldDateLabel: formatDateBR(target.scheduledAt),
+        oldTimeLabel: formatTimeBR(target.scheduledAt),
+      }
+    }
   }
 
   const days = await getAvailableSlots(id, 5)
@@ -50,8 +76,14 @@ export default async function Agendamento({
           <ArrowLeft size={16} /> Voltar ao perfil
         </Link>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-1">Agendar Consulta</h1>
-        <p className="text-gray-500 text-sm mb-8">Escolha o horário e preencha seus dados para confirmar</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">
+          {reschedule ? 'Remarcar Consulta' : 'Agendar Consulta'}
+        </h1>
+        <p className="text-gray-500 text-sm mb-8">
+          {reschedule
+            ? `Escolha o novo horário — a consulta atual, ${reschedule.oldDateLabel} às ${reschedule.oldTimeLabel}, será liberada.`
+            : 'Escolha o horário e preencha seus dados para confirmar'}
+        </p>
 
         <BookingFlow
           professional={{
@@ -72,8 +104,10 @@ export default async function Agendamento({
                 }
               : null
           }
+          paymentRequired={paymentRequirementFor(professional, active != null).required}
           days={days}
           initialHorario={horario}
+          reschedule={reschedule}
         />
       </div>
     </div>

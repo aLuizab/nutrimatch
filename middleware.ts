@@ -6,9 +6,13 @@ import { SESSION_COOKIE, verifySessionToken, type Role } from '@/lib/jwt'
 // just-suspended professional's existing session still passes this until it expires. Real
 // authorization happens in lib/session.ts#getCurrentUser(), called by every sensitive Server
 // Component/route handler.
+// /patient NÃO está aqui de propósito: nutricionista e admin também podem se consultar, então a
+// área do paciente é aberta a qualquer sessão válida. Quem manda ali é o perfil de paciente
+// existir ou não (lib/session.ts#requirePatientProfileOrRedirect), coisa que o middleware não
+// tem como checar — o runtime edge não alcança o banco. As áreas abaixo continuam por papel,
+// porque essas sim são espaços de trabalho de um papel só.
 const ROLE_PREFIXES: { prefix: string; role: Role }[] = [
   { prefix: '/admin', role: 'ADMIN' },
-  { prefix: '/patient', role: 'PATIENT' },
   { prefix: '/dashboard', role: 'PROFESSIONAL' },
   { prefix: '/agenda', role: 'PROFESSIONAL' },
   { prefix: '/pacientes', role: 'PROFESSIONAL' },
@@ -22,9 +26,14 @@ const ROLE_HOME: Record<Role, string> = {
   ADMIN: '/admin/dashboard',
 }
 
+/** Exigem apenas uma sessão válida, qualquer papel. */
+const AUTH_ONLY_PREFIXES = ['/patient']
+
 export async function middleware(request: NextRequest) {
-  const match = ROLE_PREFIXES.find((r) => request.nextUrl.pathname.startsWith(r.prefix))
-  if (!match) return NextResponse.next()
+  const { pathname } = request.nextUrl
+  const match = ROLE_PREFIXES.find((r) => pathname.startsWith(r.prefix))
+  const authOnly = AUTH_ONLY_PREFIXES.some((p) => pathname.startsWith(p))
+  if (!match && !authOnly) return NextResponse.next()
 
   const token = request.cookies.get(SESSION_COOKIE)?.value
   const session = token ? await verifySessionToken(token) : null
@@ -33,7 +42,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (session.role !== match.role) {
+  if (match && session.role !== match.role) {
     return NextResponse.redirect(new URL(ROLE_HOME[session.role], request.url))
   }
 

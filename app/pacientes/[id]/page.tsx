@@ -7,6 +7,7 @@ import WeightChart from '../../patient/evolucao/WeightChart'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { avatarColor, formatDateBR, formatPrice, formatTimeBR, initials } from '@/lib/format'
+import { audit } from '@/lib/audit'
 
 export default async function PacienteDetalhe({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -18,7 +19,6 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
     where: { id },
     include: {
       user: { select: { name: true, email: true } },
-      progressEntries: { orderBy: { recordedAt: 'asc' } },
       appointments: {
         where: { professionalId },
         orderBy: { scheduledAt: 'desc' },
@@ -35,12 +35,34 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
 
   // Access is granted by having consulted with this patient — not by a live enrollment, which
   // would make the history vanish the day a program ends.
-  const hasRelationship = patient?.appointments.some((a) => a.status === 'CONFIRMED')
-  if (!patient || !hasRelationship) {
+  const confirmed = patient?.appointments.filter((a) => a.status === 'CONFIRMED') ?? []
+  if (!patient || confirmed.length === 0) {
     notFound()
   }
 
-  const withWeight = patient.progressEntries.filter((e) => e.weightKg !== null)
+  // Health data is scoped to THIS professional's relationship window, not the patient's whole
+  // life. Loading every entry would hand over measurements recorded while the patient was
+  // under a different professional's care — data minimisation (LGPD Art. 6, necessidade).
+  // A small lead-in before the first consultation is included, since the baseline the patient
+  // logs when starting treatment is legitimately part of it.
+  const firstConsultation = confirmed[confirmed.length - 1].scheduledAt
+  const windowStart = new Date(firstConsultation.getTime() - 30 * 24 * 60 * 60 * 1000)
+
+  const progressEntries = await prisma.progressEntry.findMany({
+    where: { patientId: patient.id, recordedAt: { gte: windowStart } },
+    orderBy: { recordedAt: 'asc' },
+  })
+
+  // Records that this professional opened this patient's health data (LGPD Art. 37).
+  audit({
+    actorId: user.id,
+    actorRole: user.role,
+    action: 'PATIENT_HEALTH_DATA_VIEWED',
+    subjectId: patient.id,
+    metadata: { entries: progressEntries.length },
+  })
+
+  const withWeight = progressEntries.filter((e) => e.weightKg !== null)
   const chartPoints = withWeight.map((e) => ({ recordedAt: e.recordedAt, weightKg: e.weightKg as number }))
   const firstWeight = withWeight[0]?.weightKg ?? null
   const currentWeight = withWeight[withWeight.length - 1]?.weightKg ?? null

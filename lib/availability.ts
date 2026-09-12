@@ -1,5 +1,6 @@
 import { prisma } from './prisma'
 import { addDaysToDateString, instantAt, spDateString, weekdayOf } from './spdate'
+import { slotOccupiedWhere } from './appointment-status'
 
 export interface AvailableDay {
   dateStr: string
@@ -21,6 +22,10 @@ export async function getAvailableSlots(professionalId: string, daysWanted = 5):
       // slotHeldAt (not status) is the source of truth for "is this time taken" — it's null
       // the moment a booking is cancelled, freeing the slot immediately.
       slotHeldAt: { not: null, gte: now, lte: searchWindowEnd },
+      // …but an unconfirmed booking only holds its slot until the deadline. Past it the slot
+      // is bookable again with nothing having to run — the expiry is derived here, and the
+      // booking route clears the stale row inside its transaction before inserting.
+      ...slotOccupiedWhere(now),
     },
     select: { scheduledAt: true },
   })

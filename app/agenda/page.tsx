@@ -2,6 +2,7 @@ import ProfessionalSidebar from '../components/ProfessionalSidebar'
 import AgendaGrid from './AgendaGrid'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
+import { isMeetingOpen, meetingUrl } from '@/lib/meeting'
 import DashboardShell from '../components/DashboardShell'
 
 export default async function Agenda() {
@@ -9,7 +10,8 @@ export default async function Agenda() {
   if (!user.professional) return null
 
   const rows = await prisma.appointment.findMany({
-    where: { professionalId: user.professional.id, status: 'CONFIRMED' },
+    // Includes awaiting bookings: the agenda is where the professional acts on them.
+    where: { professionalId: user.professional.id, status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] } },
     include: { patient: { include: { user: { select: { name: true } } } } },
   })
 
@@ -20,6 +22,11 @@ export default async function Agenda() {
     reason: a.reason,
     modality: a.modality,
     summary: a.summary,
+    status: a.status as 'CONFIRMED' | 'AWAITING_CONFIRMATION',
+    confirmationDeadline: a.confirmationDeadline,
+    meetingUrl: a.meetingRoom ? meetingUrl(a.meetingRoom) : null,
+    meetingOpen: a.meetingRoom != null && isMeetingOpen(a.scheduledAt),
+    attendance: a.attendance,
   }))
 
   return (
