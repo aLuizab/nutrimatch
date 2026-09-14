@@ -7,7 +7,8 @@ import { isSlotAvailable } from '@/lib/availability'
 import { notifyBookingRequested } from '@/lib/notifications'
 import { lockAndResolveEnrollment } from '@/lib/enrollments'
 import { confirmationDeadlineFor, staleHoldWhere } from '@/lib/appointment-status'
-import { createAppointmentCheckout, paymentHoldDeadline, paymentRequirementFor } from '@/lib/payments'
+import { paymentHoldDeadline, paymentRequirementFor } from '@/lib/payments'
+import { createAppointmentPixCharge } from '@/lib/pix-payments'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
 import { getEntitlements } from '@/lib/subscription'
 import { countOpenAppointments, getPatientReliability, maxOpenAppointmentsFor } from '@/lib/reputation'
@@ -150,42 +151,15 @@ export async function POST(request: Request) {
       return { appointment: created, payment: requirement }
     })
 
-    // Stripe is called AFTER the transaction commits, never inside it: an external network call
-    // while holding a row lock is how a lock ends up held for minutes instead of milliseconds.
+    // A cobrança é preparada DEPOIS do commit: gerar o código do Pix é barato, mas manter um
+    // lock de linha aberto enquanto se faz qualquer outra coisa é como um lock passa de
+    // milissegundos a minutos.
     if (payment.required) {
-      try {
-        const checkout = await createAppointmentCheckout({
-          appointmentId: appointment.id,
-          priceReais: appointment.price,
-          professionalStripeAccountId: professional.stripeAccountId!,
-          professionalName: professional.user.name,
-          patientEmail: user.email,
-          dateLabel: formatDateBR(scheduledAtDate),
-          timeLabel: formatTimeBR(scheduledAtDate),
-        })
-        await prisma.appointment.update({
-          where: { id: appointment.id },
-          data: {
-            checkoutSessionId: checkout.sessionId,
-            amountCents: checkout.amountCents,
-            feeCents: checkout.feeCents,
-          },
-        })
-        // No e-mail yet. The professional is told about this booking only once it is paid for —
-        // otherwise every abandoned checkout would ping them about a consultation that never
-        // existed, and start a response-time clock on a request nobody made.
-        return NextResponse.json({
-          id: appointment.id,
-          price: appointment.price,
-          enrollmentApplied: appointment.enrollmentId != null,
-          awaitingConfirmation: true,
-          paymentRequired: true,
-          checkoutUrl: checkout.url,
-        })
-      } catch (e) {
-        // Checkout could not be created: release the slot rather than leaving a booking nobody
-        // can pay for sitting on the professional's calendar.
-        console.error('[appointments] falha ao criar checkout', appointment.id, e)
+      const charge = await createAppointmentPixCharge(appointment.id, appointment.price)
+      if (!charge) {
+        // Chave da plataforma sumiu entre a verificação e agora — libera o horário em vez de
+        // deixar na agenda uma consulta que ninguém consegue pagar.
+        console.error('[appointments] cobrança Pix indisponível', appointment.id)
         await prisma.appointment.update({
           where: { id: appointment.id },
           data: { status: 'CANCELLED', slotHeldAt: null, paymentStatus: 'VOIDED' },
@@ -195,6 +169,18 @@ export async function POST(request: Request) {
           { status: 502 }
         )
       }
+
+      // Nenhum e-mail ainda. O profissional só é avisado quando o pagamento é confirmado —
+      // senão toda cobrança abandonada o notificaria sobre uma consulta que nunca existiu, e
+      // ainda começaria a contar tempo de resposta de um pedido que ninguém fez.
+      return NextResponse.json({
+        id: appointment.id,
+        price: appointment.price,
+        enrollmentApplied: appointment.enrollmentId != null,
+        awaitingConfirmation: true,
+        paymentRequired: true,
+        paymentUrl: `/pagamento/consulta/${appointment.id}`,
+      })
     }
 
     notifyBookingRequested({

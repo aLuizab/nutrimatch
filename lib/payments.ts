@@ -1,7 +1,7 @@
 import type Stripe from 'stripe'
 import { prisma } from './prisma'
 import { appUrl, getStripe, stripeEnabled } from './stripe'
-import { isPaidProfessional } from './stripe-connect'
+import { canReceivePix, pixEnabled } from './pix-payments'
 import { splitFee } from './fees'
 import { reaisToCents } from './money'
 
@@ -40,22 +40,26 @@ export function paymentHoldDeadline(now: Date = new Date()): Date {
 
 export interface PaymentRequirement {
   required: boolean
-  reason: 'STRIPE_DISABLED' | 'PROFESSIONAL_NOT_CONNECTED' | 'COVERED_BY_PACKAGE' | 'REQUIRED'
+  reason: 'PIX_DISABLED' | 'PROFESSIONAL_WITHOUT_PIX' | 'COVERED_BY_PACKAGE' | 'REQUIRED'
 }
 
 /**
- * Decide se esta consulta precisa passar pelo caixa. Três motivos legítimos para não precisar,
- * e todos mantêm o app funcionando como funcionava antes de existir pagamento:
- * a instalação não tem Stripe, o profissional não conectou a conta dele, ou a consulta já foi
- * paga dentro de um pacote.
+ * Decide se esta consulta passa pelo caixa. Três motivos legítimos para não passar, e todos
+ * mantêm o app funcionando como funcionava antes de existir pagamento: a instalação não tem
+ * chave Pix da plataforma configurada, o profissional não cadastrou a chave dele (sem ela não
+ * há para onde repassar), ou a consulta já foi paga dentro de um pacote.
+ *
+ * Antes isto perguntava pelo Stripe Connect. A pergunta agora é mais simples porque o modelo é
+ * mais simples: quem recebe é a plataforma, e o profissional só precisa dizer para onde quer o
+ * repasse — sem onboarding, sem documento, sem conta em gateway.
  */
 export function paymentRequirementFor(
-  professional: { stripeChargesEnabled: boolean } | null | undefined,
+  professional: { pixKey?: string | null } | null | undefined,
   coveredByEnrollment: boolean
 ): PaymentRequirement {
   if (coveredByEnrollment) return { required: false, reason: 'COVERED_BY_PACKAGE' }
-  if (!stripeEnabled) return { required: false, reason: 'STRIPE_DISABLED' }
-  if (!isPaidProfessional(professional)) return { required: false, reason: 'PROFESSIONAL_NOT_CONNECTED' }
+  if (!pixEnabled()) return { required: false, reason: 'PIX_DISABLED' }
+  if (!canReceivePix(professional)) return { required: false, reason: 'PROFESSIONAL_WITHOUT_PIX' }
   return { required: true, reason: 'REQUIRED' }
 }
 

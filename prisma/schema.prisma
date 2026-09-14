@@ -57,8 +57,11 @@ enum AttendanceStatus {
 // funcionando exatamente como antes de existir pagamento.
 enum PaymentStatus {
   NOT_REQUIRED
-  // Checkout aberto, ainda não pago. O horário fica preso, mas por pouco tempo.
+  // Cobrança criada, aguardando o paciente pagar. O horário fica preso, mas por pouco tempo.
   PENDING
+  // Pix: o paciente declarou que pagou e a plataforma ainda não conferiu o extrato. Chave Pix
+  // estática não emite webhook, então esta etapa é humana por necessidade, não por escolha.
+  AWAITING_REVIEW
   // Cartão autorizado: o valor está reservado e ainda não saiu da conta do paciente.
   AUTHORIZED
   // Capturado de verdade, no momento em que o profissional confirmou.
@@ -154,6 +157,15 @@ model Professional {
   crnVerifiedAt DateTime?
   crnVerifiedBy String?
 
+  // ── Recebimento por Pix ──────────────────────────────────────────────────────────────
+  // O paciente paga na chave da plataforma; a plataforma repassa aqui, já descontada a taxa.
+  // Sem chave cadastrada não há como repassar, então o profissional não entra no fluxo pago —
+  // mesmo papel que stripeChargesEnabled tinha, agora sem onboarding de documentos.
+  pixKey     String?
+  // CPF | CNPJ | EMAIL | PHONE | RANDOM. String e não enum: o Bacen pode passar a aceitar outro
+  // tipo, e isso não deveria custar uma migração.
+  pixKeyType String?
+
   // Stripe Connect (Express). A professional without stripeChargesEnabled is simply not a
   // "paid" professional — the app keeps treating their consultations as arranged directly
   // with the patient, exactly as before payments existed. This one flag is the whole
@@ -167,6 +179,7 @@ model Professional {
   stripeRequirementsDue String[] @default([])
 
   subscription      ProfessionalSubscription?
+  payouts           Payout[]
   availabilityRules AvailabilityRule[]
   appointments      Appointment[]
   reviews           Review[]
@@ -250,6 +263,21 @@ model Appointment {
   amountCents Int?
   feeCents    Int?
 
+  // ── Cobrança por Pix ─────────────────────────────────────────────────────────────────
+  // Identificador que vai dentro do BR Code e aparece no extrato — é por ele que a conferência
+  // manual acha a linha certa. Ver lib/pix.ts.
+  pixTxid        String?   @unique
+  // Quando o paciente declarou ter pago. Declaração, não prova: só move a cobrança da fila de
+  // 'aguardando pagamento' para a de 'conferir extrato'.
+  pixClaimedAt   DateTime?
+  // Observação do paciente ao declarar (ex.: o E2E do comprovante).
+  pixClaimNote   String?
+  // Quem conferiu o extrato e confirmou. Dinheiro confirmado por alguém tem nome.
+  pixReviewedBy  String?
+  pixReviewedAt  DateTime?
+
+  payout Payout?
+
   // ── Comparecimento e reputação ───────────────────────────────────────────────────────
   attendance            AttendanceStatus @default(PENDING)
   attendanceMarkedAt    DateTime?
@@ -326,6 +354,14 @@ model Enrollment {
   paidAmountCents   Int?
   feeCents          Int?
   paidAt            DateTime?
+  // Cobrança por Pix do pacote — mesmo mecanismo da consulta avulsa. Enquanto pixClaimedAt
+  // for null e o status PENDING_PAYMENT, ninguém declarou pagamento ainda.
+  pixTxid       String?   @unique
+  pixClaimedAt  DateTime?
+  pixClaimNote  String?
+  pixReviewedBy String?
+  pixReviewedAt DateTime?
+
   // Estorno proporcional das consultas não usadas ao fim do prazo. Guardado em vez de
   // recalculado para que a devolução aconteça uma vez só, e para que o valor devolvido fique
   // registrado mesmo se o preço do programa mudar depois.
@@ -451,6 +487,50 @@ model SentReminder {
 
   @@unique([appointmentId, kind])
   @@index([sentAt])
+}
+
+// Quanto a plataforma deve a cada profissional, por consulta.
+//
+// Existe porque o dinheiro passa inteiro pela conta da plataforma: o paciente paga o total na
+// chave Pix da NutriMatch, e o repasse (total − taxa) é uma transferência manual depois. Sem
+// esta tabela, 'quanto eu tenho a receber' viraria uma conta refeita na mão a cada pergunta, e
+// ninguém saberia o que já foi pago.
+//
+// Uma linha por consulta, e não um saldo acumulado: saldo não conta história, e quando um
+// repasse é contestado é a linha da consulta que precisa ser olhada.
+model Payout {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  // SetNull e não Cascade: apagar a consulta não pode apagar o registro de um dinheiro que
+  // saiu de verdade.
+  appointmentId  String?      @unique
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  // Em centavos, como todo valor que passa pelo caixa (ver lib/money.ts). grossCents é o que o
+  // paciente pagou; netCents é o que o profissional recebe.
+  grossCents Int
+  feeCents   Int
+  netCents   Int
+
+  status PayoutStatus @default(PENDING)
+  // Snapshot da chave no momento do repasse: se o profissional trocar a chave depois, o
+  // histórico precisa continuar mostrando para onde o dinheiro realmente foi.
+  pixKeySnapshot String?
+  paidAt         DateTime?
+  paidBy         String?
+  note           String?
+  createdAt      DateTime  @default(now())
+
+  @@index([professionalId, status])
+  @@index([status, createdAt])
+}
+
+enum PayoutStatus {
+  PENDING
+  PAID
+  // A consulta foi cancelada e estornada antes do repasse sair — não há mais o que repassar.
+  CANCELLED
 }
 
 model Review {

@@ -63,8 +63,8 @@ export default function EnrollButton({
         setError(data.error ?? 'Não foi possível iniciar o acompanhamento')
         return
       }
-      if (data.paymentRequired && data.checkoutUrl) {
-        window.location.href = data.checkoutUrl
+      if (data.paymentRequired && data.paymentUrl) {
+        window.location.href = data.paymentUrl
         return
       }
       router.push('/patient/evolucao')

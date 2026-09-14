@@ -2,183 +2,182 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, AlertTriangle, ExternalLink, RefreshCw } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Wallet } from 'lucide-react'
 import FeeSimulator from './FeeSimulator'
+import { PIX_KEY_TYPES, type PixKeyType } from '@/lib/pix'
+import { formatCents } from '@/lib/money'
 
-export interface StripeStatus {
-  enabled: boolean
-  connected: boolean
-  chargesEnabled: boolean
-  payoutsEnabled: boolean
-  disabledReason: string | null
-  requirementsDue: string[]
+export interface PixStatus {
+  /** A plataforma tem chave configurada? Sem isso ninguém recebe por aqui. */
+  platformEnabled: boolean
+  pixKey: string | null
+  pixKeyType: string | null
+  pendingCents: number
+  pendingCount: number
+  paidCents: number
 }
 
+/**
+ * Onde o profissional diz para onde quer receber.
+ *
+ * Bem mais curto do que era com o Stripe Connect, e de propósito: o dinheiro entra na conta da
+ * plataforma e sai por transferência, então o profissional não precisa abrir conta em gateway
+ * nenhum nem enviar documento — só informar a chave.
+ */
 export default function PagamentosTab({
-  stripe,
+  pix,
   price,
   feePercent,
 }: {
-  stripe: StripeStatus
+  pix: PixStatus
   price: number
   feePercent: number
 }) {
   const router = useRouter()
-  const [refreshing, setRefreshing] = useState(false)
-  const [connecting, setConnecting] = useState(false)
+  const [pixKey, setPixKey] = useState(pix.pixKey ?? '')
+  const [pixKeyType, setPixKeyType] = useState<PixKeyType>((pix.pixKeyType as PixKeyType) ?? 'CPF')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  async function refresh() {
-    setRefreshing(true)
+  async function save() {
+    setSaving(true)
     setError(null)
     try {
-      const res = await fetch('/api/stripe/connect/refresh', { method: 'POST' })
+      const res = await fetch('/api/professional/pix', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pixKey: pixKey.trim(), pixKeyType }),
+      })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        setError(data.error ?? 'Não foi possível atualizar o status')
+        setError(data.error ?? 'Não foi possível salvar a chave')
         return
       }
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
       router.refresh()
     } catch {
       setError('Não foi possível conectar ao servidor. Tente novamente.')
     } finally {
-      setRefreshing(false)
+      setSaving(false)
     }
   }
 
-  // POST, not a plain link: creating the Stripe account is a mutation and must not be
-  // reachable by navigation (see the CSRF note in the onboard route).
-  async function connect() {
-    setConnecting(true)
-    setError(null)
-    try {
-      const res = await fetch('/api/stripe/connect/onboard', { method: 'POST' })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok || !data.url) {
-        setError(data.error ?? 'Não foi possível iniciar a conexão com o Stripe')
-        return
-      }
-      window.location.href = data.url
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.')
-    } finally {
-      setConnecting(false)
-    }
-  }
+  const hasKey = Boolean(pix.pixKey)
+  const pendingLabel =
+    pix.pendingCount === 1 ? '1 consulta' : `${pix.pendingCount} consultas`
 
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-base font-bold text-gray-900 mb-1">Recebimento pela plataforma</h2>
+        <h2 className="text-base font-bold text-gray-900 mb-1">Como você recebe</h2>
         <p className="text-sm text-gray-500 mb-5">
-          Conecte uma conta Stripe para receber os pagamentos das consultas direto na plataforma.
+          O paciente paga por Pix para a NutriMatch, e nós repassamos para a sua chave já
+          descontada a taxa de {feePercent}%.
         </p>
 
-        {error && (
-          <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-2.5 mb-4">{error}</div>
-        )}
-
-        {!stripe.enabled ? (
+        {!pix.platformEnabled ? (
           <div className="border border-gray-100 rounded-xl p-4 bg-gray-50/60">
             <p className="text-sm text-gray-600">
               O recebimento pela plataforma ainda não está ativo nesta instalação. Por enquanto, o
               pagamento das suas consultas continua sendo combinado diretamente com o paciente.
             </p>
           </div>
-        ) : !stripe.connected ? (
-          <>
-            <div className="border border-gray-100 rounded-xl p-4 mb-4">
-              <p className="text-sm font-medium text-gray-900 mb-2">O que muda ao conectar</p>
-              <ul className="text-sm text-gray-600 space-y-1.5 list-disc pl-5">
-                <li>O paciente paga no momento do agendamento, pelo site.</li>
-                <li>
-                  A NutriMatch retém <strong>{feePercent}%</strong> de cada consulta; o restante vai
-                  para a sua conta Stripe (descontada a taxa de processamento do próprio Stripe).
-                </li>
-                <li>Você acompanha repasses e extratos no painel do Stripe.</li>
-              </ul>
-              <a href="/como-funciona-profissional" target="_blank" className="text-xs text-emerald-600 hover:underline mt-2 inline-block">
-                Entenda para que serve a taxa e como isso se relaciona com o ranking de busca →
-              </a>
-            </div>
-            <button
-              onClick={connect}
-              disabled={connecting}
-              className="inline-flex items-center gap-2 bg-emerald-500 text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60"
-            >
-              {connecting ? 'Abrindo Stripe...' : 'Conectar com Stripe'} <ExternalLink size={15} />
-            </button>
-            <p className="text-xs text-gray-400 mt-3">
-              Você será levado ao Stripe para confirmar seus dados (CPF/CNPJ e documento). Leva
-              poucos minutos e pode ser retomado depois.
-            </p>
-          </>
         ) : (
           <>
-            {stripe.chargesEnabled ? (
-              <div className="flex items-start gap-3 border border-emerald-100 bg-emerald-50/60 rounded-xl p-4 mb-4">
+            {hasKey ? (
+              <div className="flex items-start gap-3 border border-emerald-100 bg-emerald-50/60 rounded-xl p-4 mb-5">
                 <CheckCircle2 size={18} className="text-emerald-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-emerald-900">Conta conectada e ativa</p>
+                  <p className="text-sm font-bold text-emerald-900">Chave cadastrada</p>
                   <p className="text-sm text-emerald-800 mt-0.5">
                     Você já pode receber pagamentos pela plataforma.
-                    {!stripe.payoutsEnabled && ' Os saques ainda estão sendo liberados pelo Stripe.'}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-3 border border-yellow-100 bg-yellow-50 rounded-xl p-4 mb-4">
-                <AlertTriangle size={18} className="text-yellow-600 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 border border-amber-100 bg-amber-50 rounded-xl p-4 mb-5">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-bold text-yellow-900">Conexão incompleta</p>
-                  <p className="text-sm text-yellow-800 mt-0.5">
-                    {stripe.disabledReason
-                      ? 'O Stripe precisa de mais informações antes de liberar os recebimentos.'
-                      : 'Faltam dados para o Stripe liberar seus recebimentos.'}{' '}
-                    Enquanto isso, suas consultas seguem combinadas diretamente com o paciente.
+                  <p className="text-sm font-bold text-amber-900">Sem chave Pix cadastrada</p>
+                  <p className="text-sm text-amber-800 mt-0.5">
+                    Enquanto não houver uma chave, suas consultas seguem combinadas diretamente com
+                    o paciente — a plataforma não tem para onde repassar.
                   </p>
                 </div>
               </div>
             )}
 
-            {stripe.requirementsDue.length > 0 && (
-              <div className="border border-gray-100 rounded-xl p-4 mb-4">
-                <p className="text-sm font-medium text-gray-900 mb-1">Pendências no Stripe</p>
-                <p className="text-sm text-gray-600">
-                  Há {stripe.requirementsDue.length} item(ns) pendente(s). Continue o cadastro para
-                  não perder o recebimento.
-                </p>
+            {error && (
+              <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-2.5 mb-4">
+                {error}
               </div>
             )}
 
-            <div className="flex flex-wrap gap-2">
-              <a
-                href="/api/stripe/connect/refresh"
-                className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 border border-gray-200 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
-              >
-                Abrir painel do Stripe <ExternalLink size={14} />
-              </a>
-              {(!stripe.chargesEnabled || stripe.requirementsDue.length > 0) && (
-                <button
-                  onClick={connect}
-                  disabled={connecting}
-                  className="inline-flex items-center gap-2 bg-emerald-500 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60"
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">Tipo de chave</label>
+                <select
+                  value={pixKeyType}
+                  onChange={(e) => setPixKeyType(e.target.value as PixKeyType)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-emerald-500"
                 >
-                  {connecting ? 'Abrindo...' : 'Continuar cadastro'} <ExternalLink size={14} />
-                </button>
-              )}
-              <button
-                onClick={refresh}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-60"
-              >
-                <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
-                {refreshing ? 'Atualizando...' : 'Atualizar status'}
-              </button>
+                  {PIX_KEY_TYPES.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">Sua chave Pix</label>
+                <input
+                  value={pixKey}
+                  onChange={(e) => setPixKey(e.target.value)}
+                  placeholder={PIX_KEY_TYPES.find((t) => t.id === pixKeyType)?.hint}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                />
+              </div>
             </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Confira com atenção: o repasse vai exatamente para a chave informada aqui.
+            </p>
+
+            <button
+              onClick={save}
+              disabled={saving}
+              className="mt-4 bg-emerald-500 text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60"
+            >
+              {saving ? 'Salvando...' : saved ? 'Salvo!' : 'Salvar chave Pix'}
+            </button>
           </>
         )}
       </div>
+
+      {pix.platformEnabled && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Wallet size={17} className="text-emerald-500" /> Seus repasses
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{formatCents(pix.pendingCents)}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                a receber{pix.pendingCount > 0 ? ` · ${pendingLabel}` : ''}
+              </p>
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-900">{formatCents(pix.paidCents)}</p>
+              <p className="text-xs text-gray-500 mt-0.5">já repassado</p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-4 leading-relaxed">
+            Um repasse é aberto quando o pagamento do paciente é confirmado, e sai por Pix para a
+            sua chave. O valor já vem com os {feePercent}% da plataforma descontados.
+          </p>
+        </div>
+      )}
 
       <FeeSimulator defaultPrice={price} feePercent={feePercent} />
     </div>

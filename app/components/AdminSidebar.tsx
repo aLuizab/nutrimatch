@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Stethoscope, Calendar, Users, Settings, TrendingUp, ShieldCheck } from 'lucide-react'
+import { LayoutDashboard, Stethoscope, Calendar, Users, Settings, TrendingUp, ShieldCheck, Wallet } from 'lucide-react'
 import { initials } from '@/lib/format'
 import LogoutButton from './LogoutButton'
 
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/admin/profissionais', label: 'Profissionais', icon: Stethoscope },
   { href: '/admin/agendamentos', label: 'Agendamentos', icon: Calendar },
   { href: '/admin/pacientes', label: 'Pacientes', icon: Users },
+  { href: '/admin/financeiro', label: 'Financeiro', icon: Wallet },
   { href: '/admin/auditoria', label: 'Auditoria', icon: ShieldCheck },
   { href: '/admin/configuracoes', label: 'Configurações', icon: Settings },
 ]

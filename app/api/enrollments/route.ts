@@ -4,7 +4,8 @@ import { prisma } from '@/lib/prisma'
 import { AuthError, requirePatientActor } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { addMonthsToDateString, instantAt, spDateString } from '@/lib/spdate'
-import { createEnrollmentCheckout, paymentRequirementFor } from '@/lib/payments'
+import { paymentRequirementFor } from '@/lib/payments'
+import { createEnrollmentPixCharge } from '@/lib/pix-payments'
 
 const enrollSchema = z.object({ carePlanId: z.string().min(1) })
 
@@ -85,37 +86,24 @@ export async function POST(request: Request) {
   })
 
   if (!requirement.required) {
-    // No Stripe on this professional: the program records the agreed terms and the money is
-    // arranged directly, exactly as it worked before payments existed.
+    // Profissional sem chave Pix cadastrada: o programa registra os termos combinados e o
+    // dinheiro é acertado diretamente, como funcionava antes de existir pagamento.
     return NextResponse.json({ id: enrollment.id, paymentRequired: false })
   }
 
-  try {
-    const checkout = await createEnrollmentCheckout({
-      enrollmentId: enrollment.id,
-      totalReais: plan.pricePerConsultation * plan.consultations,
-      consultations: plan.consultations,
-      durationMonths: plan.durationMonths,
-      planName: plan.name,
-      professionalStripeAccountId: plan.professional.stripeAccountId!,
-      professionalName: professionalName,
-      patientEmail: user.email,
-    })
-    await prisma.enrollment.update({
-      where: { id: enrollment.id },
-      data: {
-        checkoutSessionId: checkout.sessionId,
-        paidAmountCents: checkout.amountCents,
-        feeCents: checkout.feeCents,
-      },
-    })
-    return NextResponse.json({ id: enrollment.id, paymentRequired: true, checkoutUrl: checkout.url })
-  } catch (e) {
-    console.error('[enrollments] falha ao criar checkout', enrollment.id, e)
+  const charge = await createEnrollmentPixCharge(enrollment.id, plan.pricePerConsultation * plan.consultations)
+  if (!charge) {
+    console.error('[enrollments] cobrança Pix indisponível', enrollment.id)
     await prisma.enrollment.delete({ where: { id: enrollment.id } })
     return NextResponse.json(
       { error: 'Não foi possível iniciar o pagamento. Nenhum valor foi cobrado — tente novamente.' },
       { status: 502 }
     )
   }
+
+  return NextResponse.json({
+    id: enrollment.id,
+    paymentRequired: true,
+    paymentUrl: `/pagamento/pacote/${enrollment.id}`,
+  })
 }

@@ -245,13 +245,38 @@ apaga todos os usuários. O script se recusa a rodar com `NODE_ENV=production`.
 
 ---
 
+## Como o dinheiro circula
+
+O pagamento é por **Pix**, e passa inteiro pela conta da plataforma:
+
+1. O paciente agenda e vai para uma tela com o **Pix copia e cola** — já com o valor e um
+   identificador próprio daquela cobrança.
+2. Ele paga no app do banco e clica em "já fiz o pagamento". Isso é um aviso, não uma
+   confirmação: chave Pix estática não avisa ninguém quando o dinheiro cai.
+3. Em `/admin/financeiro` você confere a entrada no extrato (pelo valor e pelo identificador) e
+   confirma. **Só nesse momento** o profissional é avisado da consulta e o prazo de 24h dele
+   começa a contar.
+4. A confirmação abre um **repasse** na mesma tela: o valor menos a taxa da plataforma, com a
+   chave Pix do profissional ao lado para copiar. Você faz a transferência e marca como paga.
+
+O nutricionista cadastra a chave dele em *Configurações → Pagamentos*. Sem chave cadastrada, ele
+simplesmente não entra no fluxo pago e as consultas voltam a ser combinadas diretamente com o
+paciente — nada quebra.
+
+> **Por que manual:** uma chave Pix estática não tem webhook. Quando o volume não couber mais na
+> conferência à mão, o caminho é integrar um PSP (Mercado Pago, Efí, Asaas), que emite QR
+> dinâmico e confirma sozinho. O ponto de troca é `lib/pix-payments.ts`, e só ele.
+
 ## Antes de divulgar para nutricionistas de verdade
 
 - [ ] Admin criado e testado (passo 1)
 - [ ] Fluxo de aprovação testado com um cadastro real (passo 2)
-- [ ] **Política de privacidade e termos de uso** — hoje os links no cadastro não levam a
-      lugar nenhum. Dado de saúde é dado sensível pela LGPD, e cobrar pagamento sem termos
-      publicados é exposição jurídica. É o item mais importante desta lista.
-- [ ] Se for cobrar: política de cancelamento e reembolso visível **antes** do pagamento
-      (exigência do CDC, art. 46 e 49).
-- [ ] Stripe em modo **produção** (chaves `sk_live_`) e webhooks apontando para o domínio real.
+- [x] Páginas de **termos**, **privacidade** e **política de cancelamento** publicadas, com a
+      política visível antes do pagamento (CDC art. 46 e 49).
+- [ ] **Revisão jurídica** dessas três páginas — o texto existe e descreve o funcionamento real,
+      mas não passou por advogado. Dado de saúde é dado sensível pela LGPD. É o item mais
+      importante desta lista.
+- [ ] Nomear e publicar o encarregado de dados (DPO) em `/privacidade`.
+- [ ] `PLATFORM_PIX_KEY` definida com a chave Pix real da plataforma (ver seção de pagamento).
+- [ ] Um ciclo completo testado com dinheiro real e baixo valor: paciente paga → admin confere
+      em `/admin/financeiro` → profissional confirma → repasse marcado como pago.

@@ -3,7 +3,7 @@ import ConfiguracoesClient from './ConfiguracoesClient'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { initials } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
-import { stripeEnabled } from '@/lib/stripe'
+import { payoutSummary, pixEnabled } from '@/lib/pix-payments'
 import { platformFeePercent } from '@/lib/fees'
 import DashboardShell from '../components/DashboardShell'
 
@@ -29,6 +29,8 @@ export default async function Configuracoes() {
     days: rules.map((r) => ({ weekday: r.weekday, startTime: r.startTime, endTime: r.endTime })),
   }
 
+  const payouts = await payoutSummary(user.professional.id)
+
   return (
     <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
       <div className="bg-white border-b border-gray-100 px-8 py-5">
@@ -49,13 +51,13 @@ export default async function Configuracoes() {
           notifyCancellation: user.notifyCancellation,
           notifyReviews: user.notifyReviews,
         }}
-        stripe={{
-          enabled: stripeEnabled,
-          connected: user.professional.stripeAccountId != null,
-          chargesEnabled: user.professional.stripeChargesEnabled,
-          payoutsEnabled: user.professional.stripePayoutsEnabled,
-          disabledReason: user.professional.stripeDisabledReason,
-          requirementsDue: user.professional.stripeRequirementsDue,
+        pix={{
+          platformEnabled: pixEnabled(),
+          pixKey: user.professional.pixKey,
+          pixKeyType: user.professional.pixKeyType,
+          pendingCents: payouts.pendingCents,
+          pendingCount: payouts.pendingCount,
+          paidCents: payouts.paidCents,
         }}
         feePercent={platformFeePercent()}
       />

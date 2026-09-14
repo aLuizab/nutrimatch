@@ -152,6 +152,10 @@ async function main() {
             modality: p.modality,
             price: p.price,
             status: 'ACTIVE',
+            // Chave Pix fictícia: é o que coloca o profissional no fluxo pago da demonstração.
+            // Sem ela, paymentRequirementFor devolve PROFESSIONAL_WITHOUT_PIX e nada é cobrado.
+            pixKey: p.email,
+            pixKeyType: 'EMAIL',
             crnVerifiedAt: new Date(),
             crnVerifiedBy: 'seed@nutrimatch.com.br',
             availabilityRules: { create: AVAILABILITY },

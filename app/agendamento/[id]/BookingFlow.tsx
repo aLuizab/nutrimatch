@@ -113,12 +113,13 @@ export default function BookingFlow({
         setTimeout(() => router.push('/patient/consultas'), 3000)
         return
       }
-      // Payment is what secures the slot, so the browser leaves for Stripe here. `redirecting`
-      // keeps the button disabled while the navigation happens — the `finally` below would
-      // otherwise re-enable it and let a second click create a second booking on the same slot.
-      if (data.paymentRequired && data.checkoutUrl) {
+      // O pagamento é o que garante o horário, então o navegador sai daqui para a tela de
+      // Pix. `redirecting` mantém o botão desabilitado durante a navegação — sem ele, o
+      // `finally` abaixo reabilitaria a tempo de um segundo clique criar outro agendamento
+      // no mesmo horário.
+      if (data.paymentRequired && data.paymentUrl) {
         setRedirecting(true)
-        window.location.href = data.checkoutUrl
+        window.location.href = data.paymentUrl
         return
       }
       setChargedPrice(typeof data.price === 'number' ? data.price : null)

@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { User, Lock, Bell, CreditCard, Calendar, CheckCircle, Plus, X } from 'lucide-react'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
-import PagamentosTab, { type StripeStatus } from './PagamentosTab'
+import PagamentosTab, { type PixStatus } from './PagamentosTab'
 import SegurancaTab from './SegurancaTab'
 import LocationPicker from '../components/LocationPicker'
 import PricingGuide from '../components/PricingGuide'
@@ -47,13 +47,13 @@ export default function ConfiguracoesClient({
   initialProfile,
   initialAvailability,
   initialPrefs,
-  stripe,
+  pix,
   feePercent,
 }: {
   initialProfile: ProfileData
   initialAvailability: AvailabilityData
   initialPrefs: NotificationPrefs
-  stripe: StripeStatus
+  pix: PixStatus
   feePercent: number
 }) {
   const router = useRouter()
@@ -498,7 +498,7 @@ export default function ConfiguracoesClient({
       )}
 
       {activeTab === 'pagamentos' && (
-        <PagamentosTab stripe={stripe} price={initialProfile.price} feePercent={feePercent} />
+        <PagamentosTab pix={pix} price={initialProfile.price} feePercent={feePercent} />
       )}
     </div>
   )

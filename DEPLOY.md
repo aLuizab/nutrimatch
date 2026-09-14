@@ -137,7 +137,32 @@ Rodar duas vezes seguidas não duplica e-mail: cada lembrete é registrado antes
 tabela `SentReminder`, e a segunda execução pula o que já saiu. O mesmo vale para os estornos:
 `refundedAt` marca o pacote já acertado.
 
-## 8. Pagamento das consultas e dos pacotes
+## 8. Pagamento das consultas e dos pacotes (Pix)
+
+**O modelo atual é Pix com conferência manual.** O paciente paga na chave da plataforma, e a
+plataforma repassa ao profissional descontada a taxa. Configure:
+
+```
+PLATFORM_PIX_KEY="sua-chave-pix"
+PLATFORM_PIX_NAME="NutriMatch"
+PLATFORM_PIX_CITY="Sao Paulo"
+```
+
+Sem `PLATFORM_PIX_KEY` nenhuma cobrança é gerada e o app funciona como antes de existir
+pagamento. A operação do dia a dia acontece em `/admin/financeiro`: fila de pagamentos a
+conferir e fila de repasses a pagar.
+
+Chave Pix estática **não emite webhook** — por isso a conferência é humana. O BR Code gerado
+(`lib/pix.ts`) carrega valor e identificador justamente para tornar essa conferência viável no
+extrato.
+
+### Stripe (dormente)
+
+O código do Stripe continua no repositório mas **não é usado**: nenhuma conta foi conectada e
+nenhum pagamento passou por ele. Deixe `STRIPE_SECRET_KEY` vazia. O texto abaixo descreve como
+aquele modelo funcionava, caso um dia valha religar.
+
+## 8b. Modelo antigo, via Stripe (referência)
 
 O dinheiro passa pela plataforma como **destination charge**: o paciente paga o total, a
 NutriMatch retém `PLATFORM_FEE_PERCENT` e o restante vai para a conta conectada do profissional.

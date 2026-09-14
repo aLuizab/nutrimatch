@@ -1,0 +1,115 @@
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
+import { prisma } from '@/lib/prisma'
+import { AuthError, requireRole } from '@/lib/session'
+import { guardMutation } from '@/lib/rate-limit'
+import { audit } from '@/lib/audit'
+import { confirmAppointmentPixPayment, confirmEnrollmentPixPayment } from '@/lib/pix-payments'
+import { notifyBookingRequested } from '@/lib/notifications'
+import { confirmationDeadlineFor } from '@/lib/appointment-status'
+
+// Conferência humana do Pix: o admin olha o extrato e diz se o dinheiro entrou.
+//
+// É aqui que a consulta finalmente vira um pedido de verdade para o profissional. Avisar antes
+// disso seria pedir que ele segurasse um horário por uma declaração não verificada.
+const actionSchema = z.union([
+  z.object({ action: z.literal('CONFIRM') }).strict(),
+  z.object({ action: z.literal('REJECT'), reason: z.string().trim().max(300).optional() }).strict(),
+])
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ kind: string; id: string }> }) {
+  const { kind, id } = await params
+  if (kind !== 'consulta' && kind !== 'pacote') {
+    return NextResponse.json({ error: 'Tipo inválido' }, { status: 404 })
+  }
+
+  let admin
+  try {
+    admin = await requireRole('ADMIN')
+  } catch (e) {
+    if (e instanceof AuthError) return NextResponse.json({ error: e.message }, { status: 401 })
+    throw e
+  }
+
+  const limited = guardMutation(admin.id, 'admin-pagamento')
+  if (limited) return limited
+
+  const parsed = actionSchema.safeParse(await request.json().catch(() => null))
+  if (!parsed.success) return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
+  const now = new Date()
+
+  if (kind === 'consulta') {
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: {
+        patient: { include: { user: { select: { name: true, email: true } } } },
+        professional: { include: { user: { select: { id: true, name: true, email: true } } } },
+      },
+    })
+    if (!appointment) return NextResponse.json({ error: 'Consulta não encontrada' }, { status: 404 })
+
+    if (parsed.data.action === 'REJECT') {
+      await prisma.appointment.update({
+        where: { id },
+        data: {
+          paymentStatus: 'PENDING',
+          pixClaimedAt: null,
+          pixClaimNote: parsed.data.reason ?? null,
+          pixReviewedBy: admin.id,
+          pixReviewedAt: now,
+        },
+      })
+      audit({ actorId: admin.id, actorRole: 'ADMIN', action: 'PIX_PAYMENT_REJECTED', subjectId: id })
+      return NextResponse.json({ ok: true, confirmed: false })
+    }
+
+    const result = await confirmAppointmentPixPayment(id, admin.id)
+    if (!result) return NextResponse.json({ error: 'Consulta não encontrada' }, { status: 404 })
+    if (result.alreadyPaid) return NextResponse.json({ ok: true, confirmed: true, alreadyPaid: true })
+
+    // O relógio de 24h do profissional começa agora: até este instante ele não sabia que a
+    // consulta existia, e lib/ranking.ts mede a resposta dele a partir de paidAt pelo mesmo
+    // motivo.
+    await prisma.appointment.update({
+      where: { id },
+      data: { confirmationDeadline: confirmationDeadlineFor(appointment.scheduledAt, now) },
+    })
+
+    notifyBookingRequested({
+      scheduledAt: appointment.scheduledAt,
+      modality: appointment.modality,
+      price: appointment.price,
+      patientName: appointment.patient.user.name,
+      patientEmail: appointment.patient.user.email,
+      professionalName: appointment.professional.user.name,
+      professionalEmail: appointment.professional.user.email,
+      professionalUserId: appointment.professional.user.id,
+    })
+
+    audit({
+      actorId: admin.id,
+      actorRole: 'ADMIN',
+      action: 'PIX_PAYMENT_CONFIRMED',
+      subjectId: id,
+      metadata: { grossCents: result.grossCents, netCents: result.netCents },
+    })
+    return NextResponse.json({ ok: true, confirmed: true })
+  }
+
+  const enrollment = await prisma.enrollment.findUnique({ where: { id } })
+  if (!enrollment) return NextResponse.json({ error: 'Acompanhamento não encontrado' }, { status: 404 })
+
+  if (parsed.data.action === 'REJECT') {
+    await prisma.enrollment.update({
+      where: { id },
+      data: { pixClaimedAt: null, pixClaimNote: parsed.data.reason ?? null, pixReviewedBy: admin.id, pixReviewedAt: now },
+    })
+    audit({ actorId: admin.id, actorRole: 'ADMIN', action: 'PIX_PAYMENT_REJECTED', subjectId: id })
+    return NextResponse.json({ ok: true, confirmed: false })
+  }
+
+  const result = await confirmEnrollmentPixPayment(id, admin.id)
+  if (!result) return NextResponse.json({ error: 'Acompanhamento não encontrado' }, { status: 404 })
+  audit({ actorId: admin.id, actorRole: 'ADMIN', action: 'PIX_PAYMENT_CONFIRMED', subjectId: id })
+  return NextResponse.json({ ok: true, confirmed: true })
+}

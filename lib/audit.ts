@@ -11,6 +11,11 @@ export type AuditAction =
   | 'PASSWORD_CHANGED'
   | 'PASSWORD_RESET_REQUESTED'
   | 'PASSWORD_RESET_COMPLETED'
+  // Dinheiro confirmado ou repassado por alguém tem nome e hora — é o que permite auditar
+  // depois quem liberou o quê, já que a conferência do Pix é manual.
+  | 'PIX_PAYMENT_CONFIRMED'
+  | 'PIX_PAYMENT_REJECTED'
+  | 'PAYOUT_MARKED_PAID'
 
 export function audit(args: {
   actorId: string

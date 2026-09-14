@@ -20,6 +20,9 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   PASSWORD_CHANGED: 'Trocou a própria senha',
   PASSWORD_RESET_REQUESTED: 'Pediu redefinição de senha',
   PASSWORD_RESET_COMPLETED: 'Concluiu a redefinição de senha',
+  PIX_PAYMENT_CONFIRMED: 'Confirmou o recebimento de um Pix',
+  PIX_PAYMENT_REJECTED: 'Recusou um aviso de pagamento Pix',
+  PAYOUT_MARKED_PAID: 'Marcou um repasse como pago',
 }
 
 const ACTION_TONE: Record<AuditAction, string> = {
@@ -29,6 +32,9 @@ const ACTION_TONE: Record<AuditAction, string> = {
   PASSWORD_CHANGED: 'bg-gray-50 text-gray-600 border-gray-100',
   PASSWORD_RESET_REQUESTED: 'bg-gray-50 text-gray-600 border-gray-100',
   PASSWORD_RESET_COMPLETED: 'bg-gray-50 text-gray-600 border-gray-100',
+  PIX_PAYMENT_CONFIRMED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+  PIX_PAYMENT_REJECTED: 'bg-red-50 text-red-600 border-red-100',
+  PAYOUT_MARKED_PAID: 'bg-emerald-50 text-emerald-700 border-emerald-100',
 }
 
 const ROLE_LABELS: Record<string, string> = {

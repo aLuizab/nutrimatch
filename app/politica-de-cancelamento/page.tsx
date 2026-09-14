@@ -1,4 +1,4 @@
-import { AlertTriangle, CreditCard, QrCode, Package, Clock, CalendarClock } from 'lucide-react'
+import { AlertTriangle, QrCode, Package, Clock, CalendarClock } from 'lucide-react'
 import PublicHeader from '../components/PublicHeader'
 import { CONFIRMATION_WINDOW_HOURS, CANCEL_REFUND_CUTOFF_HOURS, RESCHEDULE_CUTOFF_HOURS } from '@/lib/appointment-status'
 import { WITHDRAWAL_WINDOW_DAYS } from '@/lib/payments'
@@ -13,7 +13,7 @@ export default function PoliticaDeCancelamento() {
       <div className="max-w-3xl mx-auto px-6 py-10">
         <h1 className="text-2xl font-bold text-gray-900 mb-1">Política de Cancelamento e Reembolso</h1>
         <p className="text-gray-500 text-sm mb-6">
-          Última atualização: 1 de setembro de 2026 — regras exigidas pelo Código de Defesa do
+          Última atualização: 14 de setembro de 2026 — regras exigidas pelo Código de Defesa do
           Consumidor (art. 46 e 49) para toda compra feita pela internet.
         </p>
 
@@ -29,29 +29,25 @@ export default function PoliticaDeCancelamento() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 text-sm text-gray-600 leading-relaxed">
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <CreditCard size={17} className="text-emerald-500" /> Consulta avulsa paga no cartão
+              <QrCode size={17} className="text-emerald-500" /> Como o pagamento funciona
             </h2>
-            <p>
-              O valor fica <strong>reservado</strong> no seu cartão no momento do agendamento, mas
-              só é <strong>cobrado</strong> quando o profissional confirma a consulta. Você tem até{' '}
-              {CONFIRMATION_WINDOW_HOURS} horas de espera: se o profissional recusar o pedido, ou
-              se esse prazo passar sem resposta, a reserva é cancelada automaticamente e{' '}
-              <strong>nada é cobrado</strong> — não existe estorno para você esperar, porque o
-              dinheiro nunca saiu da sua conta.
+            <p className="mb-2">
+              O pagamento é por <strong>Pix</strong>, feito para a NutriMatch — não diretamente
+              para o profissional. A plataforma repassa a ele o valor já descontada a taxa de
+              serviço.
             </p>
-          </section>
-
-          <section>
-            <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <QrCode size={17} className="text-emerald-500" /> Consulta avulsa paga no Pix
-            </h2>
+            <p className="mb-2">
+              O Pix é debitado da sua conta no instante em que você paga. A confirmação do
+              recebimento é feita pela nossa equipe, conferindo o extrato: normalmente em algumas
+              horas, em dia útil. Enquanto isso, <strong>seu horário fica reservado</strong> — você
+              não perde a vaga porque a conferência não é instantânea.
+            </p>
             <p>
-              Diferente do cartão, o Pix é <strong>debitado no instante do pagamento</strong> — não
-              existe reserva sem cobrança no Pix. Por isso, se o profissional recusar o pedido, ou
-              se você cancelar antes de uma resposta, o valor pago é <strong>devolvido
-              integralmente por estorno</strong>, automaticamente, assim que o cancelamento é
-              processado (o Stripe informa que estornos de Pix costumam aparecer na sua conta em
-              poucos minutos).
+              Só depois de confirmado o pagamento é que o profissional recebe o pedido e tem até{' '}
+              {CONFIRMATION_WINDOW_HOURS} horas para aceitar. Se ele recusar, ou deixar esse prazo
+              passar sem responder, <strong>o valor é devolvido integralmente</strong> por Pix para
+              a conta de onde veio. A devolução é feita manualmente pela nossa equipe, então leva
+              até 2 dias úteis.
             </p>
           </section>
 
@@ -60,13 +56,13 @@ export default function PoliticaDeCancelamento() {
               <Clock size={17} className="text-emerald-500" /> Consulta já confirmada pelo profissional
             </h2>
             <p className="mb-2">
-              Depois que o profissional confirma, o valor já foi cobrado (no cartão, na
-              confirmação; no Pix, já estava). A partir daí:
+              Depois que o profissional confirma a consulta, o valor pago já está com a plataforma.
+              A partir daí:
             </p>
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
                 <strong>Você cancela com até {CANCEL_REFUND_CUTOFF_HOURS} horas de antecedência:</strong> reembolso
-                integral, automático.
+                integral, devolvido por Pix em até 2 dias úteis.
               </li>
               <li>
                 <strong>Você cancela com menos de {CANCEL_REFUND_CUTOFF_HOURS} horas de antecedência:</strong> o
@@ -112,9 +108,10 @@ export default function PoliticaDeCancelamento() {
             </p>
             <p>
               <strong>No fim natural do prazo contratado:</strong> se sobrarem consultas que você
-              não chegou a usar, a diferença é devolvida automaticamente, na proporção das
-              consultas não utilizadas — cobrar por uma consulta de saúde que nunca aconteceu é
-              exatamente o tipo de cláusula que o CDC não permite.
+              não chegou a usar, devolvemos a diferença na proporção das consultas não utilizadas —
+              cobrar por uma consulta de saúde que nunca aconteceu é exatamente o tipo de
+              cláusula que o CDC não permite. A devolução é feita por Pix pela nossa equipe; se
+              o prazo do seu programa terminou e você não recebeu, fale com o suporte.
             </p>
           </section>
 
