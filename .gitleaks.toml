@@ -25,9 +25,14 @@ paths = [
   '''SECURITY\.md''',
   '''README\.md''',
 ]
+# Estes padrões são casados contra o SEGREDO ENCONTRADO, não contra a linha inteira — e a
+# regra acima termina em [^s/]+, que para na primeira barra. O segredo capturado é, portanto,
+# "postgresql://build:build@localhost:5432", SEM o /build final. Listar o nome do banco aqui
+# fazia a allowlist nunca casar, e os placeholders derrubavam o CI como se fossem credenciais.
+# Por isso os padrões abaixo param no host: cobrem o valor com ou sem o sufixo.
 regexes = [
-  # Deliberate non-connecting placeholder in the Docker build stages.
-  '''postgresql://build:build@localhost:5432/build''',
-  '''postgresql://ci:ci@localhost:5432/ci''',
-  '''postgresql://user:password@host:5432/dbname''',
+  # Placeholder que não conecta em lugar nenhum, usado nos estágios de build do Docker.
+  '''postgres(?:ql)?://build:build@localhost''',
+  '''postgres(?:ql)?://ci:ci@localhost''',
+  '''postgres(?:ql)?://user:password@host''',
 ]

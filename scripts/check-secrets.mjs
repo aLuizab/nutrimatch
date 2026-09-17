@@ -14,11 +14,17 @@ const PATTERNS = [
   { name: 'Resend API key', re: /re_[A-Za-z0-9]{16,}/ },
 ]
 
-// Same placeholders the gitleaks config allows — keep the two lists in sync.
+// Os mesmos placeholders que o .gitleaks.toml libera — as duas listas precisam continuar
+// iguais. Param no host de propósito: o padrão acima termina em [^s/]+ e não captura o nome
+// do banco, então listar o valor completo aqui faria a comparação falhar sempre que o trecho
+// aparecer citado (numa aspas, num comentário) em vez de isolado.
 const ALLOWED = [
-  'postgresql://build:build@localhost:5432/build',
-  'postgresql://ci:ci@localhost:5432/ci',
-  'postgresql://user:password@host:5432/dbname',
+  'postgres://build:build@localhost',
+  'postgresql://build:build@localhost',
+  'postgres://ci:ci@localhost',
+  'postgresql://ci:ci@localhost',
+  'postgres://user:password@host',
+  'postgresql://user:password@host',
   'sk_test_...',
   'sk_live_...',
   'whsec_...',
