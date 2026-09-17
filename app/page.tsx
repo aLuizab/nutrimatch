@@ -19,6 +19,18 @@ const trustPoints = [
   { icon: Star, title: 'Avaliações de verdade', text: 'Só quem teve consulta pela plataforma pode avaliar. Nada de nota inflada.' },
 ]
 
+// Renderizada a cada request, não gerada no build.
+//
+// A vitrine da home sai do banco (profissionais em destaque, ordenados por rankScore), e sem
+// isto o Next tenta gerar esta página estaticamente durante `next build` — onde não existe
+// banco nenhum para consultar. Era exatamente o que quebrava o deploy: o build morria em
+// "Error occurred prerendering page /" com falha de autenticação no Postgres.
+//
+// Além de destravar o build, é o comportamento correto: a lista muda conforme novos
+// profissionais entram e conforme o ranking é recalculado, então congelá-la no build mostraria
+// uma vitrine velha até o próximo deploy.
+export const dynamic = 'force-dynamic'
+
 export default async function LandingPage() {
   const now = new Date()
   const [featuredRows, totalActive, consultasRealizadas, ratingAgg, testimonialRows] = await Promise.all([
