@@ -16,10 +16,31 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 RUN npm run build
 
+# A self-contained install of just the Prisma CLI, used only to run `migrate deploy` at boot.
+#
+# The CLI cannot be assembled by cherry-picking directories out of the app's node_modules: its
+# own dependencies (`effect`, reached through `@prisma/config`, among others) sit at the root of
+# node_modules, outside both `prisma/` and `@prisma/`. Copying those three directories looks
+# like it should work and fails at runtime with "Cannot find module", and the exact set changes
+# between Prisma releases. Letting npm resolve the tree costs ~170 MB and is correct by
+# construction; copying the app's whole node_modules instead would cost ~880 MB.
+#
+# The version comes from the lockfile so it can never drift from @prisma/client — a CLI newer
+# than the client can write migrations the client cannot read.
+FROM node:20-alpine AS migrator
+WORKDIR /migrator
+COPY package-lock.json /tmp/lock.json
+RUN npm init -y > /dev/null && \
+    npm i --no-audit --no-fund "prisma@$(node -p "require('/tmp/lock.json').packages['node_modules/prisma'].version")" && \
+    rm /tmp/lock.json
+
 FROM node:20-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# Prisma pings a version-check endpoint on every CLI run; at boot that is a network round trip
+# between the container starting and the server listening, for information nobody reads.
+ENV CHECKPOINT_DISABLE=1
 # The real DATABASE_URL (Postgres) is injected by the hosting platform at runtime — this is
 # only a placeholder so `prisma migrate deploy` has a syntactically valid fallback if it's ever
 # missing, and will fail loudly (connection refused) rather than silently using SQLite.
@@ -36,16 +57,23 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# `output: 'standalone'` traces JS imports, but the Prisma CLI (needed below for
-# `migrate deploy`) is invoked as a binary, not imported — copy it and the schema/migrations
-# explicitly rather than relying on trace output to include them.
+# next.config.js lists @prisma/client under serverExternalPackages, so it is deliberately not
+# bundled — it and the generated client in .prisma must exist in node_modules at runtime.
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+# The schema and migrations, read by the migrator below.
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+
+COPY --from=migrator /migrator/node_modules /migrator/node_modules
 
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["sh", "-c", "npx prisma migrate deploy && node server.js"]
+# The CLI is called through its entry file rather than `npx prisma`: npm creates the
+# node_modules/.bin shim at install time and `output: standalone` never emits that directory,
+# so npx has nothing to resolve and exits with "sh: prisma: not found". build/index.js is
+# precisely what the shim would exec.
+# `exec` on the server so it replaces the shell and receives SIGTERM directly — otherwise the
+# signal stops at `sh` and the platform kills the container instead of letting it drain.
+CMD ["sh", "-c", "node /migrator/node_modules/prisma/build/index.js migrate deploy --schema /app/prisma/schema.prisma && exec node server.js"]
