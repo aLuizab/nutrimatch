@@ -16,6 +16,10 @@ const prisma = new PrismaClient()
 // Endereços exatos, nunca um padrão como "%@nutrimatch.com.br": um dia alguém real se cadastra
 // num domínio parecido e um curinga leva a conta dessa pessoa junto.
 const DEMO_EMAILS = [
+  // Veio do seed como os outros, e com a mesma senha — que está em texto puro no repositório,
+  // em prisma/seed.ts. Um admin com senha pública em produção é a conta mais perigosa do banco.
+  // A trava abaixo impede que ela saia antes de existir outro admin no lugar.
+  'admin@nutrimatch.com.br',
   'carolina@nutrimatch.com.br',
   'rafael@nutrimatch.com.br',
   'mariafernanda@nutrimatch.com.br',
@@ -108,10 +112,17 @@ async function main() {
   console.log(`\n${restantes.length} conta(s) permanecem intactas:`)
   for (const u of restantes) console.log(`  ${u.role.padEnd(13)} ${u.email}`)
 
+  // Trava dura, não aviso: sem nenhum admin fora da lista, apagar tranca o painel — e quem
+  // reabre é o painel. Um alerta que o --apply ignora só documenta o estrago depois de feito.
   const admins = restantes.filter((u) => u.role === 'ADMIN')
   if (admins.length === 0) {
-    console.log('\n  ATENÇÃO: nenhuma conta ADMIN sobra. Crie uma antes (npm run create-admin),')
-    console.log('  ou o painel administrativo fica inacessível.')
+    console.log('\n  BLOQUEADO: o único ADMIN do banco está na lista acima.')
+    console.log('  Apagá-lo trancaria o painel administrativo, inclusive o registro das mensalidades.')
+    console.log('\n  Crie o seu admin primeiro, num terminal comum:')
+    console.log('      npm run create-admin')
+    console.log('\n  Depois rode este script de novo.\n')
+    process.exitCode = 1
+    return
   }
 
   if (!apply) {
