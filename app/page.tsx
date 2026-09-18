@@ -1,26 +1,33 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, CheckCircle2, Clock, ChevronRight, Search, ShieldCheck, CalendarCheck, Star, Quote } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronRight, Search, ShieldCheck, CalendarCheck, Star, Quote } from 'lucide-react'
 import PublicHeader from './components/PublicHeader'
 import RatingStat from './components/RatingStat'
 import HeroSearch from './HeroSearch'
 import Revelar from './components/Revelar'
 import Contador from './components/Contador'
+import ParaQuemE from './ParaQuemE'
+import DemoBusca, { type DemoProfissional } from './DemoBusca'
+import CartoesFlutuantes from './CartoesFlutuantes'
+import { PRO_PLAN_SLUG } from '@/lib/subscription'
+import { formatCents } from '@/lib/money'
+import { avatarColor, initials } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { listedWhere } from '@/lib/subscription'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
 import { SPECIALTIES } from '@/lib/specialties'
 
+// Usados só enquanto nenhum profissional está publicado, e a tela diz que são exemplos.
+const EXEMPLOS: DemoProfissional[] = [
+  { id: null, nome: 'Exemplo — Nutrição Esportiva', especialidade: 'Nutrição Esportiva', rating: 0, reviewCount: 0, preco: 150, cidade: 'São Paulo, SP', online: true, iniciais: 'NE', cor: 'bg-orange-500' },
+  { id: null, nome: 'Exemplo — Nutrição Clínica', especialidade: 'Nutrição Clínica', rating: 0, reviewCount: 0, preco: 120, cidade: 'Belo Horizonte, MG', online: false, iniciais: 'NC', cor: 'bg-blue-500' },
+  { id: null, nome: 'Exemplo — Nutrição Infantil', especialidade: 'Nutrição Infantil', rating: 0, reviewCount: 0, preco: 140, cidade: 'Curitiba, PR', online: true, iniciais: 'NI', cor: 'bg-purple-500' },
+]
+
 const steps = [
   { step: '1', title: 'Busque', description: 'Filtre por especialidade, cidade, preço e modalidade. Sem cadastro para pesquisar.', icon: Search },
   { step: '2', title: 'Compare', description: 'Veja perfis completos, formação, avaliações reais de pacientes e valor da consulta.', icon: CheckCircle2 },
   { step: '3', title: 'Agende', description: 'Escolha um horário livre na agenda do profissional e confirme em poucos cliques.', icon: CalendarCheck },
-]
-
-const trustPoints = [
-  { icon: ShieldCheck, title: 'Profissionais verificados', text: 'Todo nutricionista passa por aprovação da nossa equipe antes de aparecer na busca.' },
-  { icon: Clock, title: 'Agenda em tempo real', text: 'Você vê apenas horários realmente livres — sem troca de mensagens para marcar.' },
-  { icon: Star, title: 'Avaliações de verdade', text: 'Só quem teve consulta pela plataforma pode avaliar. Nada de nota inflada.' },
 ]
 
 // Renderizada a cada request, não gerada no build.
@@ -37,7 +44,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function LandingPage() {
   const now = new Date()
-  const [featuredRows, totalActive, consultasRealizadas, ratingAgg, testimonialRows] = await Promise.all([
+  const [featuredRows, totalActive, consultasRealizadas, ratingAgg, planoPro, testimonialRows] = await Promise.all([
     prisma.professional.findMany({
       // Featured obeys the same paywall as the search: a professional nobody can book should
       // not be the first thing a patient sees on the home page.
@@ -49,6 +56,7 @@ export default async function LandingPage() {
     prisma.professional.count({ where: { status: 'ACTIVE', ...listedWhere() } }),
     prisma.appointment.count({ where: { status: 'CONFIRMED', scheduledAt: { lt: now } } }),
     prisma.review.aggregate({ _avg: { rating: true }, _count: true }),
+    prisma.subscriptionPlan.findUnique({ where: { slug: PRO_PLAN_SLUG } }),
     prisma.review.findMany({
       where: { rating: 5 },
       orderBy: { createdAt: 'desc' },
@@ -61,6 +69,27 @@ export default async function LandingPage() {
   ])
 
   const featured = featuredRows.map(toProfessionalCard)
+
+  const mensalidade = planoPro ? `${formatCents(planoPro.monthlyPrice)}/mês` : 'R$ 9,90/mês'
+
+  // A prévia da busca e os cartões do topo usam profissionais reais. Enquanto não houver
+  // nenhum publicado, entram exemplos declarados como tal na própria tela — inventar nome e
+  // nota sem dizer que são inventados é o começo de uma página que promete o que não entrega.
+  const ilustrativo = featuredRows.length === 0
+  const demoProfissionais: DemoProfissional[] = ilustrativo
+    ? EXEMPLOS
+    : featuredRows.map((p) => ({
+        id: p.id,
+        nome: p.user.name,
+        especialidade: p.specialties[0] ?? 'Nutrição',
+        rating: p.rating,
+        reviewCount: p.reviewCount,
+        preco: p.price,
+        cidade: p.city,
+        online: p.modality !== 'PRESENCIAL',
+        iniciais: initials(p.user.name),
+        cor: avatarColor(p.id),
+      }))
 
   // Every stat is real, and one with too little data behind it is hidden rather than
   // padded with an invented number.
@@ -87,6 +116,8 @@ export default async function LandingPage() {
         />
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl" aria-hidden />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-50 rounded-full blur-3xl" aria-hidden />
+
+        <CartoesFlutuantes profissionais={demoProfissionais} />
 
         <div className="relative max-w-7xl mx-auto px-6 py-16 md:py-24">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -201,18 +232,7 @@ export default async function LandingPage() {
         </div>
       </section>
 
-      {/* Por que confiar */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-10">
-          {trustPoints.map(({ icon: Icon, title, text }) => (
-            <div key={title}>
-              <Icon size={22} className="text-emerald-500 mb-3" />
-              <h3 className="font-bold text-gray-900 mb-1.5">{title}</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <ParaQuemE mensalidade={mensalidade} />
 
       {/* Profissionais em destaque */}
       {featured.length > 0 && (
@@ -297,6 +317,8 @@ export default async function LandingPage() {
           </div>
         </section>
       )}
+
+      <DemoBusca profissionais={demoProfissionais} ilustrativo={ilustrativo} />
 
       {/* CTA profissional */}
       <section className="bg-emerald-500 py-20">

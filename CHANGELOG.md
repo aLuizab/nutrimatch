@@ -35,6 +35,9 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
   especialidade flutuando fora de fase, seções que entram ao rolar, contadores que
   contam até o número e cartões que se elevam ao passar o mouse. Tudo desligado
   para quem pede menos movimento no sistema operacional.
+- Página inicial reconstruída: cartões de profissionais flutuando ao redor do
+  título, abas "Para Pacientes / Para Profissionais" com a grade de recursos, e
+  uma prévia escura da busca com filtros que funcionam de verdade.
 
 - O CI passa a rodar também em `staging`.
 
