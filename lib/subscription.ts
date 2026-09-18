@@ -1,4 +1,4 @@
-import type { Professional, ProfessionalSubscription, SubscriptionPlan } from '@prisma/client'
+import type { Prisma, Professional, ProfessionalSubscription, SubscriptionPlan } from '@prisma/client'
 import { prisma } from './prisma'
 
 // The freemium gate, in one place — the same shape as isPaidProfessional in stripe-connect.ts.
@@ -47,18 +47,46 @@ export interface Entitlements {
 }
 
 /**
- * A subscription is honoured while ACTIVE, and also while PAST_DUE — Stripe retries a failed
- * charge for days, and locking someone out on the first decline treats an expired card as if
- * it were a cancellation. CANCELLED still honours the period already paid for.
+ * Derived from the paid period, not from status.
+ *
+ * This used to trust `status`, which was right while Stripe owned it: Stripe flips a
+ * subscription to PAST_DUE and then CANCELLED on its own as charges fail. Payment is manual
+ * now — an admin records each R$ 9,90 — and nobody flips anything, so an ACTIVE row whose month
+ * ran out would keep the professional listed forever. Reading the entitlement from
+ * currentPeriodEnd is the same "derive on read, no cron" shape as effectiveAttendance() in
+ * lib/reputation.ts and isExpiredAwaiting() in lib/appointment-status.ts.
+ *
+ * Status is kept as a record of what happened, and CANCELLED still honours the month already
+ * paid for, because the period end is what decides.
+ *
+ * Whatever changes here must change in listedWhere() below, which is the same rule expressed
+ * as a database filter.
  */
 export function subscriptionIsCurrent(
   sub: SubscriptionWithPlan | null | undefined,
   now: Date = new Date()
 ): boolean {
   if (!sub) return false
-  if (sub.status === 'ACTIVE' || sub.status === 'PAST_DUE') return true
-  // CANCELLED: the professional keeps what they already paid for, to the end of the period.
+  // The free tier is a real row that never expires — it simply grants less.
+  if (sub.plan.monthlyPrice === 0) return true
   return sub.currentPeriodEnd != null && sub.currentPeriodEnd > now
+}
+
+/**
+ * The same rule as subscriptionIsCurrent(), written as a Prisma filter so the gate runs in the
+ * database instead of loading every professional and discarding most of them.
+ *
+ * During the grace period this is an empty filter: nobody is hidden. That is what makes
+ * deploying the paywall safe — it changes nothing until SUBSCRIPTION_ENFORCED_FROM is set.
+ */
+export function listedWhere(now: Date = new Date()): Prisma.ProfessionalWhereInput {
+  if (inGracePeriod(now)) return {}
+  return {
+    subscription: {
+      plan: { canReceiveBookings: true, active: true },
+      currentPeriodEnd: { gt: now },
+    },
+  }
 }
 
 export function entitlementsFor(

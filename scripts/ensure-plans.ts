@@ -13,7 +13,7 @@ const PLANS = [
     slug: FREE_PLAN_SLUG,
     name: 'Gratuito',
     description:
-      'Perfil publicado, aparece na busca e recebe avaliações. Não recebe agendamentos pela plataforma.',
+      'Cadastro e perfil gratuitos. Não aparece na busca e não recebe agendamentos até a assinatura ser ativada.',
     monthlyPrice: 0,
     sponsored: false,
     canReceiveBookings: false,
@@ -23,8 +23,8 @@ const PLANS = [
     slug: PRO_PLAN_SLUG,
     name: 'Profissional',
     description:
-      'Recebe agendamentos pela plataforma, entra no rodízio da faixa patrocinada e acessa os relatórios do painel.',
-    monthlyPrice: 4990,
+      'Aparece na busca, recebe agendamentos e entra no rodízio diário da faixa de destaque.',
+    monthlyPrice: 990,
     sponsored: true,
     canReceiveBookings: true,
     sortOrder: 1,

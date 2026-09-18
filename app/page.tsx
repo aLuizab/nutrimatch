@@ -4,6 +4,7 @@ import PublicHeader from './components/PublicHeader'
 import RatingStat from './components/RatingStat'
 import HeroSearch from './HeroSearch'
 import { prisma } from '@/lib/prisma'
+import { listedWhere } from '@/lib/subscription'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
 import { SPECIALTIES } from '@/lib/specialties'
 
@@ -35,12 +36,14 @@ export default async function LandingPage() {
   const now = new Date()
   const [featuredRows, totalActive, consultasRealizadas, ratingAgg, testimonialRows] = await Promise.all([
     prisma.professional.findMany({
-      where: { status: 'ACTIVE' },
+      // Featured obeys the same paywall as the search: a professional nobody can book should
+      // not be the first thing a patient sees on the home page.
+      where: { status: 'ACTIVE', ...listedWhere() },
       include: PROFESSIONAL_CARD_INCLUDE,
       orderBy: [{ rating: 'desc' }, { reviewCount: 'desc' }],
       take: 6,
     }),
-    prisma.professional.count({ where: { status: 'ACTIVE' } }),
+    prisma.professional.count({ where: { status: 'ACTIVE', ...listedWhere() } }),
     prisma.appointment.count({ where: { status: 'CONFIRMED', scheduledAt: { lt: now } } }),
     prisma.review.aggregate({ _avg: { rating: true }, _count: true }),
     prisma.review.findMany({

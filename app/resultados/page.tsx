@@ -10,7 +10,7 @@ import MobileFilterDrawer from './MobileFilterDrawer'
 import SearchBar from './SearchBar'
 import SortSelect from './SortSelect'
 import ResultCard from './ResultCard'
-import { pickSponsored, sponsoredCandidates, SPONSORED_SLOTS } from '@/lib/subscription'
+import { listedWhere, pickSponsored, sponsoredCandidates, SPONSORED_SLOTS } from '@/lib/subscription'
 
 const PAGE_SIZE = 9
 
@@ -55,6 +55,9 @@ export default async function Resultados({
 
   const where: Prisma.ProfessionalWhereInput = {
     status: 'ACTIVE',
+    // Only professionals whose subscription is paid up. Empty during the grace period, so this
+    // line does nothing until SUBSCRIPTION_ENFORCED_FROM is set.
+    ...listedWhere(),
     price: { lte: filters.precoMax },
     rating: { gte: filters.avaliacaoMin },
     ...(filters.especialidade !== 'Todas' ? { specialties: { hasSome: especialidadeMatches } } : {}),
@@ -156,12 +159,12 @@ export default async function Resultados({
             {sponsored.length > 0 && (
               <div className="mb-6">
                 <div className="flex items-center gap-1.5 mb-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Patrocinado</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-400">Em destaque hoje</p>
                   <span className="group relative inline-flex">
                     <Info size={12} className="text-gray-300" />
                     <span className="pointer-events-none absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover:block w-56 bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg px-3 py-2 z-10">
-                      Profissionais que assinam um plano pago. A posição é comprada e não influencia
-                      a ordem dos resultados abaixo.
+                      Rodízio diário entre profissionais da plataforma que não apareceram na
+                      primeira página. Muda todo dia e não influencia a ordem dos resultados abaixo.
                     </span>
                   </span>
                 </div>

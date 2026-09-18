@@ -16,6 +16,10 @@ export type AuditAction =
   | 'PIX_PAYMENT_CONFIRMED'
   | 'PIX_PAYMENT_REJECTED'
   | 'PAYOUT_MARKED_PAID'
+  // A mensalidade decide se o profissional aparece na busca, e quem confirma o pagamento é uma
+  // pessoa. Sem registro não há como reconstruir por que alguém sumiu (ou voltou) da lista.
+  | 'SUBSCRIPTION_PAYMENT_RECORDED'
+  | 'SUBSCRIPTION_CANCELLED'
 
 export function audit(args: {
   actorId: string
