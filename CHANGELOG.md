@@ -30,6 +30,12 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 - O CI passa a rodar também em `staging`.
 
+### Corrigido
+
+- A extração de notas do release lia `[0.1.0]` como classe de caracteres de
+  expressão regular e nunca casava com o título da seção — a página do release
+  sairia vazia no primeiro uso.
+
 ## [0.1.0] — 2026-09-18
 
 Primeira versão numerada. Reúne o que já estava em produção quando o

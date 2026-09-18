@@ -21,11 +21,13 @@ jobs:
         id: notas
         run: |
           VERSAO="${GITHUB_REF_NAME#v}"
-          # Da linha da versão até a próxima seção "## [", sem incluí-la.
-          awk -v v="$VERSAO" '
-            $0 ~ "^## \[" v "\]" { dentro=1; next }
-            dentro && /^## \[/     { exit }
-            dentro                  { print }
+          # Comparação literal, não regex: "[0.1.0]" dentro de uma regex vira classe de
+          # caracteres e nunca casa com a linha do título — bug que só apareceria no primeiro
+          # release de verdade, quando a nota sairia vazia.
+          awk -v alvo="## [$VERSAO]" '
+            index($0, alvo) == 1            { dentro=1; next }
+            dentro && index($0, "## [") == 1 { exit }
+            dentro                           { print }
           ' CHANGELOG.md > NOTAS.md
           if [ ! -s NOTAS.md ]; then
             echo "Sem seção para $VERSAO no CHANGELOG.md — o release sairia vazio." >&2
