@@ -10,25 +10,48 @@ que já aconteceu ou que custaria caro; nenhuma existe por cerimônia.
 |---|---|---|
 | Branch | `staging` | `main` |
 | Deploy | ambiente *staging* no Railway | ambiente *production* no Railway |
-| Banco | branch do Neon, cópia isolada | Neon de produção |
-| Usuários | ninguém real | pacientes e nutricionistas de verdade |
-| Pode quebrar? | sim, é para isso | não |
+| Banco | **o mesmo de produção** (provisório) | Neon de produção |
+| Usuários | os reais, porque o banco é o mesmo | pacientes e nutricionistas de verdade |
+| Pode quebrar? | o código sim, os dados não | não |
 
-`staging` é o lugar onde uma migração destrutiva, uma mudança de cobrança ou um
-disparo de e-mail em massa são testados **antes** de alcançar gente real.
+### ⚠ O banco ainda é compartilhado
 
-### O banco de staging precisa ser separado
+Decisão consciente para não travar o início, mas ela limita bastante o que o
+staging protege. Enquanto os dois apontarem para o mesmo banco, **staging serve
+para testar código, não para testar efeito sobre dados**.
 
-Este é o ponto mais importante do documento. Durante boa parte do
-desenvolvimento, o `.env` local apontou para o banco de **produção** — e isso
-levou a apagar dados reais uma vez. O Neon resolve isso com branch de banco:
+O que continua seguro testar lá: tela, texto, layout, navegação, regra que só
+lê, e se a aplicação sobe sem erro.
+
+O que **não** se testa em staging hoje, porque atinge gente de verdade:
+
+- **Comunicados.** `/admin/comunicados` manda e-mail para os usuários reais da
+  lista. Não existe "mandar só para teste".
+- **Confirmar ou recusar pagamento**, marcar repasse como pago, registrar
+  mensalidade. Tudo grava no mesmo lugar que produção lê.
+- **Aprovar ou suspender profissional.**
+- **Apagar qualquer coisa.**
+- **Migração destrutiva** — veja abaixo.
+
+#### Migrations não rodam em staging
+
+O ambiente de staging deve ter `SKIP_MIGRATIONS=1`. Sem isso, subir staging com
+uma migração nova a aplicaria no banco de **produção**, antes do código que
+precisa dela chegar lá — o contrário do que homologação existe para fazer.
+
+Então a ordem hoje é: a migração vai para produção junto com o merge em `main`.
+Revise o SQL antes, porque staging não vai pegar o erro para você.
+
+### Como separar, quando for a hora
 
 1. No painel do Neon, **Branches → New branch** a partir de `main`, nome `staging`.
 2. Copie a connection string dela.
 3. Use essa string no `DATABASE_URL` do ambiente de staging do Railway **e no seu
    `.env` local**.
+4. Tire o `SKIP_MIGRATIONS` do staging.
 
-A partir daí, desenvolver localmente não toca em dado de ninguém.
+O passo 3 é o que mais importa: hoje o `.env` local aponta para produção, e foi
+assim que dados reais foram apagados uma vez durante o desenvolvimento.
 
 ## Como o código anda
 
@@ -45,7 +68,8 @@ feat/nome-curto ──PR──> staging ──PR──> main
 2. **PR para `staging`.** O CI roda typecheck, lint, build, scanner de secrets e
    auditoria de dependências. Nada entra vermelho.
 3. **Merge em `staging`** publica no ambiente de homologação. Teste ali o que
-   você mudou, com dados que não são de ninguém.
+   você mudou — lembrando que o banco ainda é o de produção, então vale para
+   conferir tela e comportamento, não para mexer em dado.
 4. **PR de `staging` para `main`** quando quiser publicar. Esse PR é o release:
    reúne tudo que foi para homologação desde a última publicação.
 5. **Tag** depois do merge (veja abaixo). A tag é o que vira release no GitHub.
@@ -98,7 +122,8 @@ GitHub com o trecho correspondente do changelog.
 
 | Variável | staging | produção |
 |---|---|---|
-| `DATABASE_URL` | branch do Neon | Neon de produção |
+| `DATABASE_URL` | o mesmo de produção, por ora | Neon de produção |
+| `SKIP_MIGRATIONS` | `1` enquanto o banco for compartilhado | nunca definida |
 | `JWT_SECRET` | um valor próprio | **outro** valor, nunca o mesmo |
 | `NEXT_PUBLIC_APP_URL` | URL do staging | `https://nutrimatch.com.br` |
 | `RESEND_API_KEY` | chave só-envio | chave só-envio |
@@ -114,6 +139,7 @@ homologação valeria na conta de um paciente real.
 - [ ] CI verde no PR
 - [ ] Migração revisada: `ADD COLUMN` anulável e `CREATE TABLE` são seguros;
       `DROP`, `NOT NULL` em tabela existente e renomeação exigem plano de volta
-- [ ] Testado em staging, não só localmente
+- [ ] Testado em staging, não só localmente — e, para o que escreve no banco,
+      testado com consciência de que o banco é o de produção
 - [ ] `CHANGELOG.md` atualizado em "Não lançado"
 - [ ] Variável de ambiente nova já criada no Railway **antes** do deploy
