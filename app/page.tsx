@@ -336,6 +336,32 @@ export default async function LandingPage() {
         </div>
       </section>
 
+      {/* FETIN — o projeto nasceu na feira do Inatel e isso é parte da história dele */}
+      <section className="bg-white border-t border-gray-100 py-14">
+        <div className="max-w-3xl mx-auto px-6 text-center">
+          <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg mb-5">
+            Feira Tecnológica do Inatel
+          </span>
+          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight tracking-tightest">
+            O NutriMatch participa da FETIN 2026
+          </h2>
+          <p className="text-gray-500 mt-4 leading-relaxed">
+            A FETIN é a feira de tecnologia do Instituto Nacional de Telecomunicações, em Santa
+            Rita do Sapucaí. A edição de 2026 tem como tema{' '}
+            <em className="text-gray-700">Quebrando as barreiras do Futuro</em> — e é onde este
+            projeto foi concebido e apresentado.
+          </p>
+          <a
+            href="https://inatel.br/fetin/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 mt-6 text-sm font-bold text-emerald-700 border border-emerald-200 bg-emerald-50 px-5 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors"
+          >
+            Conhecer a FETIN <ArrowRight size={15} />
+          </a>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6">
@@ -350,7 +376,20 @@ export default async function LandingPage() {
             <Link href="/login" className="hover:text-white transition-colors">Entrar</Link>
             <Link href="/cadastro" className="hover:text-white transition-colors">Cadastrar</Link>
           </div>
-          <p className="text-xs">© 2026 NutriMatch</p>
+          <p className="text-xs text-center md:text-right">
+            © 2026 NutriMatch
+            <span className="block mt-1">
+              Projeto da{' '}
+              <a
+                href="https://inatel.br/fetin/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-300 hover:text-white transition-colors underline underline-offset-2"
+              >
+                FETIN 2026 · Inatel
+              </a>
+            </span>
+          </p>
         </div>
       </footer>
     </div>

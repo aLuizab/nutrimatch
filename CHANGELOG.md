@@ -38,6 +38,8 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 - Página inicial reconstruída: cartões de profissionais flutuando ao redor do
   título, abas "Para Pacientes / Para Profissionais" com a grade de recursos, e
   uma prévia escura da busca com filtros que funcionam de verdade.
+- Seção contando que o projeto participa da FETIN 2026, a Feira Tecnológica do
+  Inatel, com link para o evento.
 
 - O CI passa a rodar também em `staging`.
 
