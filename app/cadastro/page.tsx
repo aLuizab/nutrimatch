@@ -59,13 +59,21 @@ export default function Cadastro() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       })
-      const data = await res.json()
+      // A failing route can answer with something that is not JSON at all (a platform 502, an
+      // HTML error page). Parsing defensively keeps the status code in charge of the message
+      // instead of letting a parse error become the whole story.
+      const data = await res.json().catch(() => ({}) as { error?: string; role?: string })
       if (!res.ok) {
-        setError(data.error ?? 'Não foi possível criar sua conta')
+        setError(data.error ?? 'Não foi possível criar sua conta. Tente novamente.')
         return
       }
-      router.push(data.role === 'PROFESSIONAL' ? '/dashboard' : '/patient/dashboard')
+      const home = data.role === 'PROFESSIONAL' ? '/dashboard' : '/patient/dashboard'
+      router.push(`${home}?cadastro=ok`)
       router.refresh()
+    } catch {
+      // Without this the promise rejected, no message was ever set and the form just went
+      // quiet: no redirect, no error, nothing to act on.
+      setError('Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.')
     } finally {
       setLoading(false)
     }

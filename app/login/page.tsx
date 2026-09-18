@@ -27,9 +27,11 @@ function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
       })
-      const data = await res.json()
+      // Parsed defensively so a non-JSON reply does not throw its way into the catch below and
+      // get reported as a connection problem when the server in fact answered.
+      const data = await res.json().catch(() => ({}) as { error?: string; redirectTo?: string })
       if (!res.ok) {
-        setError(data.error ?? 'Não foi possível entrar')
+        setError(data.error ?? 'Não foi possível entrar. Tente novamente.')
         return
       }
       router.push(safeNext ?? data.redirectTo)

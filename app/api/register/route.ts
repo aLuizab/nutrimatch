@@ -6,6 +6,7 @@ import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, signSessionToken } from '@/lib
 import { SPECIALTY_NAMES } from '@/lib/specialties'
 import { extractUf, isCrnValidationError, validateCrn } from '@/lib/crn'
 import { LIMITS, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { configFailure, unexpectedFailure } from '@/lib/api-failures'
 
 const baseFields = {
   name: z.string().trim().min(2, 'Nome é obrigatório'),
@@ -56,6 +57,12 @@ export async function POST(request: Request) {
     return tooManyRequests(limit, 'Muitas tentativas de cadastro. Tente novamente mais tarde.')
   }
 
+  // Checked before the user row is written. signSessionToken() runs at the very end and throws
+  // on a missing JWT_SECRET, so a misconfigured deploy used to create the account and only then
+  // fail — leaving an e-mail address taken by an account that could never be signed into.
+  const misconfigured = configFailure()
+  if (misconfigured) return misconfigured
+
   const json = await request.json().catch(() => null)
   const parsed = registerSchema.safeParse(json)
   if (!parsed.success) {
@@ -81,58 +88,62 @@ export async function POST(request: Request) {
   // users genuinely need, and make bulk probing impractical via the rate limit above
   // (5/hour/IP). Revisit if signup ever moves to email confirmation, which removes the
   // Set-Cookie tell and makes a generic response actually generic.
-  const existing = await prisma.user.findUnique({ where: { email: data.email } })
-  if (existing) {
-    return NextResponse.json({ error: 'Já existe uma conta com este e-mail' }, { status: 409 })
+  try {
+    const existing = await prisma.user.findUnique({ where: { email: data.email } })
+    if (existing) {
+      return NextResponse.json({ error: 'Já existe uma conta com este e-mail' }, { status: 409 })
+    }
+
+    const passwordHash = await hashPassword(data.password)
+
+    const user = await prisma.user.create({
+      data: {
+        name: data.name,
+        email: data.email,
+        passwordHash,
+        phone: data.phone || null,
+        role: data.role,
+        ...(data.role === 'PATIENT'
+          ? {
+              patient: {
+                create: {
+                  birthDate: data.birthDate ? new Date(data.birthDate) : null,
+                  goal: data.goal || null,
+                  city: data.city || null,
+                },
+              },
+            }
+          : {
+              // Self-registered professionals start PENDING and stay out of public search
+              // until an admin approves them in /admin/profissionais.
+              professional: {
+                create: {
+                  crn: crnFormatted!,
+                  specialties: data.specialties,
+                  bio: '',
+                  city: data.city,
+                  modality: data.modality,
+                  price: data.price,
+                  status: 'PENDING',
+                  availabilityRules: { create: DEFAULT_AVAILABILITY },
+                },
+              },
+            }),
+      },
+    })
+
+    const token = await signSessionToken({ userId: user.id, role: user.role })
+
+    const response = NextResponse.json({ role: user.role })
+    response.cookies.set(SESSION_COOKIE, token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    })
+    return response
+  } catch (e) {
+    return unexpectedFailure('register', e)
   }
-
-  const passwordHash = await hashPassword(data.password)
-
-  const user = await prisma.user.create({
-    data: {
-      name: data.name,
-      email: data.email,
-      passwordHash,
-      phone: data.phone || null,
-      role: data.role,
-      ...(data.role === 'PATIENT'
-        ? {
-            patient: {
-              create: {
-                birthDate: data.birthDate ? new Date(data.birthDate) : null,
-                goal: data.goal || null,
-                city: data.city || null,
-              },
-            },
-          }
-        : {
-            // Self-registered professionals start PENDING and stay out of public search
-            // until an admin approves them in /admin/profissionais.
-            professional: {
-              create: {
-                crn: crnFormatted!,
-                specialties: data.specialties,
-                bio: '',
-                city: data.city,
-                modality: data.modality,
-                price: data.price,
-                status: 'PENDING',
-                availabilityRules: { create: DEFAULT_AVAILABILITY },
-              },
-            },
-          }),
-    },
-  })
-
-  const token = await signSessionToken({ userId: user.id, role: user.role })
-
-  const response = NextResponse.json({ role: user.role })
-  response.cookies.set(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
-    maxAge: SESSION_MAX_AGE_SECONDS,
-  })
-  return response
 }

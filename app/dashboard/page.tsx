@@ -7,8 +7,14 @@ import { addDaysToDateString, instantAt, spDateString, startOfMonthInstant } fro
 import { appointmentDisplayStatus, avatarColor, formatDateBR, formatPrice, formatTimeBR, initials } from '@/lib/format'
 import DashboardShell from '../components/DashboardShell'
 import ReputationCard from './ReputationCard'
+import SignupWelcome from '../components/SignupWelcome'
 
-export default async function DashboardProfissional() {
+export default async function DashboardProfissional({
+  searchParams,
+}: {
+  searchParams: Promise<{ cadastro?: string }>
+}) {
+  const justSignedUp = (await searchParams).cadastro === 'ok'
   const user = await requireRoleOrRedirect('PROFESSIONAL')
   if (!user.professional) return null
   const professionalId = user.professional.id
@@ -77,6 +83,8 @@ export default async function DashboardProfissional() {
           <Bell size={20} className="text-gray-600" />
         </Link>
       </div>
+
+      {justSignedUp && <SignupWelcome />}
 
       {user.professional.status === 'PENDING' && (
         <div className="mx-8 mt-6 text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-100 rounded-lg px-3 py-2">

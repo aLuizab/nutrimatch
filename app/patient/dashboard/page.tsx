@@ -9,8 +9,14 @@ import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professiona
 import { avatarColor, formatDateBR, formatTimeBR, initials } from '@/lib/format'
 import { specialtyLabel } from '@/lib/specialties'
 import DashboardShell from '../../components/DashboardShell'
+import SignupWelcome from '../../components/SignupWelcome'
 
-export default async function PatientDashboard() {
+export default async function PatientDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ cadastro?: string }>
+}) {
+  const justSignedUp = (await searchParams).cadastro === 'ok'
   const user = await requirePatientProfileOrRedirect()
   if (!user.patient) return null
   const patientId = user.patient.id
@@ -48,6 +54,8 @@ export default async function PatientDashboard() {
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{todayName}</p>
         </div>
       </div>
+
+      {justSignedUp && <SignupWelcome />}
 
       <div className="p-8 space-y-8">
         {nextAppointment ? (

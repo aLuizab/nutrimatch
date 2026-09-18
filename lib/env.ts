@@ -52,11 +52,17 @@ export function getEnv(): Env {
   return cached
 }
 
-/** Non-throwing variant for surfaces that want to report status rather than crash. */
-export function checkEnv(): { ok: true } | { ok: false; errors: string[] } {
+/**
+ * Non-throwing variant for surfaces that want to report status rather than crash.
+ *
+ * The errors array is always present rather than living only on the failure branch of a
+ * union: this project compiles with strict: false, and without strictNullChecks TypeScript
+ * will not narrow a union by its discriminant, so callers could never reach the field.
+ */
+export function checkEnv(): { ok: boolean; errors: string[] } {
   try {
     getEnv()
-    return { ok: true }
+    return { ok: true, errors: [] }
   } catch (e) {
     return { ok: false, errors: [(e as Error).message] }
   }
