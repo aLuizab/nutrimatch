@@ -76,4 +76,9 @@ ENV HOSTNAME="0.0.0.0"
 # precisely what the shim would exec.
 # `exec` on the server so it replaces the shell and receives SIGTERM directly — otherwise the
 # signal stops at `sh` and the platform kills the container instead of letting it drain.
-CMD ["sh", "-c", "node /migrator/node_modules/prisma/build/index.js migrate deploy --schema /app/prisma/schema.prisma && exec node server.js"]
+# SKIP_MIGRATIONS existe por causa de um arranjo temporário: staging e produção ainda
+# compartilham o mesmo banco. Sem esta trava, subir staging com uma migração nova a aplicaria
+# no banco de produção — antes do código que precisa dela chegar lá, e sem ninguém decidir isso.
+# É o contrário do que um ambiente de homologação serve para fazer. Deve valer 1 em staging
+# enquanto os bancos não forem separados, e nunca em produção.
+CMD ["sh", "-c", "if [ \"$SKIP_MIGRATIONS\" = \"1\" ]; then echo '[boot] SKIP_MIGRATIONS=1: migrations nao aplicadas neste ambiente'; else node /migrator/node_modules/prisma/build/index.js migrate deploy --schema /app/prisma/schema.prisma; fi && exec node server.js"]

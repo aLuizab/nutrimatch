@@ -29,6 +29,10 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 ### Modificado
 
 - O CI passa a rodar também em `staging`.
+- `SKIP_MIGRATIONS=1` impede que o ambiente de staging aplique migrations. Enquanto
+  staging e produção dividem o mesmo banco, subir staging com uma migração nova a
+  aplicaria em produção antes do código que precisa dela — o contrário do que um
+  ambiente de homologação existe para fazer.
 
 ### Corrigido
 
