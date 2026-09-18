@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowRight, CheckCircle2, ChevronRight, Search, ShieldCheck, CalendarCheck, Star, Quote } from 'lucide-react'
 import PublicHeader from './components/PublicHeader'
+import FaixaFetin from './FaixaFetin'
 import RatingStat from './components/RatingStat'
 import HeroSearch from './HeroSearch'
 import Revelar from './components/Revelar'
@@ -104,6 +105,7 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans">
+      <FaixaFetin />
       <PublicHeader />
 
       {/* Hero */}
@@ -333,32 +335,6 @@ export default async function LandingPage() {
           >
             Criar perfil profissional <ArrowRight size={18} />
           </Link>
-        </div>
-      </section>
-
-      {/* FETIN — o projeto nasceu na feira do Inatel e isso é parte da história dele */}
-      <section className="bg-white border-t border-gray-100 py-14">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <span className="inline-block text-[11px] font-bold uppercase tracking-widest text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-lg mb-5">
-            Feira Tecnológica do Inatel
-          </span>
-          <h2 className="text-2xl md:text-3xl font-bold text-gray-900 leading-tight tracking-tightest">
-            O NutriMatch participa da FETIN 2026
-          </h2>
-          <p className="text-gray-500 mt-4 leading-relaxed">
-            A FETIN é a feira de tecnologia do Instituto Nacional de Telecomunicações, em Santa
-            Rita do Sapucaí. A edição de 2026 tem como tema{' '}
-            <em className="text-gray-700">Quebrando as barreiras do Futuro</em> — e é onde este
-            projeto foi concebido e apresentado.
-          </p>
-          <a
-            href="https://inatel.br/fetin/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-6 text-sm font-bold text-emerald-700 border border-emerald-200 bg-emerald-50 px-5 py-2.5 rounded-xl hover:bg-emerald-100 transition-colors"
-          >
-            Conhecer a FETIN <ArrowRight size={15} />
-          </a>
         </div>
       </section>
 
