@@ -82,7 +82,7 @@ export default async function LandingPage() {
         {/* A malha de pontos esmaece para baixo, senão ela compete com o conteúdo em vez de
             servir de textura. */}
         <div
-          className="absolute inset-0 bg-pontilhado opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent)]"
+          className="absolute inset-0 bg-pontilhado [mask-image:linear-gradient(to_bottom,black_35%,transparent)]"
           aria-hidden
         />
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl" aria-hidden />

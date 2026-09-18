@@ -14,15 +14,20 @@
   /* Malha de pontos do topo da página. Feita com gradiente em vez de imagem: não custa
      requisição, escala em qualquer tela e acompanha a cor do tema. */
   .bg-pontilhado {
-    background-image: radial-gradient(circle, theme('colors.gray.200') 1px, transparent 1px);
-    background-size: 22px 22px;
+    /* gray-300 e não gray-200: com o tom mais claro os pontos somem contra o fundo quase
+       branco do topo. Textura que ninguém enxerga é peso morto no CSS. */
+    background-image: radial-gradient(circle, theme('colors.gray.300') 1.5px, transparent 1.5px);
+    background-size: 18px 18px;
   }
 
-  /* Brilho atrás do texto em destaque do título. */
+  /* O halo precisa de tom saturado: verde pálido atrás de texto verde-escuro sobre fundo
+     branco não produz halo nenhum, só custa pintura. As três camadas dão um degradê do centro
+     para fora, em vez de um contorno chapado. */
   .brilho-marca {
     text-shadow:
-      0 0 28px theme('colors.emerald.200'),
-      0 0 60px theme('colors.emerald.100');
+      0 0 14px theme('colors.emerald.300'),
+      0 0 34px theme('colors.emerald.300'),
+      0 0 70px theme('colors.emerald.200');
   }
 
   .elevar-no-hover {
@@ -57,18 +62,20 @@
   }
 }
 
+/* 10px em 3,2s. Os 6px anteriores em 4,5s eram lentos e curtos demais: o movimento existia
+   no CSS e ninguém percebia olhando a tela. */
 @keyframes flutuar {
   0%,
   100% {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-6px);
+    transform: translateY(-10px);
   }
 }
 
 .flutuar {
-  animation: flutuar 4.5s ease-in-out infinite;
+  animation: flutuar 3.2s ease-in-out infinite;
 }
 
 /*
