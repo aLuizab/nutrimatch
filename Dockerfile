@@ -28,6 +28,10 @@ ENV DATABASE_URL="postgresql://build:build@localhost:5432/build"
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
+# `output: standalone` leaves public/ and .next/static out of the trace, so Next requires both
+# to be copied by hand. public/ must therefore exist in the repo — COPY fails the whole build
+# when its source is missing, which is exactly what happened while this project had no public/
+# at all. Keep robots.txt there even if nothing else is.
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static

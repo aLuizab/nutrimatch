@@ -1,0 +1,16 @@
+# Áreas de trabalho e do paciente: fora do índice. Isto não é controle de acesso — quem
+# protege essas rotas é o middleware.ts — é só para não gastar rastreamento com páginas que
+# exigem sessão e nunca renderizam nada útil para um buscador.
+User-agent: *
+Disallow: /admin
+Disallow: /agenda
+Disallow: /api
+Disallow: /configuracoes
+Disallow: /dashboard
+Disallow: /pacientes
+Disallow: /pagamento
+Disallow: /patient
+Disallow: /programas
+Disallow: /redefinir-senha
+
+Allow: /
