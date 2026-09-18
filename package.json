@@ -1,5 +1,6 @@
 {
   "name": "nutrimatch",
+  "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,7 +13,8 @@
     "prepare": "husky",
     "check-secrets": "node scripts/check-secrets.mjs",
     "audit-gate": "node scripts/audit-gate.mjs",
-    "ensure-plans": "tsx scripts/ensure-plans.ts"
+    "ensure-plans": "tsx scripts/ensure-plans.ts",
+    "release": "node scripts/release.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

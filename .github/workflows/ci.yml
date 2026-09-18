@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, staging]
   pull_request:
 
 # Least privilege: nothing here needs write access to the repo.

@@ -1,0 +1,42 @@
+name: Release
+
+# Dispara na tag, não no merge: o merge em main publica em produção, mas quem
+# decide que aquilo é uma versão é a tag. Separar os dois permite juntar vários
+# merges num release só.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  publicar:
+    name: Publicar release no GitHub
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extrair a seção do CHANGELOG
+        id: notas
+        run: |
+          VERSAO="${GITHUB_REF_NAME#v}"
+          # Da linha da versão até a próxima seção "## [", sem incluí-la.
+          awk -v v="$VERSAO" '
+            $0 ~ "^## \[" v "\]" { dentro=1; next }
+            dentro && /^## \[/     { exit }
+            dentro                  { print }
+          ' CHANGELOG.md > NOTAS.md
+          if [ ! -s NOTAS.md ]; then
+            echo "Sem seção para $VERSAO no CHANGELOG.md — o release sairia vazio." >&2
+            exit 1
+          fi
+          echo "versao=$VERSAO" >> "$GITHUB_OUTPUT"
+
+      - name: Criar o release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.notas.outputs.versao }}
+          body_path: NOTAS.md
+          # 0.x continua sendo pré-lançamento aos olhos de quem chega no repositório.
+          prerelease: ${{ startsWith(steps.notas.outputs.versao, '0.') }}
