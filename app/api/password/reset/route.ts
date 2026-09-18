@@ -5,6 +5,7 @@ import { hashPassword } from '@/lib/password'
 import { consumeResetToken } from '@/lib/password-reset'
 import { LIMITS, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { notifyPasswordChanged } from '@/lib/notifications'
 
 const schema = z.object({
   token: z.string().min(1),
@@ -40,6 +41,9 @@ export async function POST(request: Request) {
   })
 
   audit({ actorId: user.id, actorRole: user.role, action: 'PASSWORD_RESET_COMPLETED' })
+
+  // Vale aqui também: quem pediu a redefinição pode não ter sido o dono da conta.
+  notifyPasswordChanged({ name: user.name, email: user.email, when: user.passwordChangedAt ?? new Date() })
 
   return NextResponse.json({ ok: true })
 }

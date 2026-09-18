@@ -392,3 +392,93 @@ export function appointmentExpiredPatient(d: AppointmentEmailData) {
     ),
   }
 }
+
+// ── Conta ───────────────────────────────────────────────────────────────────
+
+export function welcomePatient(d: { name: string; searchUrl: string }) {
+  return {
+    subject: 'Bem-vinda ao NutriMatch! 🥗',
+    html: wrap(
+      'Sua conta está pronta',
+      `<p>Olá, ${d.name}!</p>
+       <p>Sua conta foi criada. A partir de agora você pode comparar nutricionistas por preço,
+          avaliação e disponibilidade, e agendar online ou presencial.</p>
+       <p><a href="${d.searchUrl}" style="color: #10b981; font-weight: 600;">Encontrar um nutricionista</a></p>
+       <p>Duas coisas que talvez você não saiba:</p>
+       <p>• Só quem teve consulta pela plataforma pode avaliar — as notas que você vê são de
+          pacientes de verdade.<br/>
+          • Você pode definir metas e acompanhar sua evolução em <em>Minhas Metas</em>.</p>`
+    ),
+  }
+}
+
+export function welcomeProfessional(d: { name: string; monthlyLabel: string; settingsUrl: string }) {
+  return {
+    subject: 'Cadastro recebido — próximos passos',
+    html: wrap(
+      'Recebemos seu cadastro',
+      `<p>Olá, ${d.name}!</p>
+       <p>Seu perfil foi criado e está <strong>em análise</strong>. Conferimos seu CRN no portal do
+          conselho antes de publicar — é o que garante que todo nutricionista aqui é registrado de
+          verdade. Você recebe um e-mail assim que for aprovado.</p>
+       <p>Enquanto isso, deixe o perfil pronto em
+          <a href="${d.settingsUrl}" style="color: #10b981; font-weight: 600;">Configurações</a>:</p>
+       <p>• <strong>Sua chave Pix</strong> — é por onde a plataforma repassa o valor das consultas.
+          Sem ela não conseguimos te pagar.<br/>
+          • <strong>Seus horários</strong> — o paciente só vê o que estiver livre na sua agenda.<br/>
+          • <strong>Seu valor</strong> — você define; a plataforma retém 10% por consulta.</p>
+       <p>O cadastro é gratuito. Para aparecer na busca e receber agendamentos, a mensalidade é de
+          <strong>${d.monthlyLabel}</strong>.</p>`
+    ),
+  }
+}
+
+/**
+ * Aviso de segurança, não notificação de conveniência: quem não reconhece a troca precisa saber
+ * no mesmo instante, porque é o único sinal de que alguém entrou na conta. Por isso este e-mail
+ * ignora qualquer preferência de notificação.
+ */
+export function passwordChangedEmail(d: { name: string; whenLabel: string; resetUrl: string }) {
+  return {
+    subject: 'Sua senha do NutriMatch foi alterada',
+    html: wrap(
+      'Sua senha foi alterada',
+      `<p>Olá, ${d.name}!</p>
+       <p>A senha da sua conta foi alterada em <strong>${d.whenLabel}</strong>, e todas as outras
+          sessões foram desconectadas.</p>
+       <p><strong>Se foi você, não precisa fazer nada.</strong></p>
+       <p>Se não foi, redefina a senha agora mesmo:
+          <a href="${d.resetUrl}" style="color: #10b981; font-weight: 600;">redefinir minha senha</a>.</p>`
+    ),
+  }
+}
+
+/**
+ * Comunicado da plataforma. Único template com link de descadastro, porque é o único que não
+ * responde a algo que a pessoa fez — os outros são transacionais.
+ */
+export function platformAnnouncement(d: {
+  name: string
+  title: string
+  bodyHtml: string
+  unsubscribeUrl: string
+}) {
+  return {
+    subject: d.title,
+    html: `
+  <div style="font-family: -apple-system, Segoe UI, Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 24px;">
+    <p style="font-size: 20px; font-weight: 700; color: #111827; margin: 0 0 4px;">
+      Nutri<span style="color: #10b981;">Match</span>
+    </p>
+    <h1 style="font-size: 17px; color: #111827; margin: 20px 0 12px;">${d.title}</h1>
+    <div style="font-size: 14px; color: #374151; line-height: 1.6;">
+      <p>Olá, ${d.name}!</p>
+      ${d.bodyHtml}
+    </div>
+    <p style="font-size: 12px; color: #9ca3af; margin-top: 28px;">
+      Você recebeu este comunicado porque tem uma conta no NutriMatch.<br/>
+      <a href="${d.unsubscribeUrl}" style="color: #9ca3af;">Não quero mais receber novidades</a>
+    </p>
+  </div>`,
+  }
+}

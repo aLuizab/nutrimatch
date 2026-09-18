@@ -108,6 +108,11 @@ model User {
   notifyBooking      Boolean @default(true)
   notifyCancellation Boolean @default(true)
   notifyReviews      Boolean @default(true)
+  // Comunicados da plataforma — novidades, mudanças de regra, avisos gerais. Separado das
+  // outras três porque é a única categoria que não responde a algo que a pessoa fez: as demais
+  // são transacionais e silenciá-las é escolha dela; esta é a que a lei chama de comunicação
+  // não solicitada se não houver como sair.
+  notifyNews         Boolean @default(true)
 
   // Foto de perfil hospedada no Cloudinary. Guardamos a URL servida e o publicId, que é o
   // que permite apagar a imagem antiga ao trocar — sem ele cada troca deixa um arquivo órfão

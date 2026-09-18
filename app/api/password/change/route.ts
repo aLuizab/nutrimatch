@@ -5,6 +5,7 @@ import { hashPassword, verifyPassword } from '@/lib/password'
 import { AuthError, requireUser } from '@/lib/session'
 import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, signSessionToken } from '@/lib/jwt'
 import { audit } from '@/lib/audit'
+import { notifyPasswordChanged } from '@/lib/notifications'
 import { LIMITS, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 
 const schema = z.object({
@@ -47,6 +48,10 @@ export async function POST(request: Request) {
   })
 
   audit({ actorId: user.id, actorRole: user.role, action: 'PASSWORD_CHANGED' })
+
+  // Aviso de segurança, não de conveniência: se alguém tomou a conta, este e-mail é o único
+  // sinal que a pessoa recebe. Por isso não passa por preferência de notificação.
+  notifyPasswordChanged({ name: user.name, email: user.email, when: changedAt })
 
   // Every existing token is now older than passwordChangedAt and therefore dead — including
   // this browser's. Issue a fresh one so the user who just changed their password stays

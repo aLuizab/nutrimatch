@@ -6,6 +6,9 @@ import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, signSessionToken } from '@/lib
 import { SPECIALTY_NAMES } from '@/lib/specialties'
 import { extractUf, isCrnValidationError, validateCrn } from '@/lib/crn'
 import { LIMITS, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
+import { notifyWelcome } from '@/lib/notifications'
+import { formatCents } from '@/lib/money'
+import { PRO_PLAN_SLUG } from '@/lib/subscription'
 import { configFailure, unexpectedFailure } from '@/lib/api-failures'
 
 const baseFields = {
@@ -130,6 +133,17 @@ export async function POST(request: Request) {
               },
             }),
       },
+    })
+
+    // Depois do commit e sem await: e-mail lento não pode atrasar o cadastro de ninguém.
+    // O valor da mensalidade sai do plano no banco, não de um número escrito aqui, senão o
+    // e-mail passa a mentir no dia em que o preço mudar.
+    const plano = await prisma.subscriptionPlan.findUnique({ where: { slug: PRO_PLAN_SLUG } })
+    notifyWelcome({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      monthlyLabel: plano ? `${formatCents(plano.monthlyPrice)}/mês` : undefined,
     })
 
     const token = await signSessionToken({ userId: user.id, role: user.role })

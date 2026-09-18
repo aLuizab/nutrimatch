@@ -17,9 +17,14 @@ import {
   paymentRejectedPatient,
   payoutPaidProfessional,
   subscriptionRecordedProfessional,
+  welcomePatient,
+  welcomeProfessional,
+  passwordChangedEmail,
+  platformAnnouncement,
   type AppointmentEmailData,
 } from './email-templates'
 import { appUrl } from './stripe'
+import { unsubscribeUrl } from './unsubscribe'
 import { formatDateBR, formatPrice, formatTimeBR, modalityLabel } from './format'
 import type { Modality } from '@prisma/client'
 
@@ -252,4 +257,99 @@ export function notifySubscriptionRecorded(args: {
 /** O profissional deixou o prazo passar. Quem precisa saber é o paciente, que ficou esperando. */
 export function notifyAppointmentExpired(ctx: AppointmentContext) {
   fire(sendEmail({ to: ctx.patientEmail, ...appointmentExpiredPatient(toEmailData(ctx)) }))
+}
+
+// ── Conta ───────────────────────────────────────────────────────────────────
+
+/**
+ * Boas-vindas. Conteúdo diferente por papel porque as duas pessoas precisam de coisas
+ * diferentes: a paciente precisa saber o que dá para fazer aqui, e o nutricionista precisa
+ * saber que está em análise e o que deixar pronto enquanto espera.
+ */
+export function notifyWelcome(args: {
+  name: string
+  email: string
+  role: 'PATIENT' | 'PROFESSIONAL' | 'ADMIN'
+  monthlyLabel?: string
+}) {
+  if (args.role === 'ADMIN') return
+  const base = appUrl()
+  if (args.role === 'PROFESSIONAL') {
+    fire(
+      sendEmail({
+        to: args.email,
+        ...welcomeProfessional({
+          name: args.name,
+          monthlyLabel: args.monthlyLabel ?? 'R$ 9,90/mês',
+          settingsUrl: `${base}/configuracoes`,
+        }),
+      })
+    )
+    return
+  }
+  fire(sendEmail({ to: args.email, ...welcomePatient({ name: args.name, searchUrl: `${base}/resultados` }) }))
+}
+
+/**
+ * Aviso de segurança: nunca passa por preferência de notificação. Se alguém tomou a conta, este
+ * e-mail é o único sinal que a pessoa recebe, e silenciá-lo seria silenciar o alarme.
+ */
+export function notifyPasswordChanged(args: { name: string; email: string; when: Date }) {
+  fire(
+    sendEmail({
+      to: args.email,
+      ...passwordChangedEmail({
+        name: args.name,
+        whenLabel: `${formatDateBR(args.when)} às ${formatTimeBR(args.when)}`,
+        resetUrl: `${appUrl()}/esqueci-senha`,
+      }),
+    })
+  )
+}
+
+export type AnnouncementAudience = 'TODOS' | 'PROFISSIONAIS' | 'PACIENTES'
+
+/**
+ * Comunicado da plataforma.
+ *
+ * Diferente de todo o resto deste arquivo, aqui se espera o envio terminar: quem manda precisa
+ * saber quantos saíram e quantos falharam, e um disparo em massa que falha em silêncio é pior
+ * que não ter a funcionalidade. Envia em série de propósito — a lista é pequena e sequencial
+ * mantém a plataforma longe do limite de taxa do provedor.
+ */
+export async function sendAnnouncement(args: {
+  audience: AnnouncementAudience
+  title: string
+  bodyHtml: string
+}): Promise<{ enviados: number; ignorados: number }> {
+  const role =
+    args.audience === 'PROFISSIONAIS' ? 'PROFESSIONAL' : args.audience === 'PACIENTES' ? 'PATIENT' : undefined
+
+  const destinatarios = await prisma.user.findMany({
+    // notifyNews: true é o filtro que torna o descadastro real em vez de decorativo.
+    where: { notifyNews: true, ...(role ? { role } : {}) },
+    select: { id: true, name: true, email: true },
+  })
+
+  const base = appUrl()
+  let enviados = 0
+  for (const u of destinatarios) {
+    try {
+      await sendEmail({
+        to: u.email,
+        ...platformAnnouncement({
+          name: u.name.split(' ')[0],
+          title: args.title,
+          bodyHtml: args.bodyHtml,
+          unsubscribeUrl: unsubscribeUrl(base, u.id),
+        }),
+      })
+      enviados++
+    } catch (e) {
+      console.error('[announcement] falhou para', u.email, e)
+    }
+  }
+
+  const total = await prisma.user.count({ where: role ? { role } : {} })
+  return { enviados, ignorados: total - destinatarios.length }
 }

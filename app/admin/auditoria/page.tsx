@@ -26,6 +26,7 @@ const ACTION_LABELS: Record<AuditAction, string> = {
   SUBSCRIPTION_PAYMENT_RECORDED: 'Registrou o pagamento da mensalidade',
   SUBSCRIPTION_CANCELLED: 'Cancelou a assinatura de um profissional',
   PAYMENT_LINK_UPDATED: 'Alterou um link de pagamento',
+  ANNOUNCEMENT_SENT: 'Enviou um comunicado',
 }
 
 const ACTION_TONE: Record<AuditAction, string> = {
@@ -41,6 +42,7 @@ const ACTION_TONE: Record<AuditAction, string> = {
   SUBSCRIPTION_PAYMENT_RECORDED: 'bg-emerald-50 text-emerald-700 border-emerald-100',
   SUBSCRIPTION_CANCELLED: 'bg-red-50 text-red-600 border-red-100',
   PAYMENT_LINK_UPDATED: 'bg-blue-50 text-blue-700 border-blue-100',
+  ANNOUNCEMENT_SENT: 'bg-purple-50 text-purple-700 border-purple-100',
 }
 
 const ROLE_LABELS: Record<string, string> = {

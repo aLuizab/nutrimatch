@@ -22,6 +22,8 @@ export type AuditAction =
   | 'SUBSCRIPTION_CANCELLED'
   // Quem define por qual link o dinheiro do paciente entra precisa ter nome e hora.
   | 'PAYMENT_LINK_UPDATED'
+  // Disparo em massa nao tem desfazer: quem mandou, para quem e quando fica registrado.
+  | 'ANNOUNCEMENT_SENT'
 
 export function audit(args: {
   actorId: string
