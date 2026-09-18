@@ -2,7 +2,7 @@ import ProfessionalSidebar from '../components/ProfessionalSidebar'
 import AgendaGrid from './AgendaGrid'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
-import { isMeetingOpen, meetingUrl } from '@/lib/meeting'
+import { isMeetingOpen, meetingUrl, minutesUntilOpen } from '@/lib/meeting'
 import DashboardShell from '../components/DashboardShell'
 
 export default async function Agenda() {
@@ -26,6 +26,7 @@ export default async function Agenda() {
     confirmationDeadline: a.confirmationDeadline,
     meetingUrl: a.meetingRoom ? meetingUrl(a.meetingRoom) : null,
     meetingOpen: a.meetingRoom != null && isMeetingOpen(a.scheduledAt),
+    minutesUntilMeeting: minutesUntilOpen(a.scheduledAt),
     attendance: a.attendance,
   }))
 

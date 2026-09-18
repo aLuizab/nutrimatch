@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { notifySubscriptionRecorded } from '@/lib/notifications'
+import { formatCents } from '@/lib/money'
+import { formatDateBR } from '@/lib/format'
 import { PRO_PLAN_SLUG } from '@/lib/subscription'
 import { addMonthsToDateString, instantAt, spDateString } from '@/lib/spdate'
 import { configFailure, unexpectedFailure } from '@/lib/api-failures'
@@ -109,6 +112,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         amountCents: plan.monthlyPrice * parsed.data.months,
         until: end.toISOString(),
       },
+    })
+
+    // Recibo com a data de validade: é a informação que o profissional precisa para renovar
+    // antes de sumir da busca, e ele não tem outro lugar onde vê-la.
+    notifySubscriptionRecorded({
+      professionalName: professional.user.name,
+      professionalEmail: professional.user.email,
+      amountLabel: formatCents(plan.monthlyPrice * parsed.data.months),
+      untilLabel: formatDateBR(end),
     })
 
     return NextResponse.json({

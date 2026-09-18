@@ -10,6 +10,13 @@ import {
   markedNoShow,
   professionalApproved,
   reviewReceived,
+  appointmentExpiredPatient,
+  paymentConfirmedPatient,
+  paymentDeclaredPatient,
+  paymentPendingAdmin,
+  paymentRejectedPatient,
+  payoutPaidProfessional,
+  subscriptionRecordedProfessional,
   type AppointmentEmailData,
 } from './email-templates'
 import { appUrl } from './stripe'
@@ -157,4 +164,92 @@ export function notifyReviewReceived(args: {
       }
     })()
   )
+}
+
+// ── Dinheiro ────────────────────────────────────────────────────────────────
+
+/**
+ * Avisa quem precisa saber que alguém declarou um pagamento: o paciente, para ter registro de
+ * que o aviso chegou, e os admins, porque ninguém confere um extrato que não sabe que existe.
+ *
+ * Os admins são buscados no banco em vez de virem de uma variável de ambiente: uma lista fixa
+ * envelhece no dia em que alguém entra ou sai da operação, e a diferença aparece como pagamento
+ * que ninguém conferiu.
+ */
+export function notifyPaymentDeclared(args: {
+  patientName: string
+  patientEmail: string
+  what: string
+  amountLabel: string
+  note?: string | null
+}) {
+  fire(
+    sendEmail({
+      to: args.patientEmail,
+      ...paymentDeclaredPatient({
+        patientName: args.patientName,
+        what: args.what,
+        amountLabel: args.amountLabel,
+      }),
+    })
+  )
+  fire(
+    (async () => {
+      const admins = await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { email: true } })
+      const template = paymentPendingAdmin({
+        what: args.what,
+        amountLabel: args.amountLabel,
+        who: args.patientName,
+        note: args.note ?? null,
+      })
+      await Promise.all(admins.map((a) => sendEmail({ to: a.email, ...template })))
+    })()
+  )
+}
+
+export function notifyPaymentConfirmed(args: {
+  patientName: string
+  patientEmail: string
+  what: string
+  amountLabel: string
+}) {
+  fire(sendEmail({ to: args.patientEmail, ...paymentConfirmedPatient(args) }))
+}
+
+export function notifyPaymentRejected(args: {
+  patientName: string
+  patientEmail: string
+  what: string
+  amountLabel: string
+  reason?: string | null
+}) {
+  fire(sendEmail({ to: args.patientEmail, ...paymentRejectedPatient(args) }))
+}
+
+/** Repasse é dinheiro saindo daqui para a conta de alguém: nunca em silêncio. */
+export function notifyPayoutPaid(args: {
+  professionalName: string
+  professionalEmail: string
+  amountLabel: string
+  feeLabel: string
+  grossLabel: string
+  pixKeyMasked: string
+}) {
+  const { professionalEmail, ...data } = args
+  fire(sendEmail({ to: professionalEmail, ...payoutPaidProfessional(data) }))
+}
+
+export function notifySubscriptionRecorded(args: {
+  professionalName: string
+  professionalEmail: string
+  amountLabel: string
+  untilLabel: string
+}) {
+  const { professionalEmail, ...data } = args
+  fire(sendEmail({ to: professionalEmail, ...subscriptionRecordedProfessional(data) }))
+}
+
+/** O profissional deixou o prazo passar. Quem precisa saber é o paciente, que ficou esperando. */
+export function notifyAppointmentExpired(ctx: AppointmentContext) {
+  fire(sendEmail({ to: ctx.patientEmail, ...appointmentExpiredPatient(toEmailData(ctx)) }))
 }

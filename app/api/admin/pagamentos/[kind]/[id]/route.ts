@@ -5,7 +5,8 @@ import { AuthError, requireRole } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { confirmAppointmentPixPayment, confirmEnrollmentPixPayment } from '@/lib/pix-payments'
-import { notifyBookingRequested } from '@/lib/notifications'
+import { notifyBookingRequested, notifyPaymentConfirmed, notifyPaymentRejected } from '@/lib/notifications'
+import { formatCents, reaisToCents } from '@/lib/money'
 import { confirmationDeadlineFor } from '@/lib/appointment-status'
 
 // Conferência humana do Pix: o admin olha o extrato e diz se o dinheiro entrou.
@@ -60,6 +61,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
         },
       })
       audit({ actorId: admin.id, actorRole: 'ADMIN', action: 'PIX_PAYMENT_REJECTED', subjectId: id })
+      // Sem este e-mail o paciente fica esperando por algo que já foi decidido — e a tela dele
+      // volta a pedir pagamento sem nenhuma explicação.
+      notifyPaymentRejected({
+        patientName: appointment.patient.user.name,
+        patientEmail: appointment.patient.user.email,
+        what: `consulta com ${appointment.professional.user.name}`,
+        amountLabel: formatCents(appointment.amountCents ?? reaisToCents(appointment.price)),
+        reason: parsed.data.reason ?? null,
+      })
       return NextResponse.json({ ok: true, confirmed: false })
     }
 
@@ -73,6 +83,13 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
     await prisma.appointment.update({
       where: { id },
       data: { confirmationDeadline: confirmationDeadlineFor(appointment.scheduledAt, now) },
+    })
+
+    notifyPaymentConfirmed({
+      patientName: appointment.patient.user.name,
+      patientEmail: appointment.patient.user.email,
+      what: `consulta com ${appointment.professional.user.name}`,
+      amountLabel: formatCents(result.grossCents),
     })
 
     notifyBookingRequested({
@@ -96,8 +113,19 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
     return NextResponse.json({ ok: true, confirmed: true })
   }
 
-  const enrollment = await prisma.enrollment.findUnique({ where: { id } })
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id },
+    include: {
+      patient: { include: { user: { select: { name: true, email: true } } } },
+      carePlan: { select: { name: true } },
+    },
+  })
   if (!enrollment) return NextResponse.json({ error: 'Acompanhamento não encontrado' }, { status: 404 })
+
+  const pacoteLabel = `pacote ${enrollment.carePlan.name}`
+  const pacoteValor = formatCents(
+    enrollment.paidAmountCents ?? reaisToCents(enrollment.pricePerConsultation * enrollment.consultations)
+  )
 
   if (parsed.data.action === 'REJECT') {
     await prisma.enrollment.update({
@@ -105,11 +133,24 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
       data: { pixClaimedAt: null, pixClaimNote: parsed.data.reason ?? null, pixReviewedBy: admin.id, pixReviewedAt: now },
     })
     audit({ actorId: admin.id, actorRole: 'ADMIN', action: 'PIX_PAYMENT_REJECTED', subjectId: id })
+    notifyPaymentRejected({
+      patientName: enrollment.patient.user.name,
+      patientEmail: enrollment.patient.user.email,
+      what: pacoteLabel,
+      amountLabel: pacoteValor,
+      reason: parsed.data.reason ?? null,
+    })
     return NextResponse.json({ ok: true, confirmed: false })
   }
 
   const result = await confirmEnrollmentPixPayment(id, admin.id)
   if (!result) return NextResponse.json({ error: 'Acompanhamento não encontrado' }, { status: 404 })
   audit({ actorId: admin.id, actorRole: 'ADMIN', action: 'PIX_PAYMENT_CONFIRMED', subjectId: id })
+  notifyPaymentConfirmed({
+    patientName: enrollment.patient.user.name,
+    patientEmail: enrollment.patient.user.email,
+    what: pacoteLabel,
+    amountLabel: pacoteValor,
+  })
   return NextResponse.json({ ok: true, confirmed: true })
 }

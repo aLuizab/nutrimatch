@@ -4,6 +4,9 @@ import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
+import { notifyPayoutPaid } from '@/lib/notifications'
+import { formatCents } from '@/lib/money'
+import { maskPixKey } from '@/lib/pix'
 
 // Marcar o repasse como pago. A transferência em si acontece fora daqui, no app do banco — o
 // que esta rota registra é que ela aconteceu, com data e responsável. Sem isso, "já paguei o
@@ -29,7 +32,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
 
-  const payout = await prisma.payout.findUnique({ where: { id } })
+  const payout = await prisma.payout.findUnique({
+    where: { id },
+    include: { professional: { include: { user: { select: { name: true, email: true } } } } },
+  })
   if (!payout) return NextResponse.json({ error: 'Repasse não encontrado' }, { status: 404 })
   if (payout.status === 'PAID') return NextResponse.json({ ok: true, alreadyPaid: true })
   if (payout.status === 'CANCELLED') {
@@ -39,6 +45,22 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   await prisma.payout.update({
     where: { id },
     data: { status: 'PAID', paidAt: new Date(), paidBy: admin.id, note: parsed.data.note ?? null },
+  })
+
+  // Dinheiro saindo daqui para a conta de alguém nunca sai em silêncio: sem este e-mail o
+  // profissional só descobre o repasse conferindo o extrato por conta própria.
+  notifyPayoutPaid({
+    professionalName: payout.professional.user.name,
+    professionalEmail: payout.professional.user.email,
+    amountLabel: formatCents(payout.netCents),
+    feeLabel: formatCents(payout.grossCents - payout.netCents),
+    grossLabel: formatCents(payout.grossCents),
+    // A chave do snapshot é a que valia quando o repasse foi criado — é para ela que o
+    // dinheiro foi, mesmo que o profissional tenha trocado a chave depois.
+    pixKeyMasked: maskPixKey(
+      payout.pixKeySnapshot ?? payout.professional.pixKey ?? '',
+      payout.professional.pixKeyType
+    ),
   })
 
   audit({

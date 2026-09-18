@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Video, MapPin, FileText, Clock, UserCheck } from 'lucide-react'
 import { addDaysToDateString, mondayOfWeek, spDateString, spHour } from '@/lib/spdate'
 import { initials, avatarColor, formatDateBR, formatTimeBR } from '@/lib/format'
+import { OPEN_BEFORE_MINUTES } from '@/lib/meeting'
 import type { AttendanceStatus, Modality } from '@prisma/client'
 
 export interface AgendaAppointment {
@@ -18,6 +19,7 @@ export interface AgendaAppointment {
   confirmationDeadline: Date | null
   meetingUrl: string | null
   meetingOpen: boolean
+  minutesUntilMeeting: number
   attendance: AttendanceStatus
 }
 
@@ -378,15 +380,30 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                 </p>
               </div>
             </div>
-            {selected.meetingUrl && selected.meetingOpen && selected.status === 'CONFIRMED' && (
-              <a
-                href={selected.meetingUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-white bg-emerald-500 px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors"
-              >
-                <Video size={14} /> Entrar na consulta
-              </a>
+            {/* Antes o botão simplesmente não existia até a sala abrir, e o profissional não
+                tinha como saber se havia sala nem quando ela liberaria. Estado desabilitado com
+                a contagem responde as duas perguntas sem deixá-lo entrar antes da hora. */}
+            {selected.meetingUrl && selected.status === 'CONFIRMED' && (
+              selected.meetingOpen ? (
+                <a
+                  href={selected.meetingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 mt-3 text-sm font-bold text-white bg-emerald-500 px-4 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors"
+                >
+                  <Video size={14} /> Iniciar consulta
+                </a>
+              ) : (
+                <span
+                  title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes do horário`}
+                  className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-gray-400 border border-gray-200 px-4 py-2.5 rounded-xl cursor-default"
+                >
+                  <Video size={14} />
+                  {selected.minutesUntilMeeting > 60
+                    ? 'Sala abre no dia da consulta'
+                    : `Sala abre em ${selected.minutesUntilMeeting}min`}
+                </span>
+              )
             )}
             {selected.status === 'AWAITING_CONFIRMATION' ? (
               <ConfirmPanel appointment={selected} onDone={() => router.refresh()} />

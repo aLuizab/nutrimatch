@@ -22,7 +22,10 @@ export function meetingUrl(room: string): string {
  * the end so an overrunning consultation isn't cut off, while never leaving a health
  * consultation's room reachable indefinitely.
  */
-const OPEN_BEFORE_MINUTES = 15
+// Exportada porque a tela precisa dizer "abre 5 minutos antes" ao lado do botão. Repetir o
+// número no texto é como ele envelhece: alguém ajusta a regra aqui e a tela segue prometendo
+// outra coisa.
+export const OPEN_BEFORE_MINUTES = 5
 const OPEN_AFTER_MINUTES = 120
 
 export function isMeetingOpen(scheduledAt: Date, now: Date = new Date()): boolean {

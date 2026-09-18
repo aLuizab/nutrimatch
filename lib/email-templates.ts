@@ -272,3 +272,123 @@ export function paymentAuthorizedPatient(d: AppointmentEmailData) {
     ),
   }
 }
+
+// ── Dinheiro ────────────────────────────────────────────────────────────────
+// A conferência do pagamento é humana dos dois lados: o paciente avisa, alguém confere o
+// extrato, alguém libera. Cada uma dessas passagens precisa de e-mail, senão o silêncio vira a
+// resposta — e silêncio depois de pagar é a pior experiência que esta plataforma pode dar.
+
+export function paymentDeclaredPatient(d: { patientName: string; what: string; amountLabel: string }) {
+  return {
+    subject: 'Recebemos seu aviso de pagamento',
+    html: wrap(
+      'Recebemos seu aviso 👍',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>Você avisou que pagou <strong>${d.amountLabel}</strong> referente a ${d.what}.</p>
+       <p>Vamos conferir a entrada e confirmar. Você recebe um novo e-mail assim que estiver
+          confirmado — normalmente em algumas horas, em dia útil.</p>
+       <p>Ainda não precisa fazer mais nada.</p>`
+    ),
+  }
+}
+
+export function paymentPendingAdmin(d: { what: string; amountLabel: string; who: string; note?: string | null }) {
+  return {
+    subject: `Pagamento a conferir: ${d.amountLabel} — ${d.who}`,
+    html: wrap(
+      'Há um pagamento aguardando conferência',
+      `<p><strong>${d.who}</strong> avisou que pagou <strong>${d.amountLabel}</strong> referente a
+          ${d.what}.</p>
+       ${d.note ? `<p>Observação de quem pagou: <em>${d.note}</em></p>` : ''}
+       <p>Confira o extrato e libere em <em>Financeiro</em> no painel administrativo. Enquanto
+          isso, a consulta segue presa aguardando.</p>`
+    ),
+  }
+}
+
+export function paymentConfirmedPatient(d: { patientName: string; what: string; amountLabel: string }) {
+  return {
+    subject: 'Pagamento confirmado',
+    html: wrap(
+      'Pagamento confirmado ✅',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>Confirmamos o recebimento de <strong>${d.amountLabel}</strong> referente a ${d.what}.</p>
+       <p>Está tudo certo do seu lado. Você recebe um aviso quando o profissional confirmar o
+          horário.</p>`
+    ),
+  }
+}
+
+export function paymentRejectedPatient(d: {
+  patientName: string
+  what: string
+  amountLabel: string
+  reason?: string | null
+}) {
+  return {
+    subject: 'Não localizamos seu pagamento',
+    html: wrap(
+      'Não localizamos seu pagamento',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>Procuramos a entrada de <strong>${d.amountLabel}</strong> referente a ${d.what} e não
+          encontramos.</p>
+       ${d.reason ? `<p>Motivo registrado: <em>${d.reason}</em></p>` : ''}
+       <p>Isso acontece quando o pagamento ainda não compensou ou foi feito com outro valor. Se
+          você já pagou, responda este e-mail com o comprovante que a gente verifica na mão.</p>
+       <p>Nenhum valor foi cobrado por nós — o horário continua reservado por enquanto.</p>`
+    ),
+  }
+}
+
+export function payoutPaidProfessional(d: {
+  professionalName: string
+  amountLabel: string
+  feeLabel: string
+  grossLabel: string
+  pixKeyMasked: string
+}) {
+  return {
+    subject: `Repasse enviado: ${d.amountLabel}`,
+    html: wrap(
+      'Seu repasse foi enviado 💸',
+      `<p>Olá, ${d.professionalName}!</p>
+       <p>Enviamos <strong>${d.amountLabel}</strong> para a sua chave Pix <strong>${d.pixKeyMasked}</strong>.</p>
+       <p>Valor recebido do paciente: ${d.grossLabel}<br/>
+          Taxa da plataforma: ${d.feeLabel}<br/>
+          <strong>Repassado a você: ${d.amountLabel}</strong></p>
+       <p>Se não aparecer na sua conta em algumas horas, confira se a chave cadastrada está
+          correta em <em>Configurações → Pagamentos</em>.</p>`
+    ),
+  }
+}
+
+export function subscriptionRecordedProfessional(d: {
+  professionalName: string
+  amountLabel: string
+  untilLabel: string
+}) {
+  return {
+    subject: `Mensalidade registrada — ativa até ${d.untilLabel}`,
+    html: wrap(
+      'Mensalidade registrada ✅',
+      `<p>Olá, ${d.professionalName}!</p>
+       <p>Registramos o pagamento de <strong>${d.amountLabel}</strong> da sua mensalidade.</p>
+       <p>Seu perfil fica ativo na busca <strong>até ${d.untilLabel}</strong>.</p>
+       <p>Para continuar aparecendo depois dessa data, renove antes do vencimento.</p>`
+    ),
+  }
+}
+
+export function appointmentExpiredPatient(d: AppointmentEmailData) {
+  return {
+    subject: `${d.professionalName} não confirmou sua consulta`,
+    html: wrap(
+      'Sua consulta não foi confirmada a tempo',
+      `<p>Olá, ${d.patientName}!</p>
+       <p>O horário de <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong> com
+          ${d.professionalName} expirou sem confirmação, e foi liberado.</p>
+       <p>Se você pagou, o valor será devolvido — nenhuma ação sua é necessária.</p>
+       <p>Você pode escolher outro horário ou outro profissional na plataforma quando quiser.</p>`
+    ),
+  }
+}

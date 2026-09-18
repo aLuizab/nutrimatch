@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { AuthError, requirePatientActor } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
+import { notifyPaymentDeclared } from '@/lib/notifications'
+import { formatCents, reaisToCents } from '@/lib/money'
 
 // O paciente declara que pagou. É aviso, não confirmação: move a cobrança da fila "aguardando
 // pagamento" para a fila "conferir extrato", e nada além disso. Quem confirma é humano, do
@@ -32,7 +34,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
   const now = new Date()
 
   if (kind === 'consulta') {
-    const appointment = await prisma.appointment.findUnique({ where: { id } })
+    const appointment = await prisma.appointment.findUnique({
+      where: { id },
+      include: { professional: { include: { user: { select: { name: true } } } } },
+    })
     if (!appointment || appointment.patientId !== user.patient!.id) {
       return NextResponse.json({ error: 'Cobrança não encontrada' }, { status: 404 })
     }
@@ -54,10 +59,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
         paymentDeadline: null,
       },
     })
+    // Depois do commit, nunca dentro dele: e-mail lento não pode segurar a escrita.
+    notifyPaymentDeclared({
+      patientName: user.name,
+      patientEmail: user.email,
+      what: `consulta com ${appointment.professional.user.name}`,
+      amountLabel: formatCents(appointment.amountCents ?? reaisToCents(appointment.price)),
+      note,
+    })
     return NextResponse.json({ ok: true })
   }
 
-  const enrollment = await prisma.enrollment.findUnique({ where: { id } })
+  const enrollment = await prisma.enrollment.findUnique({
+    where: { id },
+    include: { carePlan: { select: { name: true } } },
+  })
   if (!enrollment || enrollment.patientId !== user.patient!.id) {
     return NextResponse.json({ error: 'Cobrança não encontrada' }, { status: 404 })
   }
@@ -68,6 +84,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ kin
   await prisma.enrollment.update({
     where: { id },
     data: { pixClaimedAt: enrollment.pixClaimedAt ?? now, pixClaimNote: note },
+  })
+
+  notifyPaymentDeclared({
+    patientName: user.name,
+    patientEmail: user.email,
+    what: `pacote ${enrollment.carePlan.name}`,
+    amountLabel: formatCents(
+      enrollment.paidAmountCents ?? reaisToCents(enrollment.pricePerConsultation * enrollment.consultations)
+    ),
+    note,
   })
   return NextResponse.json({ ok: true })
 }
