@@ -4,6 +4,8 @@ import PatientPerfilForm from './PatientPerfilForm'
 import { requirePatientProfileOrRedirect } from '@/lib/session'
 import DashboardShell from '../../components/DashboardShell'
 import { getPatientReliability, patientReliabilityNotice } from '@/lib/reputation'
+import { photoUploadsEnabled } from '@/lib/cloudinary'
+import PhotoUpload from '../../components/PhotoUpload'
 
 export default async function PatientPerfil() {
   const user = await requirePatientProfileOrRedirect()
@@ -32,6 +34,15 @@ export default async function PatientPerfil() {
       </div>
 
       <div className="p-8 space-y-6">
+        <div className="max-w-2xl bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h2 className="text-base font-bold text-gray-900 mb-5">Foto de perfil</h2>
+          <PhotoUpload
+            name={user.name}
+            photoUrl={user.photoUrl ?? null}
+            enabled={photoUploadsEnabled()}
+          />
+        </div>
+
         {reliability.rate !== null && (
           <div
             className={`max-w-2xl rounded-2xl border p-5 ${

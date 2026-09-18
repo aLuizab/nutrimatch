@@ -3,7 +3,7 @@ import { avatarColor, initials, modalityLabel } from './format'
 import { specialtyLabel } from './specialties'
 import { responseLabel } from './ranking'
 
-export const PROFESSIONAL_CARD_INCLUDE = { user: { select: { name: true } } } as const
+export const PROFESSIONAL_CARD_INCLUDE = { user: { select: { name: true, photoUrl: true } } } as const
 
 type ProfessionalCardSource = {
   id: string
@@ -15,7 +15,7 @@ type ProfessionalCardSource = {
   city: string
   medianResponseSecs?: number | null
   tier?: string | null
-  user: { name: string }
+  user: { name: string; photoUrl?: string | null }
 }
 
 export function toProfessionalCard(p: ProfessionalCardSource) {
@@ -33,6 +33,7 @@ export function toProfessionalCard(p: ProfessionalCardSource) {
     city: p.city,
     tier: p.tier ?? 'NOVO',
     responseLabel: responseLabel(p.medianResponseSecs ?? null),
+    photoUrl: p.user.photoUrl ?? null,
     initials: initials(p.user.name),
     color: avatarColor(p.id),
   }

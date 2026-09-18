@@ -11,7 +11,9 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"} https://js.stripe.com`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // res.cloudinary.com serve as fotos de perfil. Sem isto o upload funciona e o navegador
+  // recusa a imagem, que é um sintoma difícil de ligar à causa.
+  "img-src 'self' data: blob: https://res.cloudinary.com",
   "font-src 'self' data:",
   // Stripe endpoints the browser talks to directly during checkout.
   "connect-src 'self' https://api.stripe.com",

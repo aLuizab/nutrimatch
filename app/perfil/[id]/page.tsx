@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Avatar from '../../components/Avatar'
 import { notFound } from 'next/navigation'
 import { ArrowLeft, Star, CheckCircle2, MapPin, Video, Clock, Users } from 'lucide-react'
 import PublicHeader from '../../components/PublicHeader'
@@ -19,7 +20,7 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
     prisma.professional.findUnique({
       where: { id },
       include: {
-        user: { select: { name: true } },
+        user: { select: { name: true, photoUrl: true } },
         reviews: {
           orderBy: { createdAt: 'desc' },
           take: 10,
@@ -73,9 +74,12 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
               <div className="px-8 pb-8">
                 <div className="flex items-end justify-between -mt-10 mb-6">
                   <div className="relative">
-                    <div className={`w-20 h-20 bg-white border-4 border-white rounded-full flex items-center justify-center text-2xl font-bold text-white ${color} shadow-md`}>
-                      {initials(name)}
-                    </div>
+                    <Avatar
+                      name={name}
+                      photoUrl={professional.user.photoUrl}
+                      size={80}
+                      className="border-4 border-white shadow-md"
+                    />
                     <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow">
                       <CheckCircle2 size={18} className="text-emerald-500 fill-emerald-50" />
                     </div>

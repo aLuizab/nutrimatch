@@ -8,6 +8,7 @@ import PagamentosTab, { type PixStatus } from './PagamentosTab'
 import SegurancaTab from './SegurancaTab'
 import LocationPicker from '../components/LocationPicker'
 import PricingGuide from '../components/PricingGuide'
+import PhotoUpload from '../components/PhotoUpload'
 
 const tabs = [
   { id: 'perfil', label: 'Perfil', icon: User },
@@ -41,16 +42,19 @@ export interface ProfileData {
   price: number
   bio: string
   initials: string
+  photoUrl: string | null
 }
 
 export default function ConfiguracoesClient({
   initialProfile,
+  photoUploadsEnabled,
   initialAvailability,
   initialPrefs,
   pix,
   feePercent,
 }: {
   initialProfile: ProfileData
+  photoUploadsEnabled: boolean
   initialAvailability: AvailabilityData
   initialPrefs: NotificationPrefs
   pix: PixStatus
@@ -253,16 +257,12 @@ export default function ConfiguracoesClient({
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="text-base font-bold text-gray-900 mb-5">Informações pessoais</h2>
 
-            <div className="flex items-center gap-5 mb-6">
-              <div className="w-20 h-20 bg-emerald-500 text-white rounded-full flex items-center justify-center text-2xl font-bold">
-                {initialProfile.initials}
-              </div>
-              <div>
-                <button type="button" className="text-sm font-medium text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors">
-                  Alterar foto
-                </button>
-                <p className="text-xs text-gray-400 mt-1.5">JPG ou PNG. Máximo 2MB.</p>
-              </div>
+            <div className="mb-6">
+              <PhotoUpload
+                name={initialProfile.name}
+                photoUrl={initialProfile.photoUrl}
+                enabled={photoUploadsEnabled}
+              />
             </div>
 
             {error && (

@@ -109,9 +109,16 @@ model User {
   notifyCancellation Boolean @default(true)
   notifyReviews      Boolean @default(true)
 
+  // Foto de perfil hospedada no Cloudinary. Guardamos a URL servida e o publicId, que é o
+  // que permite apagar a imagem antiga ao trocar — sem ele cada troca deixa um arquivo órfão
+  // consumindo a cota para sempre.
+  photoUrl      String?
+  photoPublicId String?
+
   professional Professional?
   patient      Patient?
   resetTokens  PasswordResetToken[]
+  goalsCreated Goal[] @relation("GoalAuthor")
 }
 
 model Professional {
@@ -203,6 +210,7 @@ model Patient {
   reviews        Review[]
   enrollments    Enrollment[]
   progressEntries ProgressEntry[]
+  goals          Goal[]
 }
 
 model AvailabilityRule {
@@ -546,4 +554,44 @@ model Review {
   createdAt      DateTime     @default(now())
 
   @@index([professionalId])
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  ABANDONED
+}
+
+/// Metas do paciente. Separadas de Patient.goal, que é o objetivo genérico escolhido no
+/// cadastro ("Emagrecimento") e serve para busca e triagem — isto aqui é o acompanhamento
+/// concreto, com prazo e progresso.
+///
+/// authorId guarda quem criou porque as duas origens têm peso diferente: uma meta que o
+/// nutricionista definiu faz parte do plano dele e o paciente não deve poder apagá-la, enquanto
+/// a que o próprio paciente escreveu é dele. Sem esse campo as duas viram a mesma coisa.
+model Goal {
+  id        String @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("GoalAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  /// Meta numérica opcional: 72 kg, 2 litros de água, 3 treinos por semana. Quando target e
+  /// unit são nulos a meta é só um hábito a marcar como concluído.
+  targetValue  Float?
+  currentValue Float?
+  unit         String?
+
+  dueDate    DateTime?
+  status     GoalStatus @default(ACTIVE)
+  achievedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId, status])
 }

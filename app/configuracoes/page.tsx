@@ -2,6 +2,7 @@ import ProfessionalSidebar from '../components/ProfessionalSidebar'
 import ConfiguracoesClient from './ConfiguracoesClient'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { initials } from '@/lib/format'
+import { photoUploadsEnabled } from '@/lib/cloudinary'
 import { prisma } from '@/lib/prisma'
 import { payoutSummary, pixEnabled } from '@/lib/pix-payments'
 import { platformFeePercent } from '@/lib/fees'
@@ -21,6 +22,7 @@ export default async function Configuracoes() {
     price: user.professional.price,
     bio: user.professional.bio,
     initials: initials(user.name),
+    photoUrl: user.photoUrl ?? null,
   }
 
   const rules = await prisma.availabilityRule.findMany({ where: { professionalId: user.professional.id } })
@@ -45,6 +47,7 @@ export default async function Configuracoes() {
 
       <ConfiguracoesClient
         initialProfile={profile}
+        photoUploadsEnabled={photoUploadsEnabled()}
         initialAvailability={availability}
         initialPrefs={{
           notifyBooking: user.notifyBooking,

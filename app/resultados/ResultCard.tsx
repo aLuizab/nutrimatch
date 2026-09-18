@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Avatar from '../components/Avatar'
 import { MapPin, Video, Users, Clock } from 'lucide-react'
 import RatingStat from '../components/RatingStat'
 import TierBadge from '../components/TierBadge'
@@ -13,9 +14,7 @@ export default function ResultCard({ n, sponsored = false }: { n: ProfessionalCa
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
       <div className="flex items-center gap-4">
-        <div className={`w-14 h-14 ${n.color} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
-          {n.initials}
-        </div>
+        <Avatar name={n.name} photoUrl={n.photoUrl} size={56} className="shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
