@@ -28,6 +28,19 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Modificado
 
+- Design system do NutriMatch aplicado ao front end: paleta verde da marca,
+  neutros com fundo esverdeado, amarelo próprio para as estrelas e a fonte Inter
+  servida pelo próprio domínio.
+- Movimento na interface: fundo pontilhado e brilho no título do topo, chips de
+  especialidade flutuando fora de fase, seções que entram ao rolar, contadores que
+  contam até o número e cartões que se elevam ao passar o mouse. Tudo desligado
+  para quem pede menos movimento no sistema operacional.
+- Página inicial reconstruída: cartões de profissionais flutuando ao redor do
+  título, abas "Para Pacientes / Para Profissionais" com a grade de recursos, e
+  uma prévia escura da busca com filtros que funcionam de verdade.
+- Faixa fina no topo da página inicial informando que o projeto participa da
+  FETIN 2026, a Feira Tecnológica do Inatel, com link para o evento.
+
 - O CI passa a rodar também em `staging`.
 - `SKIP_MIGRATIONS=1` impede que o ambiente de staging aplique migrations. Enquanto
   staging e produção dividem o mesmo banco, subir staging com uma migração nova a

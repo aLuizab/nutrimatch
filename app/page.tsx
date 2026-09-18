@@ -1,24 +1,34 @@
 import Link from 'next/link'
 import Image from 'next/image'
-import { ArrowRight, CheckCircle2, Clock, ChevronRight, Search, ShieldCheck, CalendarCheck, Star, Quote } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronRight, Search, ShieldCheck, CalendarCheck, Star, Quote } from 'lucide-react'
 import PublicHeader from './components/PublicHeader'
+import FaixaFetin from './FaixaFetin'
 import RatingStat from './components/RatingStat'
 import HeroSearch from './HeroSearch'
+import Revelar from './components/Revelar'
+import Contador from './components/Contador'
+import ParaQuemE from './ParaQuemE'
+import DemoBusca, { type DemoProfissional } from './DemoBusca'
+import CartoesFlutuantes from './CartoesFlutuantes'
+import { PRO_PLAN_SLUG } from '@/lib/subscription'
+import { formatCents } from '@/lib/money'
+import { avatarColor, initials } from '@/lib/format'
 import { prisma } from '@/lib/prisma'
 import { listedWhere } from '@/lib/subscription'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
 import { SPECIALTIES } from '@/lib/specialties'
 
+// Usados só enquanto nenhum profissional está publicado, e a tela diz que são exemplos.
+const EXEMPLOS: DemoProfissional[] = [
+  { id: null, nome: 'Exemplo — Nutrição Esportiva', especialidade: 'Nutrição Esportiva', rating: 0, reviewCount: 0, preco: 150, cidade: 'São Paulo, SP', online: true, iniciais: 'NE', cor: 'bg-orange-500' },
+  { id: null, nome: 'Exemplo — Nutrição Clínica', especialidade: 'Nutrição Clínica', rating: 0, reviewCount: 0, preco: 120, cidade: 'Belo Horizonte, MG', online: false, iniciais: 'NC', cor: 'bg-blue-500' },
+  { id: null, nome: 'Exemplo — Nutrição Infantil', especialidade: 'Nutrição Infantil', rating: 0, reviewCount: 0, preco: 140, cidade: 'Curitiba, PR', online: true, iniciais: 'NI', cor: 'bg-purple-500' },
+]
+
 const steps = [
   { step: '1', title: 'Busque', description: 'Filtre por especialidade, cidade, preço e modalidade. Sem cadastro para pesquisar.', icon: Search },
   { step: '2', title: 'Compare', description: 'Veja perfis completos, formação, avaliações reais de pacientes e valor da consulta.', icon: CheckCircle2 },
   { step: '3', title: 'Agende', description: 'Escolha um horário livre na agenda do profissional e confirme em poucos cliques.', icon: CalendarCheck },
-]
-
-const trustPoints = [
-  { icon: ShieldCheck, title: 'Profissionais verificados', text: 'Todo nutricionista passa por aprovação da nossa equipe antes de aparecer na busca.' },
-  { icon: Clock, title: 'Agenda em tempo real', text: 'Você vê apenas horários realmente livres — sem troca de mensagens para marcar.' },
-  { icon: Star, title: 'Avaliações de verdade', text: 'Só quem teve consulta pela plataforma pode avaliar. Nada de nota inflada.' },
 ]
 
 // Renderizada a cada request, não gerada no build.
@@ -35,7 +45,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function LandingPage() {
   const now = new Date()
-  const [featuredRows, totalActive, consultasRealizadas, ratingAgg, testimonialRows] = await Promise.all([
+  const [featuredRows, totalActive, consultasRealizadas, ratingAgg, planoPro, testimonialRows] = await Promise.all([
     prisma.professional.findMany({
       // Featured obeys the same paywall as the search: a professional nobody can book should
       // not be the first thing a patient sees on the home page.
@@ -47,6 +57,7 @@ export default async function LandingPage() {
     prisma.professional.count({ where: { status: 'ACTIVE', ...listedWhere() } }),
     prisma.appointment.count({ where: { status: 'CONFIRMED', scheduledAt: { lt: now } } }),
     prisma.review.aggregate({ _avg: { rating: true }, _count: true }),
+    prisma.subscriptionPlan.findUnique({ where: { slug: PRO_PLAN_SLUG } }),
     prisma.review.findMany({
       where: { rating: 5 },
       orderBy: { createdAt: 'desc' },
@@ -59,6 +70,27 @@ export default async function LandingPage() {
   ])
 
   const featured = featuredRows.map(toProfessionalCard)
+
+  const mensalidade = planoPro ? `${formatCents(planoPro.monthlyPrice)}/mês` : 'R$ 9,90/mês'
+
+  // A prévia da busca e os cartões do topo usam profissionais reais. Enquanto não houver
+  // nenhum publicado, entram exemplos declarados como tal na própria tela — inventar nome e
+  // nota sem dizer que são inventados é o começo de uma página que promete o que não entrega.
+  const ilustrativo = featuredRows.length === 0
+  const demoProfissionais: DemoProfissional[] = ilustrativo
+    ? EXEMPLOS
+    : featuredRows.map((p) => ({
+        id: p.id,
+        nome: p.user.name,
+        especialidade: p.specialties[0] ?? 'Nutrição',
+        rating: p.rating,
+        reviewCount: p.reviewCount,
+        preco: p.price,
+        cidade: p.city,
+        online: p.modality !== 'PRESENCIAL',
+        iniciais: initials(p.user.name),
+        cor: avatarColor(p.id),
+      }))
 
   // Every stat is real, and one with too little data behind it is hidden rather than
   // padded with an invented number.
@@ -73,12 +105,21 @@ export default async function LandingPage() {
 
   return (
     <div className="min-h-screen bg-white font-sans">
+      <FaixaFetin />
       <PublicHeader />
 
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/80 via-white to-white">
+        {/* A malha de pontos esmaece para baixo, senão ela compete com o conteúdo em vez de
+            servir de textura. */}
+        <div
+          className="absolute inset-0 bg-pontilhado [mask-image:linear-gradient(to_bottom,black_35%,transparent)]"
+          aria-hidden
+        />
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl" aria-hidden />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-50 rounded-full blur-3xl" aria-hidden />
+
+        <CartoesFlutuantes profissionais={demoProfissionais} />
 
         <div className="relative max-w-7xl mx-auto px-6 py-16 md:py-24">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -93,7 +134,7 @@ export default async function LandingPage() {
               )}
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-[1.1] mb-6">
                 O nutricionista certo para
-                <span className="block text-emerald-500">o seu objetivo</span>
+                <span className="block text-emerald-600 brilho-marca tracking-tightest">o seu objetivo</span>
               </h1>
               <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 Compare especialistas por preço, avaliação e disponibilidade. Agende online ou presencial em minutos.
@@ -102,11 +143,14 @@ export default async function LandingPage() {
               <HeroSearch />
 
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start mt-6">
-                {SPECIALTIES.map((s) => (
+                {SPECIALTIES.map((s, i) => (
                   <Link
                     key={s.long}
                     href={`/resultados?especialidade=${encodeURIComponent(s.short)}`}
-                    className={`flex items-center gap-1.5 border px-4 py-1.5 rounded-full text-xs font-medium hover:scale-105 transition-transform ${s.color}`}
+                    // O atraso por índice faz os chips subirem e descerem fora de sincronia. Em
+                    // fase, viram um bloco só piscando; defasados, parecem vivos.
+                    style={{ animationDelay: `${i * 260}ms` }}
+                    className={`flutuar flex items-center gap-1.5 border px-4 py-1.5 rounded-full text-xs font-medium hover:scale-105 transition-transform ${s.color}`}
                   >
                     <span>{s.emoji}</span> {s.short}
                   </Link>
@@ -150,11 +194,13 @@ export default async function LandingPage() {
       {stats.length >= 2 && (
         <section className="border-y border-gray-100 bg-white">
           <div className={`max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 gap-8 ${stats.length >= 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+            {stats.map((stat, i) => (
+              <Revelar key={stat.label} atraso={i * 90} className="text-center">
+                <p className="text-3xl font-bold text-gray-900">
+                  <Contador valor={stat.value} />
+                </p>
                 <p className="text-sm text-gray-500 mt-1">{stat.label}</p>
-              </div>
+              </Revelar>
             ))}
           </div>
         </section>
@@ -169,7 +215,11 @@ export default async function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {steps.map(({ step, title, description, icon: Icon }) => (
-              <div key={step} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+              <Revelar
+              key={step}
+              atraso={(Number(step) - 1) * 110}
+              className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm elevar-no-hover hover:border-emerald-200"
+            >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
                     <Icon size={20} />
@@ -178,24 +228,13 @@ export default async function LandingPage() {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
-              </div>
+            </Revelar>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Por que confiar */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-10">
-          {trustPoints.map(({ icon: Icon, title, text }) => (
-            <div key={title}>
-              <Icon size={22} className="text-emerald-500 mb-3" />
-              <h3 className="font-bold text-gray-900 mb-1.5">{title}</h3>
-              <p className="text-sm text-gray-500 leading-relaxed">{text}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+      <ParaQuemE mensalidade={mensalidade} />
 
       {/* Profissionais em destaque */}
       {featured.length > 0 && (
@@ -216,7 +255,7 @@ export default async function LandingPage() {
                 <Link
                   key={n.id}
                   href={`/perfil/${n.id}`}
-                  className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all block"
+                  className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-emerald-200 elevar-no-hover block"
                 >
                   <div className="flex gap-4 items-start">
                     <div className={`w-14 h-14 ${n.color} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
@@ -281,6 +320,8 @@ export default async function LandingPage() {
         </section>
       )}
 
+      <DemoBusca profissionais={demoProfissionais} ilustrativo={ilustrativo} />
+
       {/* CTA profissional */}
       <section className="bg-emerald-500 py-20">
         <div className="max-w-7xl mx-auto px-6 text-center">
@@ -311,7 +352,20 @@ export default async function LandingPage() {
             <Link href="/login" className="hover:text-white transition-colors">Entrar</Link>
             <Link href="/cadastro" className="hover:text-white transition-colors">Cadastrar</Link>
           </div>
-          <p className="text-xs">© 2026 NutriMatch</p>
+          <p className="text-xs text-center md:text-right">
+            © 2026 NutriMatch
+            <span className="block mt-1">
+              Projeto da{' '}
+              <a
+                href="https://inatel.br/fetin/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-gray-300 hover:text-white transition-colors underline underline-offset-2"
+              >
+                FETIN 2026 · Inatel
+              </a>
+            </span>
+          </p>
         </div>
       </footer>
     </div>

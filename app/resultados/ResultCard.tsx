@@ -12,7 +12,7 @@ import type { ProfessionalCard } from '@/lib/professionals'
  */
 export default function ResultCard({ n, sponsored = false }: { n: ProfessionalCard; sponsored?: boolean }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all">
+    <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-emerald-200 elevar-no-hover">
       <div className="flex items-center gap-4">
         <Avatar name={n.name} photoUrl={n.photoUrl} size={56} className="shrink-0" />
         <div className="flex-1 min-w-0">
