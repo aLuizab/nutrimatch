@@ -22,7 +22,6 @@ const envSchema = z.object({
     .refine((v) => !PLACEHOLDER_SECRETS.includes(v.toLowerCase().trim()), {
       message: 'JWT_SECRET está com um valor de exemplo. Gere um real: openssl rand -base64 48',
     }),
-  NEXT_PUBLIC_APP_URL: z.string().url().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).optional(),
 })
 
@@ -37,15 +36,6 @@ export function getEnv(): Env {
   if (!parsed.success) {
     const details = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n')
     throw new Error(`Configuração inválida:\n${details}`)
-  }
-
-  // In production the app is served over HTTPS and the session cookie carries `secure`, so an
-  // http:// base URL would produce redirect targets that silently drop the session.
-  if (parsed.data.NODE_ENV === 'production') {
-    const url = parsed.data.NEXT_PUBLIC_APP_URL
-    if (url && !url.startsWith('https://')) {
-      throw new Error('Configuração inválida:\n  - NEXT_PUBLIC_APP_URL deve usar https:// em produção')
-    }
   }
 
   cached = parsed.data
@@ -66,4 +56,37 @@ export function checkEnv(): { ok: boolean; errors: string[] } {
   } catch (e) {
     return { ok: false, errors: [(e as Error).message] }
   }
+}
+
+/**
+ * NEXT_PUBLIC_APP_URL is reported, never enforced.
+ *
+ * It used to live in the schema above, which meant a malformed value made getEnv() throw — and
+ * getEnv() is reached from signSessionToken(), so a typo in the address used to build e-mail
+ * links took down every login and signup while the static pages carried on rendering, making
+ * the deploy look healthy. The variable guards nothing: it only turns relative paths into
+ * absolute ones for outgoing mail. A wrong link in an e-mail deserves a loud warning; it does
+ * not deserve locking everybody out of their accounts.
+ */
+export function appUrlProblem(): string | null {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()
+  if (!raw) {
+    return 'NEXT_PUBLIC_APP_URL não definida — links enviados por e-mail vão apontar para http://localhost:3000'
+  }
+
+  let parsed: URL
+  try {
+    parsed = new URL(raw)
+  } catch {
+    return (
+      'NEXT_PUBLIC_APP_URL não é uma URL absoluta válida (recebido: ' +
+      JSON.stringify(raw) +
+      '). Use o endereço completo, com https:// na frente.'
+    )
+  }
+
+  if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+    return 'NEXT_PUBLIC_APP_URL deveria usar https:// em produção (recebido: ' + parsed.protocol + '//)'
+  }
+  return null
 }
