@@ -4,6 +4,8 @@ import { ArrowRight, CheckCircle2, Clock, ChevronRight, Search, ShieldCheck, Cal
 import PublicHeader from './components/PublicHeader'
 import RatingStat from './components/RatingStat'
 import HeroSearch from './HeroSearch'
+import Revelar from './components/Revelar'
+import Contador from './components/Contador'
 import { prisma } from '@/lib/prisma'
 import { listedWhere } from '@/lib/subscription'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
@@ -77,6 +79,12 @@ export default async function LandingPage() {
 
       {/* Hero */}
       <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/80 via-white to-white">
+        {/* A malha de pontos esmaece para baixo, senão ela compete com o conteúdo em vez de
+            servir de textura. */}
+        <div
+          className="absolute inset-0 bg-pontilhado opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent)]"
+          aria-hidden
+        />
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl" aria-hidden />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-50 rounded-full blur-3xl" aria-hidden />
 
@@ -93,7 +101,7 @@ export default async function LandingPage() {
               )}
               <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-[1.1] mb-6">
                 O nutricionista certo para
-                <span className="block text-emerald-500">o seu objetivo</span>
+                <span className="block text-emerald-600 brilho-marca tracking-tightest">o seu objetivo</span>
               </h1>
               <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
                 Compare especialistas por preço, avaliação e disponibilidade. Agende online ou presencial em minutos.
@@ -102,11 +110,14 @@ export default async function LandingPage() {
               <HeroSearch />
 
               <div className="flex flex-wrap gap-2 justify-center lg:justify-start mt-6">
-                {SPECIALTIES.map((s) => (
+                {SPECIALTIES.map((s, i) => (
                   <Link
                     key={s.long}
                     href={`/resultados?especialidade=${encodeURIComponent(s.short)}`}
-                    className={`flex items-center gap-1.5 border px-4 py-1.5 rounded-full text-xs font-medium hover:scale-105 transition-transform ${s.color}`}
+                    // O atraso por índice faz os chips subirem e descerem fora de sincronia. Em
+                    // fase, viram um bloco só piscando; defasados, parecem vivos.
+                    style={{ animationDelay: `${i * 260}ms` }}
+                    className={`flutuar flex items-center gap-1.5 border px-4 py-1.5 rounded-full text-xs font-medium hover:scale-105 transition-transform ${s.color}`}
                   >
                     <span>{s.emoji}</span> {s.short}
                   </Link>
@@ -150,11 +161,13 @@ export default async function LandingPage() {
       {stats.length >= 2 && (
         <section className="border-y border-gray-100 bg-white">
           <div className={`max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 gap-8 ${stats.length >= 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+            {stats.map((stat, i) => (
+              <Revelar key={stat.label} atraso={i * 90} className="text-center">
+                <p className="text-3xl font-bold text-gray-900">
+                  <Contador valor={stat.value} />
+                </p>
                 <p className="text-sm text-gray-500 mt-1">{stat.label}</p>
-              </div>
+              </Revelar>
             ))}
           </div>
         </section>
@@ -169,7 +182,11 @@ export default async function LandingPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {steps.map(({ step, title, description, icon: Icon }) => (
-              <div key={step} className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+              <Revelar
+              key={step}
+              atraso={(Number(step) - 1) * 110}
+              className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm elevar-no-hover hover:border-emerald-200"
+            >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
                     <Icon size={20} />
@@ -178,7 +195,7 @@ export default async function LandingPage() {
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">{description}</p>
-              </div>
+            </Revelar>
             ))}
           </div>
         </div>
@@ -216,7 +233,7 @@ export default async function LandingPage() {
                 <Link
                   key={n.id}
                   href={`/perfil/${n.id}`}
-                  className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-emerald-100 transition-all block"
+                  className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-emerald-200 elevar-no-hover block"
                 >
                   <div className="flex gap-4 items-start">
                     <div className={`w-14 h-14 ${n.color} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>

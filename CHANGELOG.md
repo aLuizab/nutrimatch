@@ -31,6 +31,10 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 - Design system do NutriMatch aplicado ao front end: paleta verde da marca,
   neutros com fundo esverdeado, amarelo próprio para as estrelas e a fonte Inter
   servida pelo próprio domínio.
+- Movimento na interface: fundo pontilhado e brilho no título do topo, chips de
+  especialidade flutuando fora de fase, seções que entram ao rolar, contadores que
+  contam até o número e cartões que se elevam ao passar o mouse. Tudo desligado
+  para quem pede menos movimento no sistema operacional.
 
 - O CI passa a rodar também em `staging`.
 
