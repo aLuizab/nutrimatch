@@ -50,7 +50,9 @@ export default function CartoesFlutuantes({ profissionais }: { profissionais: De
                   <span className="text-[10px] font-bold text-gray-700">{p.rating.toFixed(1)}</span>
                 </>
               ) : (
-                <span className="text-[10px] text-gray-400">Novo na plataforma</span>
+                <span className="text-[10px] text-gray-400">
+                  {p.id ? 'Novo na plataforma' : 'Perfil de exemplo'}
+                </span>
               )}
             </div>
           </div>
