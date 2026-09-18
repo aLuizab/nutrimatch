@@ -584,6 +584,9 @@ model Goal {
   /// unit são nulos a meta é só um hábito a marcar como concluído.
   targetValue  Float?
   currentValue Float?
+  /// Ponto de partida, gravado na criação. É o que permite calcular progresso em metas
+  /// decrescentes: sem ele, emagrecer de 85 para 72 faz a barra andar para trás a cada quilo.
+  startValue   Float?
   unit         String?
 
   dueDate    DateTime?
