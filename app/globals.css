@@ -10,4 +10,93 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
+
+  /* Malha de pontos do topo da página. Feita com gradiente em vez de imagem: não custa
+     requisição, escala em qualquer tela e acompanha a cor do tema. */
+  .bg-pontilhado {
+    /* gray-300 e não gray-200: com o tom mais claro os pontos somem contra o fundo quase
+       branco do topo. Textura que ninguém enxerga é peso morto no CSS. */
+    background-image: radial-gradient(circle, theme('colors.gray.300') 1.5px, transparent 1.5px);
+    background-size: 18px 18px;
+  }
+
+  /* O halo precisa de tom saturado: verde pálido atrás de texto verde-escuro sobre fundo
+     branco não produz halo nenhum, só custa pintura. As três camadas dão um degradê do centro
+     para fora, em vez de um contorno chapado. */
+  .brilho-marca {
+    text-shadow:
+      0 0 14px theme('colors.emerald.300'),
+      0 0 34px theme('colors.emerald.300'),
+      0 0 70px theme('colors.emerald.200');
+  }
+
+  .elevar-no-hover {
+    transition:
+      transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 220ms ease;
+  }
+  .elevar-no-hover:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px -12px rgb(13 31 23 / 0.18);
+  }
+}
+
+@layer components {
+  /* Entrada de seção ao rolar. A classe base já deixa o elemento visível: se o JavaScript não
+     rodar, o conteúdo aparece normalmente em vez de ficar invisível para sempre — que é a
+     forma mais comum de uma animação de scroll quebrar uma página inteira. */
+  .revelar {
+    opacity: 1;
+  }
+  .revelar[data-revelar='pendente'] {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  .revelar[data-revelar='visivel'] {
+    opacity: 1;
+    transform: none;
+    transition:
+      opacity 560ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 560ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* 10px em 3,2s. Os 6px anteriores em 4,5s eram lentos e curtos demais: o movimento existia
+   no CSS e ninguém percebia olhando a tela. */
+@keyframes flutuar {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.flutuar {
+  animation: flutuar 3.2s ease-in-out infinite;
+}
+
+/*
+ * Quem pede menos movimento no sistema operacional costuma ter um motivo — enjoo, vertigem,
+ * distração. Aqui isso desliga tudo que se move, inclusive as animações do Tailwind, e mantém
+ * o conteúdo no lugar final em vez de escondido.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .revelar[data-revelar='pendente'] {
+    opacity: 1;
+    transform: none;
+  }
+  .elevar-no-hover:hover {
+    transform: none;
+  }
 }
