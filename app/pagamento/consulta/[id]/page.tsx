@@ -3,8 +3,10 @@ import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import PublicHeader from '../../../components/PublicHeader'
 import PixCheckout from '../../PixCheckout'
+import PaymentLinkCard from '../../PaymentLinkCard'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { paymentLinkUrl } from '@/lib/payment-link'
 import { appointmentPixCharge } from '@/lib/pix-payments'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
 
@@ -29,6 +31,8 @@ export default async function PagamentoConsulta({ params }: { params: Promise<{ 
   const charge = appointmentPixCharge(appointment)
   if (!charge) notFound()
 
+  const link = paymentLinkUrl()
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <PublicHeader />
@@ -44,6 +48,8 @@ export default async function PagamentoConsulta({ params }: { params: Promise<{ 
         <p className="text-gray-500 text-sm mb-6">
           Sua consulta fica reservada assim que o pagamento for confirmado.
         </p>
+
+        {link && <PaymentLinkCard url={link} amountCents={charge.amountCents} />}
 
         <PixCheckout
           kind="consulta"

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 import { ArrowRight, CheckCircle2, Clock, ChevronRight, Search, ShieldCheck, CalendarCheck, Star, Quote } from 'lucide-react'
 import PublicHeader from './components/PublicHeader'
 import RatingStat from './components/RatingStat'
@@ -79,34 +80,67 @@ export default async function LandingPage() {
         <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl" aria-hidden />
         <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-emerald-50 rounded-full blur-3xl" aria-hidden />
 
-        <div className="relative max-w-7xl mx-auto px-6 py-20 md:py-28">
-          <div className="max-w-3xl mx-auto text-center">
-            {totalActive >= 10 && (
-              <span className="inline-flex items-center gap-2 bg-white border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-2 rounded-full mb-6 shadow-sm">
-                <ShieldCheck size={14} />
-                {totalActive} nutricionistas verificados na plataforma
-              </span>
-            )}
-            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-[1.1] mb-6">
-              O nutricionista certo para
-              <span className="block text-emerald-500">o seu objetivo</span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-xl mx-auto leading-relaxed">
-              Compare especialistas por preço, avaliação e disponibilidade. Agende online ou presencial em minutos.
-            </p>
+        <div className="relative max-w-7xl mx-auto px-6 py-16 md:py-24">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            {/* Texto e busca. Alinhado à esquerda no desktop e centralizado no mobile, onde
+                não há imagem ao lado para equilibrar. */}
+            <div className="text-center lg:text-left">
+              {totalActive >= 10 && (
+                <span className="inline-flex items-center gap-2 bg-white border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-2 rounded-full mb-6 shadow-sm">
+                  <ShieldCheck size={14} />
+                  {totalActive} nutricionistas verificados na plataforma
+                </span>
+              )}
+              <h1 className="text-4xl md:text-6xl font-bold text-gray-900 leading-[1.1] mb-6">
+                O nutricionista certo para
+                <span className="block text-emerald-500">o seu objetivo</span>
+              </h1>
+              <p className="text-lg md:text-xl text-gray-500 mb-10 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+                Compare especialistas por preço, avaliação e disponibilidade. Agende online ou presencial em minutos.
+              </p>
 
-            <HeroSearch />
+              <HeroSearch />
 
-            <div className="flex flex-wrap gap-2 justify-center mt-6">
-              {SPECIALTIES.map((s) => (
-                <Link
-                  key={s.long}
-                  href={`/resultados?especialidade=${encodeURIComponent(s.short)}`}
-                  className={`flex items-center gap-1.5 border px-4 py-1.5 rounded-full text-xs font-medium hover:scale-105 transition-transform ${s.color}`}
-                >
-                  <span>{s.emoji}</span> {s.short}
-                </Link>
-              ))}
+              <div className="flex flex-wrap gap-2 justify-center lg:justify-start mt-6">
+                {SPECIALTIES.map((s) => (
+                  <Link
+                    key={s.long}
+                    href={`/resultados?especialidade=${encodeURIComponent(s.short)}`}
+                    className={`flex items-center gap-1.5 border px-4 py-1.5 rounded-full text-xs font-medium hover:scale-105 transition-transform ${s.color}`}
+                  >
+                    <span>{s.emoji}</span> {s.short}
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            {/* Escondida no celular de propósito: numa tela estreita a imagem empurraria a
+                busca para baixo da dobra, e procurar nutricionista é o que a pessoa veio
+                fazer. Foto do Pexels, servida do nosso domínio — hotlink dependeria de um
+                terceiro no meio do carregamento e entregaria o IP de cada visitante a ele. */}
+            <div className="hidden lg:block relative">
+              <div className="relative rounded-3xl overflow-hidden shadow-xl shadow-emerald-900/10 rotate-1">
+                <Image
+                  src="/hero-prato.jpg"
+                  alt="Prato equilibrado com grão-de-bico, abóbora assada, folhas, quinoa e abacate"
+                  width={1200}
+                  height={900}
+                  priority
+                  className="w-full h-auto object-cover"
+                />
+              </div>
+
+              <div className="absolute -bottom-5 -left-5 bg-white rounded-2xl shadow-lg border border-gray-100 px-5 py-4 -rotate-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                    <CalendarCheck size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-gray-900">Online ou presencial</p>
+                    <p className="text-xs text-gray-500">Você escolhe como quer ser atendido</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

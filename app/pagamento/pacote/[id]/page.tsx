@@ -3,8 +3,10 @@ import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import PublicHeader from '../../../components/PublicHeader'
 import PixCheckout from '../../PixCheckout'
+import PaymentLinkCard from '../../PaymentLinkCard'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
+import { paymentLinkUrl } from '@/lib/payment-link'
 import { enrollmentPixCharge } from '@/lib/pix-payments'
 
 export default async function PagamentoPacote({ params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +29,8 @@ export default async function PagamentoPacote({ params }: { params: Promise<{ id
   const charge = enrollmentPixCharge(enrollment)
   if (!charge) notFound()
 
+  const link = paymentLinkUrl()
+
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
       <PublicHeader />
@@ -42,6 +46,8 @@ export default async function PagamentoPacote({ params }: { params: Promise<{ id
         <p className="text-gray-500 text-sm mb-6">
           O programa começa a valer assim que o pagamento for confirmado.
         </p>
+
+        {link && <PaymentLinkCard url={link} amountCents={charge.amountCents} />}
 
         <PixCheckout
           kind="pacote"
