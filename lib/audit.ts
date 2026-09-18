@@ -20,6 +20,8 @@ export type AuditAction =
   // pessoa. Sem registro não há como reconstruir por que alguém sumiu (ou voltou) da lista.
   | 'SUBSCRIPTION_PAYMENT_RECORDED'
   | 'SUBSCRIPTION_CANCELLED'
+  // Quem define por qual link o dinheiro do paciente entra precisa ter nome e hora.
+  | 'PAYMENT_LINK_UPDATED'
 
 export function audit(args: {
   actorId: string

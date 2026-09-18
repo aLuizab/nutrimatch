@@ -1,6 +1,7 @@
 import type Stripe from 'stripe'
 import { prisma } from './prisma'
 import { appUrl, getStripe, stripeEnabled } from './stripe'
+import { professionalPaymentLink } from './payment-link'
 import { canReceivePix, pixEnabled } from './pix-payments'
 import { splitFee } from './fees'
 import { reaisToCents } from './money'
@@ -40,26 +41,39 @@ export function paymentHoldDeadline(now: Date = new Date()): Date {
 
 export interface PaymentRequirement {
   required: boolean
-  reason: 'PIX_DISABLED' | 'PROFESSIONAL_WITHOUT_PIX' | 'COVERED_BY_PACKAGE' | 'REQUIRED'
+  reason:
+    | 'PROFESSIONAL_WITHOUT_LINK'
+    | 'PROFESSIONAL_WITHOUT_PIX'
+    | 'COVERED_BY_PACKAGE'
+    | 'REQUIRED'
 }
 
 /**
- * Decide se esta consulta passa pelo caixa. Três motivos legítimos para não passar, e todos
- * mantêm o app funcionando como funcionava antes de existir pagamento: a instalação não tem
- * chave Pix da plataforma configurada, o profissional não cadastrou a chave dele (sem ela não
- * há para onde repassar), ou a consulta já foi paga dentro de um pacote.
+ * Decide se esta consulta passa pelo caixa da plataforma.
  *
- * Antes isto perguntava pelo Stripe Connect. A pergunta agora é mais simples porque o modelo é
- * mais simples: quem recebe é a plataforma, e o profissional só precisa dizer para onde quer o
- * repasse — sem onboarding, sem documento, sem conta em gateway.
+ * Exige as duas pontas do caminho do dinheiro, e a distincao importa: sem o link de pagamento
+ * nao ha como cobrar o paciente, e sem a chave Pix nao ha como devolver os 90% ao profissional.
+ * Faltando a segunda, cobrar seria reter dinheiro de alguem sem ter para onde mandar — pior do
+ * que nao cobrar.
+ *
+ * Nos dois casos o app segue funcionando como antes de existir pagamento: a consulta acontece e
+ * o valor e combinado direto entre paciente e profissional. Mesma degradacao graciosa de sempre.
  */
 export function paymentRequirementFor(
-  professional: { pixKey?: string | null } | null | undefined,
+  professional:
+    | { price: number; paymentLinkUrl?: string | null; paymentLinkAmount?: number | null; pixKey?: string | null }
+    | null
+    | undefined,
   coveredByEnrollment: boolean
 ): PaymentRequirement {
   if (coveredByEnrollment) return { required: false, reason: 'COVERED_BY_PACKAGE' }
-  if (!pixEnabled()) return { required: false, reason: 'PIX_DISABLED' }
-  if (!canReceivePix(professional)) return { required: false, reason: 'PROFESSIONAL_WITHOUT_PIX' }
+  if (!professional) return { required: false, reason: 'PROFESSIONAL_WITHOUT_LINK' }
+  if (!professionalPaymentLink(professional)) {
+    return { required: false, reason: 'PROFESSIONAL_WITHOUT_LINK' }
+  }
+  if (!professional.pixKey?.trim()) {
+    return { required: false, reason: 'PROFESSIONAL_WITHOUT_PIX' }
+  }
   return { required: true, reason: 'REQUIRED' }
 }
 

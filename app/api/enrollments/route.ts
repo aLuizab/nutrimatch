@@ -5,7 +5,8 @@ import { AuthError, requirePatientActor } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { addMonthsToDateString, instantAt, spDateString } from '@/lib/spdate'
 import { paymentRequirementFor } from '@/lib/payments'
-import { createEnrollmentPixCharge } from '@/lib/pix-payments'
+import { recordEnrollmentCharge } from '@/lib/pix-payments'
+import { carePlanPaymentLink, carePlanTotalReais } from '@/lib/payment-link'
 
 const enrollSchema = z.object({ carePlanId: z.string().min(1) })
 
@@ -67,7 +68,12 @@ export async function POST(request: Request) {
   }
 
   const professionalName = plan.professional.user.name
-  const requirement = paymentRequirementFor(plan.professional, false)
+  // O pacote cobra pelo link do próprio plano, não pelo do profissional: o total dele não é o
+  // preço da consulta avulsa, e um link do InfinitePay cobra um valor só. A chave Pix continua
+  // sendo exigida pelo mesmo motivo de sempre — é por onde o repasse sai.
+  const requirement = {
+    required: carePlanPaymentLink(plan) !== null && Boolean(plan.professional.pixKey?.trim()),
+  }
   const today = spDateString(new Date())
   const enrollment = await prisma.enrollment.create({
     data: {
@@ -86,20 +92,14 @@ export async function POST(request: Request) {
   })
 
   if (!requirement.required) {
-    // Profissional sem chave Pix cadastrada: o programa registra os termos combinados e o
-    // dinheiro é acertado diretamente, como funcionava antes de existir pagamento.
+    // Sem link de pagamento no plano, ou sem chave Pix para o repasse: o programa registra os
+    // termos combinados e o dinheiro é acertado direto, como antes de existir pagamento aqui.
     return NextResponse.json({ id: enrollment.id, paymentRequired: false })
   }
 
-  const charge = await createEnrollmentPixCharge(enrollment.id, plan.pricePerConsultation * plan.consultations)
-  if (!charge) {
-    console.error('[enrollments] cobrança Pix indisponível', enrollment.id)
-    await prisma.enrollment.delete({ where: { id: enrollment.id } })
-    return NextResponse.json(
-      { error: 'Não foi possível iniciar o pagamento. Nenhum valor foi cobrado — tente novamente.' },
-      { status: 502 }
-    )
-  }
+  // Só registra quanto é devido e a fatia da plataforma. O paciente paga no link do plano, que
+  // já carrega o valor — não há código de cobrança a gerar aqui, nem como isto falhar.
+  await recordEnrollmentCharge(enrollment.id, carePlanTotalReais(plan))
 
   return NextResponse.json({
     id: enrollment.id,

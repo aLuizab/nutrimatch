@@ -2,12 +2,10 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import PublicHeader from '../../../components/PublicHeader'
-import PixCheckout from '../../PixCheckout'
 import PaymentLinkCard from '../../PaymentLinkCard'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
-import { paymentLinkUrl } from '@/lib/payment-link'
-import { enrollmentPixCharge } from '@/lib/pix-payments'
+import { carePlanPaymentLink } from '@/lib/payment-link'
 
 export default async function PagamentoPacote({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -17,7 +15,16 @@ export default async function PagamentoPacote({ params }: { params: Promise<{ id
   const enrollment = await prisma.enrollment.findUnique({
     where: { id },
     include: {
-      carePlan: { select: { name: true, consultations: true, durationMonths: true } },
+      carePlan: {
+        select: {
+          name: true,
+          consultations: true,
+          durationMonths: true,
+          pricePerConsultation: true,
+          paymentLinkUrl: true,
+          paymentLinkAmount: true,
+        },
+      },
       professional: { include: { user: { select: { name: true } } } },
     },
   })
@@ -26,10 +33,12 @@ export default async function PagamentoPacote({ params }: { params: Promise<{ id
     redirect('/patient/evolucao')
   }
 
-  const charge = enrollmentPixCharge(enrollment)
-  if (!charge) notFound()
+  // O pacote tem link próprio: o total dele não é o preço da consulta avulsa, e um link do
+  // InfinitePay cobra um valor só.
+  const link = carePlanPaymentLink(enrollment.carePlan)
+  if (!link) notFound()
 
-  const link = paymentLinkUrl()
+  const amountCents = enrollment.paidAmountCents ?? link.amountCents
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -47,14 +56,10 @@ export default async function PagamentoPacote({ params }: { params: Promise<{ id
           O programa começa a valer assim que o pagamento for confirmado.
         </p>
 
-        {link && <PaymentLinkCard url={link} amountCents={charge.amountCents} />}
-
-        <PixCheckout
+        <PaymentLinkCard
+          link={{ ...link, amountCents }}
           kind="pacote"
           id={enrollment.id}
-          payload={charge.payload}
-          txid={charge.txid}
-          amountCents={charge.amountCents}
           title="Acompanhamento"
           subtitle={`${enrollment.carePlan.name} · ${enrollment.carePlan.consultations} consultas em ${enrollment.carePlan.durationMonths} meses · ${enrollment.professional.user.name}`}
           alreadyClaimed={enrollment.pixClaimedAt !== null}

@@ -8,7 +8,7 @@ import { notifyBookingRequested } from '@/lib/notifications'
 import { lockAndResolveEnrollment } from '@/lib/enrollments'
 import { confirmationDeadlineFor, staleHoldWhere } from '@/lib/appointment-status'
 import { paymentHoldDeadline, paymentRequirementFor } from '@/lib/payments'
-import { createAppointmentPixCharge } from '@/lib/pix-payments'
+import { recordAppointmentCharge } from '@/lib/pix-payments'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
 import { getEntitlements } from '@/lib/subscription'
 import { countOpenAppointments, getPatientReliability, maxOpenAppointmentsFor } from '@/lib/reputation'
@@ -155,20 +155,9 @@ export async function POST(request: Request) {
     // lock de linha aberto enquanto se faz qualquer outra coisa é como um lock passa de
     // milissegundos a minutos.
     if (payment.required) {
-      const charge = await createAppointmentPixCharge(appointment.id, appointment.price)
-      if (!charge) {
-        // Chave da plataforma sumiu entre a verificação e agora — libera o horário em vez de
-        // deixar na agenda uma consulta que ninguém consegue pagar.
-        console.error('[appointments] cobrança Pix indisponível', appointment.id)
-        await prisma.appointment.update({
-          where: { id: appointment.id },
-          data: { status: 'CANCELLED', slotHeldAt: null, paymentStatus: 'VOIDED' },
-        })
-        return NextResponse.json(
-          { error: 'Não foi possível iniciar o pagamento. Nenhum valor foi cobrado — tente novamente.' },
-          { status: 502 }
-        )
-      }
+      // Só registra quanto é devido e qual fatia é da plataforma. O paciente paga no link do
+      // InfinitePay do profissional, que já carrega o valor — não há código a gerar aqui.
+      await recordAppointmentCharge(appointment.id, appointment.price)
 
       // Nenhum e-mail ainda. O profissional só é avisado quando o pagamento é confirmado —
       // senão toda cobrança abandonada o notificaria sobre uma consulta que nunca existiu, e

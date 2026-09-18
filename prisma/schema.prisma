@@ -168,6 +168,17 @@ model Professional {
   // O paciente paga na chave da plataforma; a plataforma repassa aqui, já descontada a taxa.
   // Sem chave cadastrada não há como repassar, então o profissional não entra no fluxo pago —
   // mesmo papel que stripeChargesEnabled tinha, agora sem onboarding de documentos.
+  // ── Link de pagamento da consulta avulsa ────────────────────────────────────────────
+  // Criado pelo admin no InfinitePay com o valor desta pessoa e colado aqui. Um link por
+  // profissional porque o link carrega valor fixo, e o valor é o preço dele.
+  paymentLinkUrl String?
+  // O preço para o qual o link foi criado, em reais inteiros, como Professional.price. Guardado
+  // para detectar o link envelhecido: o profissional muda o preço na tela dele e o link continua
+  // cobrando o valor antigo, sem nada avisando ninguém. Comparar os dois é o que torna isso
+  // visível em vez de virar diferença de caixa descoberta semanas depois.
+  paymentLinkAmount    Int?
+  paymentLinkUpdatedAt DateTime?
+
   pixKey     String?
   // CPF | CNPJ | EMAIL | PHONE | RANDOM. String e não enum: o Bacen pode passar a aceitar outro
   // tipo, e isso não deveria custar uma migração.
@@ -331,6 +342,12 @@ model CarePlan {
   pricePerConsultation Int
   active               Boolean      @default(true)
   createdAt            DateTime     @default(now())
+
+  // Link próprio porque o valor do pacote (pricePerConsultation x consultations) não é o da
+  // consulta avulsa, e um link do InfinitePay cobra um valor só.
+  paymentLinkUrl       String?
+  paymentLinkAmount    Int?
+  paymentLinkUpdatedAt DateTime?
 
   enrollments Enrollment[]
 

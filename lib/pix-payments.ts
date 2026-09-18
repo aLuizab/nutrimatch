@@ -205,3 +205,35 @@ export async function payoutSummary(professionalId: string) {
     paidCount: paid._count,
   }
 }
+
+/**
+ * Registra o valor e a taxa de uma cobrança que será paga pelo link do InfinitePay.
+ *
+ * Mesmo papel de createAppointmentPixCharge, sem o código Pix: o paciente paga num link
+ * externo, e o que esta plataforma precisa guardar é quanto era devido e qual fatia é da casa —
+ * é disso que o repasse é calculado depois, em confirmAppointmentPixPayment, que não se importa
+ * com o caminho pelo qual o dinheiro chegou.
+ *
+ * O nome do arquivo virou dívida: ele trata de "a plataforma recebe e repassa", e o Pix é hoje
+ * só a perna do repasse. Renomear agora espalharia o diff por meia dúzia de telas sem mudar
+ * comportamento nenhum.
+ */
+export async function recordAppointmentCharge(appointmentId: string, priceReais: number): Promise<number> {
+  const amountCents = reaisToCents(priceReais)
+  const { feeCents } = splitFee(amountCents)
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { amountCents, feeCents },
+  })
+  return amountCents
+}
+
+export async function recordEnrollmentCharge(enrollmentId: string, totalReais: number): Promise<number> {
+  const amountCents = reaisToCents(totalReais)
+  const { feeCents } = splitFee(amountCents)
+  await prisma.enrollment.update({
+    where: { id: enrollmentId },
+    data: { paidAmountCents: amountCents, feeCents },
+  })
+  return amountCents
+}

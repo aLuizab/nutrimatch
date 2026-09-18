@@ -2,12 +2,10 @@ import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import PublicHeader from '../../../components/PublicHeader'
-import PixCheckout from '../../PixCheckout'
 import PaymentLinkCard from '../../PaymentLinkCard'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
-import { paymentLinkUrl } from '@/lib/payment-link'
-import { appointmentPixCharge } from '@/lib/pix-payments'
+import { professionalPaymentLink } from '@/lib/payment-link'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
 
 export default async function PagamentoConsulta({ params }: { params: Promise<{ id: string }> }) {
@@ -28,10 +26,12 @@ export default async function PagamentoConsulta({ params }: { params: Promise<{ 
     redirect('/patient/consultas')
   }
 
-  const charge = appointmentPixCharge(appointment)
-  if (!charge) notFound()
+  const link = professionalPaymentLink(appointment.professional)
+  if (!link) notFound()
 
-  const link = paymentLinkUrl()
+  // O valor é o desta consulta, congelado no agendamento — e não o preço de tabela de hoje. Se
+  // o profissional mudou o preço depois, quem vale é o que foi combinado aqui.
+  const amountCents = appointment.amountCents ?? link.amountCents
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -49,14 +49,10 @@ export default async function PagamentoConsulta({ params }: { params: Promise<{ 
           Sua consulta fica reservada assim que o pagamento for confirmado.
         </p>
 
-        {link && <PaymentLinkCard url={link} amountCents={charge.amountCents} />}
-
-        <PixCheckout
+        <PaymentLinkCard
+          link={{ ...link, amountCents }}
           kind="consulta"
           id={appointment.id}
-          payload={charge.payload}
-          txid={charge.txid}
-          amountCents={charge.amountCents}
           title="Consulta"
           subtitle={`${appointment.professional.user.name} · ${formatDateBR(appointment.scheduledAt)} às ${formatTimeBR(appointment.scheduledAt)}`}
           alreadyClaimed={appointment.paymentStatus === 'AWAITING_REVIEW'}
