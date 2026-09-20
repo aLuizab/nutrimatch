@@ -48,7 +48,7 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
   // contratar comigo mesmo.
   const isSelf = viewer?.id === professional.userId
   const isLoggedInPatient = viewer != null && !isSelf
-  // Um pacote só passa pelo caixa quando o profissional tem conta conectada no Stripe.
+  // Um pacote só passa pelo caixa quando o profissional tem link de pagamento e chave Pix.
   const packagePaymentRequired = paymentRequirementFor(professional, false).required
   const existingEnrollment = viewer?.patient
     ? await prisma.enrollment.findFirst({

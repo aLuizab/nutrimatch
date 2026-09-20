@@ -12,8 +12,7 @@ Como os secrets são guardados, como rotacioná-los, e quais barreiras existem h
 | Produção | Variáveis do Railway | Criptografadas pelo Railway; não tocam disco nem repositório |
 | CI | Placeholders | O CI **nunca** recebe credencial real — usa valores falsos só para compilar |
 
-Secrets em uso: `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY`, `STRIPE_SECRET_KEY`,
-`STRIPE_WEBHOOK_SECRET`, `STRIPE_CONNECT_WEBHOOK_SECRET`.
+Secrets em uso: `DATABASE_URL`, `JWT_SECRET`, `RESEND_API_KEY`.
 
 O app **recusa iniciar** com `JWT_SECRET` curto (<32 caracteres) ou com valor de exemplo
 (`lib/env.ts`) — melhor quebrar no boot do que rodar assinando tokens forjáveis.
@@ -40,12 +39,6 @@ precisa entrar de novo. Isso é intencional: é o único jeito de invalidar sess
 2. Atualize `DATABASE_URL` no `.env` e no Railway.
 3. Redeploy. Há um breve intervalo em que a app antiga falha ao conectar — normal.
 
-### Chaves do Stripe
-1. Dashboard → Desenvolvedores → Chaves de API → **Roll key**.
-2. Atualize `STRIPE_SECRET_KEY` no Railway.
-3. Segredos de webhook são separados por endpoint: role cada um em Webhooks → endpoint →
-   "Assinatura" e atualize `STRIPE_WEBHOOK_SECRET` / `STRIPE_CONNECT_WEBHOOK_SECRET`.
-
 ### `RESEND_API_KEY`
 Dashboard do Resend → API Keys → revogar e criar nova.
 
@@ -55,7 +48,7 @@ Dashboard do Resend → API Keys → revogar e criar nova.
 
 **Impedir vazamento de secret**
 - `.husky/pre-commit` roda `scripts/check-secrets.mjs`: bloqueia commit de `.env` e de padrões
-  de credencial (chaves Stripe, URLs Postgres com senha, chaves privadas, keys do Resend).
+  de credencial (URLs Postgres com senha, chaves privadas, keys do Resend).
 - `gitleaks` no CI varre **todo o histórico**, não só o diff.
 
 **Autenticação**

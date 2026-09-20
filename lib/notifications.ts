@@ -24,7 +24,7 @@ import {
   platformAnnouncement,
   type AppointmentEmailData,
 } from './email-templates'
-import { appUrl } from './stripe'
+import { appUrl } from './env'
 import { unsubscribeUrl } from './unsubscribe'
 import { formatDateBR, formatPrice, formatTimeBR, modalityLabel } from './format'
 import type { Modality } from '@prisma/client'
@@ -96,21 +96,19 @@ export function notifyBookingPendingPayment(ctx: AppointmentContext) {
   )
 }
 
+/**
+ * Consulta confirmada. Os dois lados recebem, sem consultar preferência.
+ *
+ * O do profissional era condicionado a notifyBooking, e deixou de ser: isto não é aviso de
+ * movimento na agenda, é o comprovante de um compromisso com hora marcada que ele assumiu com
+ * outra pessoa — e que já foi pago. Quem desligou avisos de agendamento quis dizer "não me
+ * avise a cada pedido", não "não me diga quando tenho consulta marcada". Perder este e-mail
+ * significa faltar.
+ */
 export function notifyBookingConfirmed(ctx: AppointmentContext) {
   const data = toEmailData(ctx)
-  // Patient e-mail is transactional — always sent, no preference gate.
   fire(sendEmail({ to: ctx.patientEmail, ...bookingConfirmedPatient(data) }))
-  fire(
-    (async () => {
-      const pref = await prisma.user.findUnique({
-        where: { id: ctx.professionalUserId },
-        select: { notifyBooking: true },
-      })
-      if (pref?.notifyBooking) {
-        await sendEmail({ to: ctx.professionalEmail, ...bookingReceivedProfessional(data) })
-      }
-    })()
-  )
+  fire(sendEmail({ to: ctx.professionalEmail, ...bookingReceivedProfessional(data) }))
 }
 
 export function notifyCancelled(ctx: AppointmentContext, cancelledBy: 'PATIENT' | 'PROFESSIONAL') {

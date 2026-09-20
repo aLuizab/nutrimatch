@@ -51,10 +51,10 @@ enum AttendanceStatus {
   CONTESTED
 }
 
-// O ciclo do dinheiro de uma consulta. NOT_REQUIRED é o estado de quem nunca tocou no Stripe:
-// profissional sem conta conectada, ou consulta já coberta por um pacote pago. Manter esse
-// estado explícito é o que preserva a degradação graciosa — sem chave do Stripe o app segue
-// funcionando exatamente como antes de existir pagamento.
+// O ciclo do dinheiro de uma consulta. NOT_REQUIRED é o estado de quem fica fora do caixa da
+// plataforma: profissional sem link de pagamento ou sem chave Pix, ou consulta já coberta por um
+// pacote pago. Manter esse estado explícito é o que preserva a degradação graciosa — sem os dois
+// lados do caminho do dinheiro o app segue funcionando como antes de existir pagamento.
 enum PaymentStatus {
   NOT_REQUIRED
   // Cobrança criada, aguardando o paciente pagar. O horário fica preso, mas por pouco tempo.
@@ -73,8 +73,9 @@ enum PaymentStatus {
 
 enum SubscriptionStatus {
   ACTIVE
-  // Stripe could not collect. The professional keeps access during Stripe's own retry window
-  // — cutting them off on the first failed card would punish an expired card like a churn.
+  // A mensalidade venceu e não foi paga. O acesso continua durante o período de carência (ver
+  // lib/subscription.ts): cortar no primeiro dia de atraso puniria um esquecimento como se fosse
+  // desistência.
   PAST_DUE
   CANCELLED
 }
@@ -172,7 +173,7 @@ model Professional {
   // ── Recebimento por Pix ──────────────────────────────────────────────────────────────
   // O paciente paga na chave da plataforma; a plataforma repassa aqui, já descontada a taxa.
   // Sem chave cadastrada não há como repassar, então o profissional não entra no fluxo pago —
-  // mesmo papel que stripeChargesEnabled tinha, agora sem onboarding de documentos.
+  // mesmo papel que a flag de conta conectada tinha, agora sem onboarding de documentos.
   // ── Link de pagamento da consulta avulsa ────────────────────────────────────────────
   // Criado pelo admin no InfinitePay com o valor desta pessoa e colado aqui. Um link por
   // profissional porque o link carrega valor fixo, e o valor é o preço dele.
@@ -188,18 +189,6 @@ model Professional {
   // CPF | CNPJ | EMAIL | PHONE | RANDOM. String e não enum: o Bacen pode passar a aceitar outro
   // tipo, e isso não deveria custar uma migração.
   pixKeyType String?
-
-  // Stripe Connect (Express). A professional without stripeChargesEnabled is simply not a
-  // "paid" professional — the app keeps treating their consultations as arranged directly
-  // with the patient, exactly as before payments existed. This one flag is the whole
-  // gradual-adoption story; see lib/stripe-connect.ts#isPaidProfessional.
-  stripeAccountId       String?  @unique
-  stripeChargesEnabled  Boolean  @default(false)
-  stripePayoutsEnabled  Boolean  @default(false)
-  stripeDisabledReason  String?
-  // Requirements Stripe still needs from them (documents, etc). Non-empty means the account
-  // works today but will stop unless they act — surfaced as a banner, not a silent failure.
-  stripeRequirementsDue String[] @default([])
 
   subscription      ProfessionalSubscription?
   payouts           Payout[]
@@ -276,14 +265,12 @@ model Appointment {
   // O PaymentIntent é criado com captura manual: autoriza no agendamento, captura só quando o
   // profissional confirma. Se ele recusar, a autorização é cancelada e nada é cobrado — sem
   // estorno, sem dinheiro parado na conta de ninguém.
-  paymentIntentId   String? @unique
-  checkoutSessionId String? @unique
   // Enquanto o checkout está aberto o horário fica preso, mas por minutos e não por 24h: um
   // carrinho abandonado não pode bloquear a agenda de alguém.
   paymentDeadline DateTime?
   paidAt          DateTime?
-  // Em centavos, ao contrário de price (reais inteiros) — a API do Stripe é em centavos e a
-  // taxa de 10% precisa de arredondamento exato. Ver lib/money.ts.
+  // Em centavos, ao contrário de price (reais inteiros): a taxa de 10% precisa de arredondamento
+  // exato, e centavo inteiro é a única forma de dividir dinheiro sem sobra. Ver lib/money.ts.
   amountCents Int?
   feeCents    Int?
 
@@ -379,8 +366,7 @@ model Enrollment {
   // ── Pagamento do pacote ──────────────────────────────────────────────────────────────
   // O pacote é cobrado de uma vez, na compra. Diferente da consulta avulsa, aqui a captura é
   // imediata: não há um profissional para confirmar a compra de um programa.
-  paymentIntentId   String? @unique
-  checkoutSessionId String? @unique
+
   paidAmountCents   Int?
   feeCents          Int?
   paidAt            DateTime?
@@ -454,16 +440,8 @@ model AuditLog {
   @@index([actorId, createdAt])
 }
 
-// Stripe retries the same event id for up to 3 days; recording it makes every handler
-// idempotent. The insert doubles as the "have I seen this?" check — a P2002 means duplicate.
-model WebhookEvent {
-  id         String   @id
-  type       String
-  receivedAt DateTime @default(now())
-}
-
-// The tiers on offer. A row per tier rather than constants in code, so the price and the Stripe
-// price id can change without a deploy, and so an admin can see what is actually being sold.
+// Os planos à venda. Uma linha por plano em vez de constantes no código, para que o preço e o
+// link de cobrança mudem sem deploy, e para o admin ver o que está sendo vendido de fato.
 model SubscriptionPlan {
   id           String  @id @default(cuid())
   slug         String  @unique
@@ -472,8 +450,12 @@ model SubscriptionPlan {
   // Cents per month. 0 for the free tier, which exists as a real row so a professional always
   // has a plan and the "no subscription" case doesn't need special handling everywhere.
   monthlyPrice Int
-  // Null on the free tier and until the admin creates the recurring price in Stripe.
-  stripePriceId String? @unique
+  // Link do InfinitePay que cobra a mensalidade deste plano, cadastrado pelo admin — mesmo
+  // arranjo do link por profissional e do link por pacote. Null no plano gratuito, que não
+  // cobra nada, e enquanto o admin não criar o link.
+  paymentLinkUrl       String?
+  paymentLinkAmount    Int?
+  paymentLinkUpdatedAt DateTime?
   // Whether this tier is eligible for the labelled "Patrocinado" band. Deliberately a plan
   // property and NOT an input to Professional.rankScore — see lib/subscription.ts.
   sponsored    Boolean @default(false)
@@ -493,8 +475,6 @@ model ProfessionalSubscription {
   plan           SubscriptionPlan   @relation(fields: [planId], references: [id])
   status         SubscriptionStatus @default(ACTIVE)
 
-  stripeCustomerId     String?
-  stripeSubscriptionId String? @unique
   // When the paid period runs out. Null on the free tier, which never expires.
   currentPeriodEnd     DateTime?
   cancelAtPeriodEnd    Boolean @default(false)
@@ -507,8 +487,8 @@ model ProfessionalSubscription {
 
 // One row per (appointment, reminder kind) that has actually been sent. The unique key IS the
 // idempotency mechanism: the cron inserts before sending, so a second run in the same window
-// hits the constraint and skips instead of e-mailing the patient twice. Same reasoning as
-// WebhookEvent — recording the intent is what makes the handler safe to retry.
+// hits the constraint and skips instead of e-mailing the patient twice: registrar a intenção
+// antes de agir é o que torna o handler seguro para repetir.
 model SentReminder {
   id            String   @id @default(cuid())
   appointmentId String
