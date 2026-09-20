@@ -62,7 +62,11 @@ Dashboard do Resend → API Keys → revogar e criar nova.
 - Senhas com bcrypt custo 12.
 - Sessão em cookie `httpOnly` + `secure` (produção) + `sameSite=lax`, 7 dias.
 - **Revogação**: `User.passwordChangedAt` — trocar a senha invalida todos os tokens antigos.
-- **Rate limit** (`lib/rate-limit.ts`): login 5/15min por IP, cadastro 5/h, reset de senha 3/h.
+- **Rate limit** (`lib/rate-limit.ts`): login **5 falhas/15min por IP + e-mail** e **20 falhas/15min
+  por IP**, cadastro 5/h, reset de senha 3/h. No login só tentativa que **falha** consome cota, e
+  acertar a senha zera o balde da conta (não o do IP — senão quem tem conta válida na rede
+  zeraria o contador a cada acerto e seguiria varrendo as outras). Os dois baldes existem
+  porque um IP é muita gente: consultório, laboratório da faculdade, Wi-Fi de evento.
 - Login não revela se o e-mail existe (mesma mensagem **e** mesmo tempo de resposta —
   compara contra um hash dummy quando o usuário não existe).
 - Suspensão de profissional tem efeito **imediato** (revalidada em `requireRole`).

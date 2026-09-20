@@ -56,6 +56,49 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   return { allowed: true, remaining: limit - recent.length, retryAfter: 0 }
 }
 
+/** Os carimbos ainda dentro da janela, já podados. */
+function dentroDaJanela(key: string, now: number, windowMs: number): number[] {
+  const hit = buckets.get(key)
+  return hit ? hit.timestamps.filter((t) => now - t < windowMs) : []
+}
+
+/**
+ * O mesmo veredito de rateLimit(), mas SEM registrar a tentativa.
+ *
+ * Existe para o login poder cobrar a cota só quando a senha está de fato errada. Contando
+ * também os acessos que dão certo, entrar com três contas diferentes e errar a senha duas
+ * vezes trancava a pessoa para fora da própria conta — o que não defende de nada, já que
+ * quem acerta a senha não precisa adivinhá-la.
+ */
+export function peekRateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+  const now = Date.now()
+  sweep(now, windowMs)
+  const recent = dentroDaJanela(key, now, windowMs)
+
+  if (recent.length >= limit) {
+    const oldest = Math.min(...recent)
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfter: Math.max(1, Math.ceil((windowMs - (now - oldest)) / 1000)),
+    }
+  }
+  return { allowed: true, remaining: limit - recent.length, retryAfter: 0 }
+}
+
+/** Contabiliza uma tentativa que falhou. Par de peekRateLimit(). */
+export function recordFailure(key: string, windowMs: number): void {
+  const now = Date.now()
+  const recent = dentroDaJanela(key, now, windowMs)
+  recent.push(now)
+  buckets.set(key, { timestamps: recent })
+}
+
+/** Esquece o histórico da chave — para quando a pessoa provou que é quem diz ser. */
+export function clearRateLimit(key: string): void {
+  buckets.delete(key)
+}
+
 /**
  * Best-effort client IP. Behind Railway/Vercel the real address is in x-forwarded-for; the
  * first entry is the client, the rest are proxies. Falls back to a constant, which degrades
@@ -68,8 +111,19 @@ export function clientIp(request: Request): string {
 }
 
 export const LIMITS = {
-  /** Brute-force defence: password guessing against a known email. */
+  /**
+   * Força bruta contra UMA conta: chaveado por IP + e-mail, e só conta tentativa que falhou.
+   * Acertar a senha zera o balde, então errar duas vezes e acertar na terceira não deixa
+   * resíduo para a próxima vez que a pessoa entrar.
+   */
   login: { limit: 5, windowMs: 15 * 60 * 1000 },
+  /**
+   * Segunda linha, chaveada só pelo IP: pega quem varre muitas contas do mesmo endereço, coisa
+   * que o balde por conta acima não enxerga. Mais alto de propósito — um consultório, um
+   * laboratório da faculdade ou o Wi-Fi de um evento são um IP só para muita gente, e cinco
+   * falhas compartilhadas trancariam a sala inteira para fora da demonstração.
+   */
+  loginPerIp: { limit: 20, windowMs: 15 * 60 * 1000 },
   /** Account-creation spam and email enumeration probing. */
   register: { limit: 5, windowMs: 60 * 60 * 1000 },
   /** Password-reset request flooding (also an email-sending cost control). */
