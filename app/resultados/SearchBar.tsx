@@ -32,7 +32,7 @@ export default function SearchBar({ initial }: { initial: FilterValues }) {
         value={q}
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Nome, especialidade ou cidade..."
-        className="w-full border border-gray-200 rounded-xl py-3 pl-11 pr-10 text-sm bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+        className="w-full border border-gray-200 rounded-xl py-3 pl-11 pr-10 text-sm bg-surface focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
       />
       {isPending ? (
         <Loader2 size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-500 animate-spin" />

@@ -30,7 +30,7 @@ export default async function Descadastrar({
     <div className="min-h-screen bg-gray-50 font-sans">
       <PublicHeader />
       <div className="max-w-md mx-auto px-6 py-16">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
           {!valido || !user ? (
             <>
               <h1 className="text-lg font-bold text-gray-900">Link inválido</h1>

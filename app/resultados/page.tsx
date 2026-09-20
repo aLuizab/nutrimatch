@@ -140,7 +140,7 @@ export default async function Resultados({
 
         <div className="flex gap-6">
           <aside className="w-64 shrink-0 hidden md:block">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5">
+            <div className="bg-surface rounded-2xl border border-gray-100 p-5">
               <FilterFields initial={filters} />
             </div>
           </aside>

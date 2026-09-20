@@ -81,16 +81,16 @@ export default function EnrollmentCard({ program }: { program: EnrollmentSummary
             </span>
             <span>{program.remaining} restantes</span>
           </div>
-          <div className="h-2 bg-white/25 rounded-full overflow-hidden">
+          <div className="h-2 bg-glass/25 rounded-full overflow-hidden">
             <div
-              className="h-full bg-white rounded-full"
+              className="h-full bg-surface rounded-full"
               style={{ width: `${Math.min(100, (program.used / program.total) * 100)}%` }}
             />
           </div>
           {program.remaining > 0 && (
             <Link
               href={`/agendamento/${program.professionalId}`}
-              className="inline-block mt-3 bg-white text-emerald-600 text-sm font-bold px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors"
+              className="inline-block mt-3 bg-surface text-emerald-600 text-sm font-bold px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors"
             >
               Agendar próxima
             </Link>
@@ -99,16 +99,16 @@ export default function EnrollmentCard({ program }: { program: EnrollmentSummary
       </div>
 
       {program.withinWithdrawalWindow && (
-        <div className="mt-4 pt-4 border-t border-white/20">
+        <div className="mt-4 pt-4 border-t border-glass/20">
           {!confirming ? (
             <button
               onClick={() => setConfirming(true)}
-              className="text-xs font-medium text-white/90 underline hover:text-white"
+              className="text-xs font-medium text-glass/90 underline hover:text-white"
             >
               Cancelar e receber reembolso total
             </button>
           ) : (
-            <div className="bg-white/10 rounded-xl p-3">
+            <div className="bg-glass/10 rounded-xl p-3">
               <p className="text-xs text-white leading-relaxed">
                 Você está dentro do prazo de 7 dias para desistir da compra sem precisar de
                 justificativa (direito de arrependimento garantido pelo CDC). Ao confirmar,{' '}
@@ -119,14 +119,14 @@ export default function EnrollmentCard({ program }: { program: EnrollmentSummary
               <div className="flex gap-2 mt-3">
                 <button
                   onClick={() => setConfirming(false)}
-                  className="text-xs font-medium text-white/80 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                  className="text-xs font-medium text-glass/80 px-3 py-1.5 rounded-lg hover:bg-glass/10 transition-colors"
                 >
                   Voltar
                 </button>
                 <button
                   onClick={cancel}
                   disabled={loading}
-                  className="text-xs font-bold text-emerald-700 bg-white px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-60"
+                  className="text-xs font-bold text-emerald-700 bg-surface px-3 py-1.5 rounded-lg hover:bg-emerald-50 transition-colors disabled:opacity-60"
                 >
                   {loading ? 'Cancelando...' : 'Confirmar cancelamento'}
                 </button>

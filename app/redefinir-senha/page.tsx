@@ -46,7 +46,7 @@ function ResetForm() {
 
   if (!token) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
         <h1 className="text-xl font-bold text-gray-900 mb-2">Link inválido</h1>
         <p className="text-sm text-gray-500 mb-5">Este link não é válido ou está incompleto.</p>
         <Link href="/esqueci-senha" className="text-emerald-600 text-sm font-medium hover:underline">
@@ -58,7 +58,7 @@ function ResetForm() {
 
   if (done) {
     return (
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+      <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
         <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 className="text-emerald-500" size={26} />
         </div>
@@ -71,7 +71,7 @@ function ResetForm() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-8">
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Criar nova senha</h1>
       <p className="text-gray-500 text-sm mb-6">Escolha uma senha de pelo menos 8 caracteres.</p>
 
@@ -89,7 +89,7 @@ function ResetForm() {
               onChange={(e) => setPassword(e.target.value)}
               minLength={8}
               required
-              className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+              className="w-full border border-gray-200 rounded-xl px-4 py-3 pr-12 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
             />
             <button
               type="button"
@@ -109,7 +109,7 @@ function ResetForm() {
             onChange={(e) => setConfirm(e.target.value)}
             minLength={8}
             required
-            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
           />
         </div>
         <button
@@ -128,7 +128,7 @@ export default function RedefinirSenha() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 font-sans">
       <div className="w-full max-w-md">
-        <Suspense fallback={<div className="bg-white rounded-2xl border border-gray-100 h-64" />}>
+        <Suspense fallback={<div className="bg-surface rounded-2xl border border-gray-100 h-64" />}>
           <ResetForm />
         </Suspense>
       </div>

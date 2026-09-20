@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Calendar, Users, Settings, Repeat, CreditCard } from 'lucide-react'
 import { initials } from '@/lib/format'
 import LogoutButton from './LogoutButton'
+import SeletorDeTema from './SeletorDeTema'
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -19,7 +20,7 @@ export default function ProfessionalSidebar({ name = 'Dra. Carolina Matos', crn 
   const pathname = usePathname()
 
   return (
-    <aside className="w-64 bg-white border-r border-gray-100 min-h-screen flex flex-col shrink-0">
+    <aside className="w-64 bg-surface border-r border-gray-100 min-h-screen flex flex-col shrink-0">
       <div className="p-6 border-b border-gray-100">
         <Link href="/" className="text-xl font-bold text-gray-900">
           Nutri<span className="text-emerald-500">Match</span>
@@ -56,7 +57,8 @@ export default function ProfessionalSidebar({ name = 'Dra. Carolina Matos', crn 
         ))}
       </nav>
 
-      <div className="p-4 border-t border-gray-100">
+      <div className="p-4 border-t border-gray-100 space-y-3">
+        <SeletorDeTema />
         <LogoutButton className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors" />
       </div>
     </aside>

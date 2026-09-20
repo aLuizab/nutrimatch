@@ -80,7 +80,7 @@ export default function MetasClient({ goals }: { goals: GoalView[] }) {
 
   return (
     <>
-      <div className="bg-white border-b border-gray-100 px-8 py-5 flex items-center justify-between gap-4 flex-wrap">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Minhas Metas</h1>
           <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>
@@ -147,7 +147,7 @@ export default function MetasClient({ goals }: { goals: GoalView[] }) {
 
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
       <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
         <Target size={26} />
       </div>
@@ -199,7 +199,7 @@ function NewGoalForm({ onSubmit }: { onSubmit: (body: NewGoalBody) => Promise<bo
         })
         setSaving(false)
       }}
-      className="bg-white rounded-2xl border border-emerald-100 shadow-sm p-6 space-y-4"
+      className="bg-surface rounded-2xl border border-emerald-100 shadow-sm p-6 space-y-4"
     >
       <div>
         <label className="text-xs font-bold text-gray-700 block mb-1.5">O que você quer alcançar</label>
@@ -312,7 +312,7 @@ function GoalCard({ goal, busy, call }: { goal: GoalView; busy: boolean; call: C
 
   return (
     <div
-      className={`bg-white rounded-2xl border shadow-sm p-6 ${borderTone} ${
+      className={`bg-surface rounded-2xl border shadow-sm p-6 ${borderTone} ${
         goal.status === 'ABANDONED' ? 'opacity-60' : ''
       }`}
     >

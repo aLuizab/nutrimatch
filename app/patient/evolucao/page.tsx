@@ -50,7 +50,7 @@ export default async function Evolucao() {
 
   return (
     <DashboardShell sidebar={<PatientSidebar name={user.name} primaryRole={user.role} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Minha Evolução</h1>
         <p className="text-sm text-gray-500 mt-0.5">Acompanhe seu progresso entre as consultas</p>
       </div>
@@ -59,13 +59,13 @@ export default async function Evolucao() {
         {program && <EnrollmentCard program={program} />}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500">Peso atual</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
               {currentWeight !== null ? `${currentWeight.toFixed(1)} kg` : '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500">Desde o início</p>
             <p className={`text-2xl font-bold mt-1 flex items-center gap-1.5 ${
               totalDelta !== null && totalDelta < 0 ? 'text-emerald-600' : 'text-gray-900'
@@ -74,7 +74,7 @@ export default async function Evolucao() {
               {totalDelta !== null ? `${totalDelta > 0 ? '+' : ''}${totalDelta.toFixed(1)} kg` : '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500 flex items-center gap-1.5">
               <Target size={13} className="text-emerald-500" /> Meta
             </p>
@@ -96,7 +96,7 @@ export default async function Evolucao() {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-1">Evolução do peso</h2>
           <p className="text-xs text-gray-500 mb-4">Passe o mouse sobre os pontos para ver cada medida</p>
           {chartPoints.length === 0 ? (

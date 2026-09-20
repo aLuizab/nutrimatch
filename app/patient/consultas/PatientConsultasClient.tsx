@@ -196,7 +196,7 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
         <button
           onClick={() => setActiveTab('proximas')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'proximas' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            activeTab === 'proximas' ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           <Clock size={15} /> Próximas ({upcoming.length})
@@ -204,7 +204,7 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
         <button
           onClick={() => setActiveTab('historico')}
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all ${
-            activeTab === 'historico' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+            activeTab === 'historico' ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
           }`}
         >
           <Calendar size={15} /> Histórico ({past.length})
@@ -234,7 +234,7 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
       {activeTab === 'proximas' && (
         <div className="space-y-4">
           {upcoming.map((appt) => (
-            <div key={appt.id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+            <div key={appt.id} className="bg-surface border border-gray-100 rounded-2xl shadow-sm p-6">
               <div className="flex items-start gap-4 flex-wrap">
                 <div className={`w-14 h-14 ${avatarColor(appt.professionalId)} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
                   {initials(appt.professionalName)}
@@ -314,14 +314,14 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
                   <div className="flex gap-2 mt-3">
                     <button
                       onClick={() => setConfirmingCancelId(null)}
-                      className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg hover:bg-white transition-colors"
+                      className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg hover:bg-surface transition-colors"
                     >
                       Voltar
                     </button>
                     {appt.canReschedule && !appt.refundsIfCancelledNow && (
                       <Link
                         href={`/agendamento/${appt.professionalId}?remarcar=${appt.id}`}
-                        className="text-sm font-medium text-gray-700 border border-gray-200 bg-white px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                        className="text-sm font-medium text-gray-700 border border-gray-200 bg-surface px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors"
                       >
                         Remarcar
                       </Link>
@@ -353,7 +353,7 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
       {activeTab === 'historico' && (
         <div className="space-y-4">
           {past.map((appt) => (
-            <div key={appt.id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+            <div key={appt.id} className="bg-surface border border-gray-100 rounded-2xl shadow-sm p-6">
               <div className="flex items-start gap-4 flex-wrap">
                 <div className={`w-14 h-14 ${avatarColor(appt.professionalId)} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
                   {initials(appt.professionalName)}

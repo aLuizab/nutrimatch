@@ -25,7 +25,7 @@ export default function HeroSearch() {
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Nome, especialidade ou cidade..."
           aria-label="Buscar nutricionista"
-          className="w-full border border-gray-200 rounded-2xl py-4 pl-12 pr-4 text-gray-700 shadow-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all bg-white"
+          className="w-full border border-gray-200 rounded-2xl py-4 pl-12 pr-4 text-gray-700 shadow-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 transition-all bg-surface"
         />
       </div>
       <button

@@ -244,7 +244,7 @@ export default function ConfiguracoesClient({
             key={id}
             onClick={() => setActiveTab(id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              activeTab === id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              activeTab === id ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
             }`}
           >
             <Icon size={15} /> {label}
@@ -254,7 +254,7 @@ export default function ConfiguracoesClient({
 
       {activeTab === 'perfil' && (
         <form onSubmit={handleSave} className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="text-base font-bold text-gray-900 mb-5">Informações pessoais</h2>
 
             <div className="mb-6">
@@ -349,7 +349,7 @@ export default function ConfiguracoesClient({
 
       {activeTab === 'disponibilidade' && (
         <form onSubmit={handleSaveAvailability} className="space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="text-base font-bold text-gray-900 mb-1">Horários de atendimento</h2>
             <p className="text-sm text-gray-500 mb-5">
               Defina os dias e horários em que você atende. Pacientes só conseguem agendar dentro desses horários.
@@ -364,7 +364,7 @@ export default function ConfiguracoesClient({
               <select
                 value={slotMinutes}
                 onChange={(e) => setSlotMinutes(Number(e.target.value))}
-                className="w-full max-w-xs border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-white"
+                className="w-full max-w-xs border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-surface"
               >
                 {SLOT_DURATIONS.map((m) => (
                   <option key={m} value={m}>{m} minutos</option>
@@ -450,7 +450,7 @@ export default function ConfiguracoesClient({
       {activeTab === 'seguranca' && <SegurancaTab />}
 
       {activeTab === 'notificacoes' && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
           <h2 className="text-base font-bold text-gray-900">Preferências de notificação</h2>
           <p className="text-xs text-gray-500 -mt-3">Notificações são enviadas para {initialProfile.email}.</p>
           {prefsError && (
@@ -475,7 +475,7 @@ export default function ConfiguracoesClient({
                   onChange={() => togglePref(item.key)}
                   className="sr-only peer"
                 />
-                <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 peer-focus:ring-2 peer-focus:ring-emerald-300 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-4" />
+                <div className="w-10 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 peer-focus:ring-2 peer-focus:ring-emerald-300 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-surface after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-4" />
               </label>
             </div>
           ))}
@@ -490,7 +490,7 @@ export default function ConfiguracoesClient({
               </div>
               <label className="relative inline-flex items-center cursor-not-allowed">
                 <input type="checkbox" disabled className="sr-only peer" />
-                <div className="w-10 h-6 bg-gray-200 rounded-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5" />
+                <div className="w-10 h-6 bg-gray-200 rounded-full after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-surface after:rounded-full after:h-5 after:w-5" />
               </label>
             </div>
           ))}

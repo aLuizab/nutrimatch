@@ -54,7 +54,7 @@ export default async function AdminDashboard() {
 
   return (
     <DashboardShell sidebar={<AdminSidebar name={admin.name} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Painel administrativo</h1>
         <p className="text-sm text-gray-500 mt-0.5">Visão geral da plataforma</p>
       </div>
@@ -62,7 +62,7 @@ export default async function AdminDashboard() {
       <div className="p-8 space-y-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div key={s.label} className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color} mb-3`}>
                 <s.icon size={20} />
               </div>
@@ -73,7 +73,7 @@ export default async function AdminDashboard() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="lg:col-span-2 bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-base font-bold text-gray-900">Agendamentos recentes</h2>
               <Link href="/admin/agendamentos" className="flex items-center gap-1 text-xs text-emerald-600 font-medium hover:underline">
@@ -120,7 +120,7 @@ export default async function AdminDashboard() {
               <p className="text-emerald-200 text-sm mt-0.5">entre profissionais ativos</p>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
                   <Clock size={14} className="text-yellow-500" /> Aguardando aprovação

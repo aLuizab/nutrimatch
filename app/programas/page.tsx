@@ -76,7 +76,7 @@ export default async function Programas() {
 
   return (
     <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Programas de acompanhamento</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Transforme consultas avulsas em acompanhamento contínuo
@@ -86,7 +86,7 @@ export default async function Programas() {
       <div className="p-8 space-y-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div key={s.label} className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color} mb-3`}>
                 <s.icon size={20} />
               </div>
@@ -97,7 +97,7 @@ export default async function Programas() {
         </div>
 
         {expectedValue > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500">Valor previsto dos programas ativos</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">{formatPrice(expectedValue)}</p>
             <p className="text-xs text-gray-400 mt-1.5">
@@ -109,7 +109,7 @@ export default async function Programas() {
 
         <ProgramasClient plans={plans} listPrice={user.professional.price} />
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-1">Pacientes em acompanhamento</h2>
           <p className="text-xs text-gray-500 mb-5">Progresso de cada paciente dentro do programa</p>
 

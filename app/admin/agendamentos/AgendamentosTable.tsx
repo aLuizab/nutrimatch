@@ -48,7 +48,7 @@ export default function AgendamentosTable({ appointments }: { appointments: Appo
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por paciente ou profissional..."
-            className="w-full border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm bg-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+            className="w-full border border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm bg-surface focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
           />
         </div>
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1 overflow-x-auto">
@@ -57,7 +57,7 @@ export default function AgendamentosTable({ appointments }: { appointments: Appo
               key={s}
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap ${
-                statusFilter === s ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                statusFilter === s ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
               {s === 'todos' ? 'Todos' : displayStatusLabels[s]}
@@ -71,7 +71,7 @@ export default function AgendamentosTable({ appointments }: { appointments: Appo
         <span className="font-bold text-gray-900">R$ {totalRevenue}</span> em consultas confirmadas
       </p>
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+      <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-100">

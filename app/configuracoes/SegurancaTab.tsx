@@ -43,7 +43,7 @@ export default function SegurancaTab() {
   }
 
   return (
-    <form onSubmit={submit} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4 max-w-lg">
+    <form onSubmit={submit} className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4 max-w-lg">
       <div>
         <h2 className="text-base font-bold text-gray-900">Alterar senha</h2>
         <p className="text-xs text-gray-500 mt-0.5">

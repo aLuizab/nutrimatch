@@ -22,7 +22,7 @@ export default function ReputationCard({
   const tierIndex = TIERS.findIndex((t) => t.id === tier)
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1.5">Sua reputação</p>

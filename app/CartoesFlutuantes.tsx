@@ -33,7 +33,7 @@ export default function CartoesFlutuantes({ profissionais }: { profissionais: De
         <div
           key={p.id ?? i}
           style={{ animationDelay: `${i * 700}ms` }}
-          className={`flutuar absolute ${POSICOES[i]} bg-white border border-gray-100 rounded-2xl shadow-lg shadow-gray-900/5 px-4 py-3 flex items-center gap-3 w-64`}
+          className={`flutuar absolute ${POSICOES[i]} bg-surface border border-gray-100 rounded-2xl shadow-lg shadow-gray-900/5 px-4 py-3 flex items-center gap-3 w-64`}
         >
           <div
             className={`w-10 h-10 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0 ${p.cor}`}
@@ -67,7 +67,7 @@ export default function CartoesFlutuantes({ profissionais }: { profissionais: De
         <div
           key={pill.rotulo}
           style={{ animationDelay: `${400 + i * 550}ms` }}
-          className={`flutuar absolute ${pill.pos} bg-white border border-gray-100 rounded-full shadow-md shadow-gray-900/5 px-4 py-2 flex items-center gap-2`}
+          className={`flutuar absolute ${pill.pos} bg-surface border border-gray-100 rounded-full shadow-md shadow-gray-900/5 px-4 py-2 flex items-center gap-2`}
         >
           <span className="text-sm">{pill.emoji}</span>
           <span className="text-xs font-bold text-gray-700">{pill.rotulo}</span>
