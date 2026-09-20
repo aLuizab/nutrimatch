@@ -1,6 +1,71 @@
+/* A identidade visual, em tokens. Precisa vir antes do Tailwind: é de onde cada classe de
+   cor tira o valor dela. Ver app/tema.css. */
+@import './tema.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* O fundo e a tinta da página saem do token, não de uma classe no <body>. Assim a troca de
+     tema alcança também o que é pintado fora do React — a barra de rolagem, o overscroll do
+     celular, o fundo atrás de um modal. */
+  html {
+    background-color: rgb(var(--c-bg));
+    color: rgb(var(--c-gray-900));
+  }
+
+  /* Foco de teclado, conforme a identidade: contorno de acento com 2px de folga. Vale para
+     tudo, e não só para o que lembramos de estilizar. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-accent-500));
+    outline-offset: 2px;
+  }
+
+  /* A troca de tema não deve ser um estrobo. Só as duas propriedades que realmente mudam, e
+     desligado para quem pede menos movimento. */
+  @media (prefers-reduced-motion: no-preference) {
+    html.trocando-tema,
+    html.trocando-tema * {
+      transition:
+        background-color 180ms ease,
+        border-color 180ms ease;
+    }
+  }
+}
+
+@layer components {
+  /* ── Logotipo ─────────────────────────────────────────────────────────────────────────
+     A identidade fixa dois valores diferentes para o verde do arco frontal e da palavra
+     `match`: #357a54 sobre fundo claro, #7fd0a0 sobre escuro. Não são o mesmo degrau da
+     rampa, então não dá para resolver com um token só — daí as três regras. Os valores vêm
+     da escala da marca, que é igual nos dois temas. */
+  .nm-arco-frente {
+    stroke: var(--nm-accent-700);
+  }
+  .nm-arco-tras {
+    stroke: rgb(var(--c-gray-900));
+  }
+  .nm-match {
+    color: var(--nm-accent-700);
+  }
+
+  :root[data-theme='dark'] .nm-arco-frente {
+    stroke: var(--nm-accent-400);
+  }
+  :root[data-theme='dark'] .nm-match {
+    color: var(--nm-accent-400);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .nm-arco-frente {
+      stroke: var(--nm-accent-400);
+    }
+    :root:not([data-theme='light']) .nm-match {
+      color: var(--nm-accent-400);
+    }
+  }
+}
 
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {

@@ -18,13 +18,13 @@ export default async function AdminPacientes() {
 
   return (
     <DashboardShell sidebar={<AdminSidebar name={admin.name} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Pacientes</h1>
         <p className="text-sm text-gray-500 mt-0.5">{patients.length} pacientes cadastrados</p>
       </div>
 
       <div className="p-8">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">

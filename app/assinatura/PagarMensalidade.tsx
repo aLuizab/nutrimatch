@@ -36,7 +36,7 @@ export default function PagarMensalidade({
         rel="noopener noreferrer"
         className={`inline-flex items-center gap-2 font-bold px-5 py-3 rounded-xl transition-colors ${
           jaPago
-            ? 'bg-white text-gray-900 border border-gray-200 hover:bg-gray-50'
+            ? 'bg-surface text-gray-900 border border-gray-200 hover:bg-gray-50'
             : 'bg-emerald-600 text-white hover:bg-emerald-700'
         }`}
       >

@@ -170,7 +170,7 @@ export default function BookingFlow({
     <div className="flex flex-col lg:flex-row gap-8">
       {/* Coluna esquerda: calendário */}
       <div className="flex-1 space-y-6">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
           <div className={`w-14 h-14 ${professional.color} text-white rounded-full flex items-center justify-center text-xl font-bold shrink-0`}>
             {professional.initials}
           </div>
@@ -192,7 +192,7 @@ export default function BookingFlow({
         </div>
 
         {!reschedule && canChooseModality && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <h3 className="text-sm font-bold text-gray-700 mb-3">Modalidade de atendimento</h3>
             <div className="flex gap-3">
               <button
@@ -217,7 +217,7 @@ export default function BookingFlow({
           </div>
         )}
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
           {days.length === 0 ? (
             <p className="text-sm text-gray-400">Este profissional não tem horários disponíveis no momento.</p>
           ) : (
@@ -271,7 +271,7 @@ export default function BookingFlow({
 
       {/* Coluna direita: formulário */}
       <div className="w-full lg:w-96 shrink-0">
-        <form onSubmit={handleConfirm} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
+        <form onSubmit={handleConfirm} className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h3 className="text-base font-bold text-gray-900">{reschedule ? 'Novo horário' : 'Seus dados'}</h3>
 
           {error && (

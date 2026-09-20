@@ -126,7 +126,7 @@ export default function ParaQuemE({ mensalidade }: { mensalidade: string }) {
                 onClick={() => setAba(valor)}
                 className={`text-sm font-bold px-5 py-2.5 rounded-lg transition-all ${
                   aba === valor
-                    ? 'bg-white text-gray-900 shadow-sm'
+                    ? 'bg-surface text-gray-900 shadow-sm'
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
@@ -154,7 +154,7 @@ export default function ParaQuemE({ mensalidade }: { mensalidade: string }) {
             // A chave inclui a aba para o React remontar os cartões ao trocar de público —
             // sem isso ele reaproveita os nós e a troca acontece sem nenhuma transição.
             const classe =
-              'bg-white border border-gray-100 rounded-2xl p-6 elevar-no-hover hover:border-emerald-200 block'
+              'bg-surface border border-gray-100 rounded-2xl p-6 elevar-no-hover hover:border-emerald-200 block'
 
             return item.href ? (
               <Link key={`${aba}-${i}`} href={item.href} className={classe}>

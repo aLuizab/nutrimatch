@@ -132,13 +132,13 @@ export default function FinanceiroClient({
         </p>
 
         {charges.length === 0 ? (
-          <p className="text-sm text-gray-400 bg-white border border-gray-100 rounded-2xl p-6 text-center">
+          <p className="text-sm text-gray-400 bg-surface border border-gray-100 rounded-2xl p-6 text-center">
             Nada a conferir agora.
           </p>
         ) : (
           <div className="space-y-3">
             {charges.map((c) => (
-              <div key={`${c.kind}-${c.id}`} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+              <div key={`${c.kind}-${c.id}`} className="bg-surface border border-gray-100 rounded-2xl shadow-sm p-5">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
@@ -207,13 +207,13 @@ export default function FinanceiroClient({
         </p>
 
         {payouts.length === 0 ? (
-          <p className="text-sm text-gray-400 bg-white border border-gray-100 rounded-2xl p-6 text-center">
+          <p className="text-sm text-gray-400 bg-surface border border-gray-100 rounded-2xl p-6 text-center">
             Nenhum repasse pendente.
           </p>
         ) : (
           <div className="space-y-3">
             {payouts.map((p) => (
-              <div key={p.id} className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5">
+              <div key={p.id} className="bg-surface border border-gray-100 rounded-2xl shadow-sm p-5">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
                   <div className="min-w-0">
                     <p className="font-bold text-gray-900">{p.professionalName}</p>

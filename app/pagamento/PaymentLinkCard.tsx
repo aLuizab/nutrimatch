@@ -39,7 +39,7 @@ export default async function PaymentLinkCard({
   const qr = await qrDataUrl(link.url)
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="text-center pb-6 border-b border-gray-100">
         <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{title}</p>
         <p className="text-sm text-gray-500 mt-1">{subtitle}</p>

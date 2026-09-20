@@ -58,7 +58,7 @@ export default function ComunicadosClient({
 
   return (
     <>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Comunicados</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Novidades e avisos gerais. Todo comunicado leva link de descadastro.
@@ -89,7 +89,7 @@ export default function ComunicadosClient({
             <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
           )}
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
             <div>
               <label className="text-xs font-bold text-gray-700 block mb-2">Para quem</label>
               <div className="flex gap-2 flex-wrap">
@@ -104,7 +104,7 @@ export default function ComunicadosClient({
                     className={`text-sm font-medium px-4 py-2 rounded-xl border transition-colors ${
                       audience === a
                         ? 'bg-emerald-500 text-white border-emerald-500'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                        : 'bg-surface text-gray-600 border-gray-200 hover:bg-gray-50'
                     }`}
                   >
                     {ROTULOS[a]}{' '}
@@ -173,7 +173,7 @@ export default function ComunicadosClient({
                 <button
                   onClick={() => setConfirmando(false)}
                   disabled={enviando}
-                  className="text-sm font-medium text-gray-600 border border-gray-200 bg-white px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-60"
+                  className="text-sm font-medium text-gray-600 border border-gray-200 bg-surface px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors disabled:opacity-60"
                 >
                   Voltar
                 </button>

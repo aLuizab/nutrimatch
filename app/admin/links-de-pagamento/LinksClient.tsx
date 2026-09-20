@@ -45,7 +45,7 @@ export default function LinksClient({
 
   return (
     <>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Links de pagamento</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Crie o link no InfinitePay com o valor do profissional e cole aqui. O paciente vê o QR
@@ -70,7 +70,7 @@ export default function LinksClient({
             paga o profissional. Misturar na mesma lista faria parecer mais um link de cobrança
             de consulta. */}
         {mensalidade && (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <div className="bg-surface rounded-2xl border border-gray-200 shadow-sm p-6">
             <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
@@ -99,13 +99,13 @@ export default function LinksClient({
         )}
 
         {rows.length === 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
             <p className="text-gray-500">Nenhum profissional cadastrado ainda.</p>
           </div>
         )}
 
         {rows.map((row) => (
-          <div key={row.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div key={row.id} className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
               <div>
                 <div className="flex items-center gap-2 flex-wrap">

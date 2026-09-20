@@ -79,7 +79,7 @@ export default function ProgressForm({ today, entries }: { today: string; entrie
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-base font-bold text-gray-900">Minhas medidas</h2>
@@ -105,7 +105,7 @@ export default function ProgressForm({ today, entries }: { today: string; entrie
                 value={recordedAt}
                 max={today}
                 onChange={(e) => setRecordedAt(e.target.value)}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
@@ -116,7 +116,7 @@ export default function ProgressForm({ today, entries }: { today: string; entrie
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder="75,5"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
@@ -127,7 +127,7 @@ export default function ProgressForm({ today, entries }: { today: string; entrie
                 value={waist}
                 onChange={(e) => setWaist(e.target.value)}
                 placeholder="88"
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>
@@ -138,7 +138,7 @@ export default function ProgressForm({ today, entries }: { today: string; entrie
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Como foi a semana?"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
             />
           </div>
           <div className="flex items-center justify-between pt-1">

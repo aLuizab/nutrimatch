@@ -272,20 +272,20 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
 
   return (
     <>
-      <div className="bg-white border-b border-gray-100 px-8 py-5 flex justify-between items-center">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
           <p className="text-sm text-gray-500 mt-0.5">Gerencie suas consultas semanais</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-            <button onClick={() => setWeekOffset(weekOffset - 1)} aria-label="Semana anterior" className="p-2 rounded-lg hover:bg-white transition-colors">
+            <button onClick={() => setWeekOffset(weekOffset - 1)} aria-label="Semana anterior" className="p-2 rounded-lg hover:bg-surface transition-colors">
               <ChevronLeft size={18} className="text-gray-600" />
             </button>
             <span className="text-sm font-medium text-gray-700 px-2">
               {weekOffset === 0 ? 'Esta semana' : weekOffset < 0 ? `${Math.abs(weekOffset)} sem. atrás` : `${weekOffset} sem. à frente`}
             </span>
-            <button onClick={() => setWeekOffset(weekOffset + 1)} aria-label="Próxima semana" className="p-2 rounded-lg hover:bg-white transition-colors">
+            <button onClick={() => setWeekOffset(weekOffset + 1)} aria-label="Próxima semana" className="p-2 rounded-lg hover:bg-surface transition-colors">
               <ChevronRight size={18} className="text-gray-600" />
             </button>
           </div>
@@ -304,7 +304,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
           <div className="flex items-center gap-1.5"><MapPin size={12} className="text-emerald-500" /> Presencial</div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
           <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: '64px repeat(5, 1fr)' }}>
             <div className="border-r border-gray-100" />
             {weekDates.map((dateStr, i) => (
@@ -334,7 +334,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                         <button
                           key={appt.id}
                           onClick={() => setSelectedId(appt.id === selectedId ? null : appt.id)}
-                          className={`w-full text-left p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm bg-white ${
+                          className={`w-full text-left p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm bg-surface ${
                             // Awaiting bookings get their own colour and a dashed edge: they
                             // need action, and must not look like a settled appointment.
                             appt.status === 'AWAITING_CONFIRMATION'
@@ -367,7 +367,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
         </div>
 
         {selected && (
-          <div className="mt-4 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="mt-4 bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center gap-4">
               <div className={`w-10 h-10 ${avatarColor(selected.id)} text-white rounded-full flex items-center justify-center text-sm font-bold`}>
                 {initials(selected.patientName)}

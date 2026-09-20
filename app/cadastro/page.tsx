@@ -165,7 +165,7 @@ export default function Cadastro() {
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Seu nome"
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                   />
                 </div>
                 <div>
@@ -176,7 +176,7 @@ export default function Cadastro() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seu@email.com"
                     required
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                   />
                 </div>
                 <div>
@@ -188,7 +188,7 @@ export default function Cadastro() {
                     placeholder="Mínimo 8 caracteres"
                     required
                     minLength={8}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                   />
                 </div>
                 <button type="submit" className="w-full bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors">
@@ -215,7 +215,7 @@ export default function Cadastro() {
                       onChange={(e) => setCrn(e.target.value)}
                       placeholder="Ex: CRN-3 12345"
                       required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                     />
                     <p className="text-xs text-gray-400 mt-1.5">
                       Informe a regional (1 a 11) e seu número. Conferimos seu registro na consulta
@@ -262,7 +262,7 @@ export default function Cadastro() {
                       onChange={(e) => setPrice(e.target.value)}
                       min={50}
                       required
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                     />
                   </div>
                   <PricingGuide specialties={specialties} />
@@ -271,7 +271,7 @@ export default function Cadastro() {
                     <select
                       value={modality}
                       onChange={(e) => setModality(e.target.value as typeof modality)}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-surface"
                     >
                       <option value="AMBOS">Online e Presencial</option>
                       <option value="ONLINE">Apenas Online</option>
@@ -290,7 +290,7 @@ export default function Cadastro() {
                       type="date"
                       value={birthDate}
                       onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                     />
                   </div>
                   <div>
@@ -298,7 +298,7 @@ export default function Cadastro() {
                     <select
                       value={goal}
                       onChange={(e) => setGoal(e.target.value)}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-white"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-surface"
                     >
                       <option>Emagrecimento</option>
                       <option>Ganho de massa muscular</option>

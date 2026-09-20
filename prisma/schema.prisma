@@ -59,14 +59,17 @@ enum PaymentStatus {
   NOT_REQUIRED
   // Cobrança criada, aguardando o paciente pagar. O horário fica preso, mas por pouco tempo.
   PENDING
-  // Pix: o paciente declarou que pagou e a plataforma ainda não conferiu o extrato. Chave Pix
-  // estática não emite webhook, então esta etapa é humana por necessidade, não por escolha.
+  // O paciente declarou que pagou e a plataforma ainda não conferiu o extrato. Link de
+  // cobrança não emite webhook, então esta etapa é humana por necessidade, não por escolha.
   AWAITING_REVIEW
-  // Cartão autorizado: o valor está reservado e ainda não saiu da conta do paciente.
-  AUTHORIZED
-  // Capturado de verdade, no momento em que o profissional confirmou.
+  // Conferido no extrato e confirmado por um admin. É aqui que o repasse passa a existir.
   PAID
-  // Autorização cancelada sem nunca virar cobrança — o profissional recusou ou deixou vencer.
+  // ── Inalcançáveis ────────────────────────────────────────────────────────────────────
+  // Nenhum caminho do código grava os três abaixo. AUTHORIZED e VOIDED vinham de reserva em
+  // cartão, que esta plataforma não faz; REFUNDED pressupunha estorno automático, e a
+  // devolução é manual. Continuam declarados porque remover valor de enum no Postgres é
+  // mudança de contração: só depois de garantir que nenhuma linha os usa. Ver CHANGELOG.
+  AUTHORIZED
   VOIDED
   REFUNDED
 }
@@ -124,7 +127,7 @@ model User {
   professional Professional?
   patient      Patient?
   resetTokens  PasswordResetToken[]
-  goalsCreated Goal[] @relation("GoalAuthor")
+  goalsCreated Goal[]               @relation("GoalAuthor")
 }
 
 model Professional {
@@ -146,11 +149,11 @@ model Professional {
   // score computed in application memory. Recomputed by lib/ranking.ts whenever an input
   // changes (new review, new confirmation). Paid subscriptions deliberately do NOT feed this
   // — sponsored placement is a separate, labelled slot, never a hidden boost.
-  rankScore            Float     @default(0)
+  rankScore          Float     @default(0)
   // Median seconds from booking to the professional accepting it, over recent bookings.
   // Null until they have enough samples to be meaningful.
-  medianResponseSecs   Int?
-  rankUpdatedAt        DateTime?
+  medianResponseSecs Int?
+  rankUpdatedAt      DateTime?
 
   // ── Reputação ────────────────────────────────────────────────────────────────────────
   // Composto de qualidade (avaliações), resposta e confiabilidade — 0..1. Materializado
@@ -177,7 +180,7 @@ model Professional {
   // ── Link de pagamento da consulta avulsa ────────────────────────────────────────────
   // Criado pelo admin no InfinitePay com o valor desta pessoa e colado aqui. Um link por
   // profissional porque o link carrega valor fixo, e o valor é o preço dele.
-  paymentLinkUrl String?
+  paymentLinkUrl       String?
   // O preço para o qual o link foi criado, em reais inteiros, como Professional.price. Guardado
   // para detectar o link envelhecido: o profissional muda o preço na tela dele e o link continua
   // cobrando o valor antigo, sem nada avisando ninguém. Comparar os dois é o que torna isso
@@ -211,11 +214,11 @@ model Patient {
   targetWeightKg Float?
   createdAt      DateTime  @default(now())
 
-  appointments   Appointment[]
-  reviews        Review[]
-  enrollments    Enrollment[]
+  appointments    Appointment[]
+  reviews         Review[]
+  enrollments     Enrollment[]
   progressEntries ProgressEntry[]
-  goals          Goal[]
+  goals           Goal[]
 }
 
 model AvailabilityRule {
@@ -231,61 +234,60 @@ model AvailabilityRule {
 }
 
 model Appointment {
-  id             String            @id @default(cuid())
-  professionalId String
-  professional   Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
-  patientId      String
-  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  scheduledAt    DateTime
+  id                   String            @id @default(cuid())
+  professionalId       String
+  professional         Professional      @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  patientId            String
+  patient              Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  scheduledAt          DateTime
   // Mirrors scheduledAt while this row occupies the slot (CONFIRMED); set back to null once it
   // doesn't (CANCELLED). Postgres treats NULLs as distinct within a unique index, so a
   // cancelled appointment's slot becomes bookable again — the unique constraint lives on this
   // column, never on scheduledAt itself, which stays untouched for history.
-  slotHeldAt     DateTime?
-  modality       Modality
-  price          Int
-  status         AppointmentStatus @default(AWAITING_CONFIRMATION)
+  slotHeldAt           DateTime?
+  modality             Modality
+  price                Int
+  status               AppointmentStatus @default(AWAITING_CONFIRMATION)
   // When the professional accepted. createdAt → confirmedAt is the response-time sample
   // that feeds lib/ranking.ts.
-  confirmedAt    DateTime?
+  confirmedAt          DateTime?
   // Past this instant with no confirmation, the slot is treated as free. Derived at read
   // time (see lib/availability.ts) — no cron required, matching how the rest of this
   // codebase handles time-based state.
   confirmationDeadline DateTime?
-  reason         String?
-  phone          String?
+  reason               String?
+  phone                String?
   // Post-consultation notes written by the professional, visible to the patient.
-  summary        String?
+  summary              String?
   // Jitsi room for ONLINE consultations. The room name IS the access control on public
   // Jitsi, so it must be unpredictable — a sequential or derivable id would let anyone walk
   // into someone else's health consultation.
-  meetingRoom    String?   @unique
+  meetingRoom          String?           @unique
   // ── Pagamento ────────────────────────────────────────────────────────────────────────
-  paymentStatus  PaymentStatus @default(NOT_REQUIRED)
-  // O PaymentIntent é criado com captura manual: autoriza no agendamento, captura só quando o
-  // profissional confirma. Se ele recusar, a autorização é cancelada e nada é cobrado — sem
-  // estorno, sem dinheiro parado na conta de ninguém.
-  // Enquanto o checkout está aberto o horário fica preso, mas por minutos e não por 24h: um
-  // carrinho abandonado não pode bloquear a agenda de alguém.
-  paymentDeadline DateTime?
-  paidAt          DateTime?
+  paymentStatus        PaymentStatus     @default(NOT_REQUIRED)
+  // Prazo para o paciente pagar no link e avisar. Enquanto corre, o horário fica preso — por
+  // 30 minutos e não por 24h: um pedido abandonado não pode bloquear a agenda de alguém.
+  // O relógio para quando o paciente declara o pagamento; daí quem vale é o prazo de
+  // conferência do admin. Ver PAYMENT_HOLD_MINUTES em lib/payments.ts.
+  paymentDeadline      DateTime?
+  paidAt               DateTime?
   // Em centavos, ao contrário de price (reais inteiros): a taxa de 10% precisa de arredondamento
   // exato, e centavo inteiro é a única forma de dividir dinheiro sem sobra. Ver lib/money.ts.
-  amountCents Int?
-  feeCents    Int?
+  amountCents          Int?
+  feeCents             Int?
 
   // ── Cobrança por Pix ─────────────────────────────────────────────────────────────────
   // Identificador que vai dentro do BR Code e aparece no extrato — é por ele que a conferência
   // manual acha a linha certa. Ver lib/pix.ts.
-  pixTxid        String?   @unique
+  pixTxid       String?   @unique
   // Quando o paciente declarou ter pago. Declaração, não prova: só move a cobrança da fila de
   // 'aguardando pagamento' para a de 'conferir extrato'.
-  pixClaimedAt   DateTime?
+  pixClaimedAt  DateTime?
   // Observação do paciente ao declarar (ex.: o E2E do comprovante).
-  pixClaimNote   String?
+  pixClaimNote  String?
   // Quem conferiu o extrato e confirmou. Dinheiro confirmado por alguém tem nome.
-  pixReviewedBy  String?
-  pixReviewedAt  DateTime?
+  pixReviewedBy String?
+  pixReviewedAt DateTime?
 
   payout Payout?
 
@@ -303,9 +305,9 @@ model Appointment {
 
   // Set when the consultation was booked inside a care program. SetNull (not Cascade) —
   // deleting an enrollment must never destroy consultation history.
-  enrollmentId   String?
-  enrollment     Enrollment?       @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
-  createdAt      DateTime          @default(now())
+  enrollmentId String?
+  enrollment   Enrollment? @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  createdAt    DateTime    @default(now())
 
   review Review?
 
@@ -367,16 +369,16 @@ model Enrollment {
   // O pacote é cobrado de uma vez, na compra. Diferente da consulta avulsa, aqui a captura é
   // imediata: não há um profissional para confirmar a compra de um programa.
 
-  paidAmountCents   Int?
-  feeCents          Int?
-  paidAt            DateTime?
+  paidAmountCents Int?
+  feeCents        Int?
+  paidAt          DateTime?
   // Cobrança por Pix do pacote — mesmo mecanismo da consulta avulsa. Enquanto pixClaimedAt
   // for null e o status PENDING_PAYMENT, ninguém declarou pagamento ainda.
-  pixTxid       String?   @unique
-  pixClaimedAt  DateTime?
-  pixClaimNote  String?
-  pixReviewedBy String?
-  pixReviewedAt DateTime?
+  pixTxid         String?   @unique
+  pixClaimedAt    DateTime?
+  pixClaimNote    String?
+  pixReviewedBy   String?
+  pixReviewedAt   DateTime?
 
   // Estorno proporcional das consultas não usadas ao fim do prazo. Guardado em vez de
   // recalculado para que a devolução aconteça uma vez só, e para que o valor devolvido fique
@@ -428,13 +430,13 @@ model PasswordResetToken {
 // operations over sensitive data; before this the only audit trail in the whole system was
 // CRN verification.
 model AuditLog {
-  id         String   @id @default(cuid())
-  actorId    String
-  actorRole  Role
-  action     String
-  subjectId  String?
-  metadata   String?
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  actorId   String
+  actorRole Role
+  action    String
+  subjectId String?
+  metadata  String?
+  createdAt DateTime @default(now())
 
   @@index([subjectId, createdAt])
   @@index([actorId, createdAt])
@@ -443,13 +445,13 @@ model AuditLog {
 // Os planos à venda. Uma linha por plano em vez de constantes no código, para que o preço e o
 // link de cobrança mudem sem deploy, e para o admin ver o que está sendo vendido de fato.
 model SubscriptionPlan {
-  id           String  @id @default(cuid())
-  slug         String  @unique
-  name         String
-  description  String
+  id                   String    @id @default(cuid())
+  slug                 String    @unique
+  name                 String
+  description          String
   // Cents per month. 0 for the free tier, which exists as a real row so a professional always
   // has a plan and the "no subscription" case doesn't need special handling everywhere.
-  monthlyPrice Int
+  monthlyPrice         Int
   // Link do InfinitePay que cobra a mensalidade deste plano, cadastrado pelo admin — mesmo
   // arranjo do link por profissional e do link por pacote. Null no plano gratuito, que não
   // cobra nada, e enquanto o admin não criar o link.
@@ -458,11 +460,11 @@ model SubscriptionPlan {
   paymentLinkUpdatedAt DateTime?
   // Whether this tier is eligible for the labelled "Patrocinado" band. Deliberately a plan
   // property and NOT an input to Professional.rankScore — see lib/subscription.ts.
-  sponsored    Boolean @default(false)
-  canReceiveBookings Boolean @default(true)
-  active       Boolean @default(true)
-  sortOrder    Int     @default(0)
-  createdAt    DateTime @default(now())
+  sponsored            Boolean   @default(false)
+  canReceiveBookings   Boolean   @default(true)
+  active               Boolean   @default(true)
+  sortOrder            Int       @default(0)
+  createdAt            DateTime  @default(now())
 
   subscriptions ProfessionalSubscription[]
 }
@@ -476,8 +478,8 @@ model ProfessionalSubscription {
   status         SubscriptionStatus @default(ACTIVE)
 
   // When the paid period runs out. Null on the free tier, which never expires.
-  currentPeriodEnd     DateTime?
-  cancelAtPeriodEnd    Boolean @default(false)
+  currentPeriodEnd  DateTime?
+  cancelAtPeriodEnd Boolean   @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -523,14 +525,14 @@ model Payout {
   feeCents   Int
   netCents   Int
 
-  status PayoutStatus @default(PENDING)
+  status         PayoutStatus @default(PENDING)
   // Snapshot da chave no momento do repasse: se o profissional trocar a chave depois, o
   // histórico precisa continuar mostrando para onde o dinheiro realmente foi.
   pixKeySnapshot String?
   paidAt         DateTime?
   paidBy         String?
   note           String?
-  createdAt      DateTime  @default(now())
+  createdAt      DateTime     @default(now())
 
   @@index([professionalId, status])
   @@index([status, createdAt])
@@ -572,7 +574,7 @@ enum GoalStatus {
 /// nutricionista definiu faz parte do plano dele e o paciente não deve poder apagá-la, enquanto
 /// a que o próprio paciente escreveu é dele. Sem esse campo as duas viram a mesma coisa.
 model Goal {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   patientId String
   patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
 

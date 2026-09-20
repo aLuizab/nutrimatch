@@ -23,7 +23,7 @@ export default function Privacidade() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 text-sm text-gray-600 leading-relaxed">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 text-sm text-gray-600 leading-relaxed">
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-2">1. Quais dados coletamos</h2>
             <p className="mb-2"><strong>De todos os usuários:</strong> nome, e-mail, telefone, senha (armazenada com hash, nunca em texto puro).</p>

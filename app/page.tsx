@@ -106,12 +106,12 @@ export default async function LandingPage() {
   ].filter((s): s is { value: string; label: string } => s !== null)
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-surface font-sans">
       <FaixaFetin />
       <PublicHeader />
 
       {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/80 via-white to-white">
+      <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/80 via-surface to-surface">
         {/* A malha de pontos esmaece para baixo, senão ela compete com o conteúdo em vez de
             servir de textura. */}
         <div
@@ -129,7 +129,7 @@ export default async function LandingPage() {
                 não há imagem ao lado para equilibrar. */}
             <div className="text-center lg:text-left">
               {totalActive >= 10 && (
-                <span className="inline-flex items-center gap-2 bg-white border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-2 rounded-full mb-6 shadow-sm">
+                <span className="inline-flex items-center gap-2 bg-surface border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-2 rounded-full mb-6 shadow-sm">
                   <ShieldCheck size={14} />
                   {totalActive} nutricionistas verificados na plataforma
                 </span>
@@ -165,7 +165,7 @@ export default async function LandingPage() {
                 fazer. Foto do Pexels, servida do nosso domínio — hotlink dependeria de um
                 terceiro no meio do carregamento e entregaria o IP de cada visitante a ele. */}
             <div className="hidden lg:block relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-xl shadow-emerald-900/10 rotate-1">
+              <div className="relative rounded-3xl overflow-hidden shadow-xl shadow-black/20 rotate-1">
                 <Image
                   src="/hero-prato.jpg"
                   alt="Prato equilibrado com grão-de-bico, abóbora assada, folhas, quinoa e abacate"
@@ -176,7 +176,7 @@ export default async function LandingPage() {
                 />
               </div>
 
-              <div className="absolute -bottom-5 -left-5 bg-white rounded-2xl shadow-lg border border-gray-100 px-5 py-4 -rotate-2">
+              <div className="absolute -bottom-5 -left-5 bg-surface rounded-2xl shadow-lg border border-gray-100 px-5 py-4 -rotate-2">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
                     <CalendarCheck size={20} />
@@ -194,7 +194,7 @@ export default async function LandingPage() {
 
       {/* Stats — only rendered when there's enough real data to be meaningful */}
       {stats.length >= 2 && (
-        <section className="border-y border-gray-100 bg-white">
+        <section className="border-y border-gray-100 bg-surface">
           <div className={`max-w-7xl mx-auto px-6 py-10 grid grid-cols-2 gap-8 ${stats.length >= 4 ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
             {stats.map((stat, i) => (
               <Revelar key={stat.label} atraso={i * 90} className="text-center">
@@ -220,7 +220,7 @@ export default async function LandingPage() {
               <Revelar
               key={step}
               atraso={(Number(step) - 1) * 110}
-              className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm elevar-no-hover hover:border-emerald-200"
+              className="bg-surface rounded-2xl p-8 border border-gray-100 shadow-sm elevar-no-hover hover:border-emerald-200"
             >
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
@@ -257,7 +257,7 @@ export default async function LandingPage() {
                 <Link
                   key={n.id}
                   href={`/perfil/${n.id}`}
-                  className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-emerald-200 elevar-no-hover block"
+                  className="bg-surface border border-gray-100 rounded-2xl p-5 shadow-sm hover:border-emerald-200 elevar-no-hover block"
                 >
                   <div className="flex gap-4 items-start">
                     <div className={`w-14 h-14 ${n.color} text-white rounded-full flex items-center justify-center text-lg font-bold shrink-0`}>
@@ -295,7 +295,7 @@ export default async function LandingPage() {
 
       {/* Depoimentos reais — escondido enquanto não houver avaliações 5 estrelas */}
       {testimonialRows.length > 0 && (
-        <section className="py-20 bg-white">
+        <section className="py-20 bg-surface">
           <div className="max-w-7xl mx-auto px-6">
             <div className="text-center mb-12">
               <h2 className="text-3xl font-bold text-gray-900">O que dizem os pacientes</h2>
@@ -333,7 +333,7 @@ export default async function LandingPage() {
           </p>
           <Link
             href="/cadastro"
-            className="inline-flex items-center gap-2 bg-white text-emerald-600 font-bold px-8 py-4 rounded-2xl hover:bg-emerald-50 transition-colors shadow-lg"
+            className="inline-flex items-center gap-2 bg-surface text-emerald-600 font-bold px-8 py-4 rounded-2xl hover:bg-emerald-50 transition-colors shadow-lg"
           >
             Criar perfil profissional <ArrowRight size={18} />
           </Link>

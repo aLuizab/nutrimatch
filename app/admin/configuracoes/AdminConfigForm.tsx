@@ -37,7 +37,7 @@ export default function AdminConfigForm({ name: initialName, phone: initialPhone
 
   return (
     <form onSubmit={handleSave} className="space-y-6">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="text-base font-bold text-gray-900 mb-5">Informações da conta</h2>
 
         {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3 mb-4">{error}</div>}

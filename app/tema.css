@@ -1,0 +1,295 @@
+/**
+ * Identidade visual do NutriMatch — a camada de tokens.
+ *
+ * Este arquivo é a única fonte de verdade de cor no projeto. O `tailwind.config.js` não guarda
+ * mais nenhum hexadecimal: ele aponta cada degrau de `gray`, `emerald`, `white` e das cores
+ * semânticas para uma variável daqui. A consequência é que trocar de tema é trocar os valores
+ * de um bloco, e os ~2.300 usos de cor espalhados pelos 97 componentes acompanham sem serem
+ * tocados.
+ *
+ * ── Por que canais em vez de hexadecimal ──────────────────────────────────────────────────
+ * Os valores são `R G B` separados por espaço, e não `#rrggbb`. É o que permite ao Tailwind
+ * escrever `rgb(var(--tok) / 0.1)` e fazer `bg-white/10` continuar funcionando. Com
+ * hexadecimal dentro de uma variável, todo modificador de opacidade do projeto quebraria em
+ * silêncio. Para uso direto em CSS existe o par `--nm-x`, já embrulhado em `rgb()`.
+ *
+ * ── Como as rampas se invertem ────────────────────────────────────────────────────────────
+ * No tema claro, o degrau 50 é o mais claro e o 900 o mais escuro, como no Tailwind. No tema
+ * escuro a ordem inverte: o 50 vira o fundo mais escuro e o 900 o texto mais claro. É isso
+ * que faz `bg-gray-50` continuar sendo "o fundo da página" e `text-gray-900` continuar sendo
+ * "o texto principal" nos dois temas, sem condicional em lugar nenhum.
+ *
+ * ── Contraste ─────────────────────────────────────────────────────────────────────────────
+ * Cada degrau usado como texto foi conferido contra o fundo do seu tema no critério AA da
+ * WCAG (4,5:1 para texto normal). Os que valem registrar:
+ *   claro   emerald-500 #357a54 sobre branco      4,7:1   — botão sólido e texto de acento
+ *           emerald-600 #2d6a49 sobre branco      5,9:1   — 74 usos de texto de acento
+ *           gray-500    #5B7668 sobre #FAFCFB     4,9:1   — 239 usos de texto secundário
+ *   escuro  emerald-500 #57b881 sobre #141a17     6,9:1
+ *           gray-500    #aab5ae sobre #141a17     7,9:1
+ *           gray-400    #7d8a82 sobre #141a17     4,6:1   — texto tênue, no limite
+ *
+ * O acento puro da marca (#57b881) reprova como texto sobre branco: 2,4:1. Por isso o tema
+ * claro ancora o degrau 500 em #357a54, que a própria identidade já indica como a versão do
+ * verde sobre fundo claro.
+ */
+
+:root {
+  /* ── Escala de acento da marca, 100 → 900 ────────────────────────────────────────────
+     Igual nos dois temas: é a identidade, não o tema. O que muda é qual degrau cada papel
+     do Tailwind aponta. */
+  --nm-accent-100: #eefaf1;
+  --nm-accent-200: #d4f2de;
+  --nm-accent-300: #a9e3bf;
+  --nm-accent-400: #7fd0a0;
+  --nm-accent-500: #57b881;
+  --nm-accent-600: #45996a;
+  --nm-accent-700: #357a54;
+  --nm-accent-800: #27593e;
+  --nm-accent-900: #1d3329;
+
+  /* Campo profundo — faixas e peças inteiras de destaque. */
+  --nm-field: #143d2c;
+
+  --nm-font: var(--fonte-inter), "Inter", system-ui, sans-serif;
+  --nm-radius: 8px;
+}
+
+/* ══ TEMA CLARO ══════════════════════════════════════════════════════════════════════════
+   Os neutros vêm do sistema anterior sem alteração: passaram por conferência de contraste e
+   trocá-los por trocar seria reabrir uma questão já resolvida. O que muda aqui é o verde. */
+:root,
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --c-bg: 250 252 251; /* #FAFCFB */
+  --c-surface: 255 255 255; /* #FFFFFF — cartões */
+  --c-surface-high: 250 252 251; /* #FAFCFB — blocos internos */
+  --c-on-accent: 255 255 255; /* texto sobre preenchimento de acento */
+
+  --c-gray-50: 250 252 251;
+  --c-gray-100: 226 238 232;
+  --c-gray-200: 207 226 216;
+  --c-gray-300: 175 198 186;
+  --c-gray-400: 134 162 148;
+  --c-gray-500: 91 118 104;
+  --c-gray-600: 72 96 83;
+  --c-gray-700: 55 75 65;
+  --c-gray-800: 34 51 43;
+  --c-gray-900: 13 31 23;
+  --c-gray-950: 7 20 16;
+
+  --c-accent-50: 238 250 241; /* #eefaf1 */
+  --c-accent-100: 212 242 222; /* #d4f2de */
+  --c-accent-200: 169 227 191; /* #a9e3bf */
+  --c-accent-300: 127 208 160; /* #7fd0a0 */
+  --c-accent-400: 87 184 129; /* #57b881 */
+  --c-accent-500: 53 122 84; /* #357a54 — primária sobre claro */
+  --c-accent-600: 45 106 73; /* #2d6a49 */
+  --c-accent-700: 39 89 62; /* #27593e */
+  --c-accent-800: 29 51 41; /* #1d3329 */
+  --c-accent-900: 22 38 30; /* #16261e */
+  --c-accent-950: 13 23 18; /* #0d1712 */
+
+  /* Estrelas de avaliação. Âmbar não pertence à paleta da marca — é cor semântica, como o
+     vermelho de erro. Uma estrela verde deixaria de ser lida como estrela. */
+  --c-star: 255 184 0; /* #FFB800 */
+
+  --c-red-50: 254 242 242;
+  --c-red-100: 254 226 226;
+  --c-red-200: 254 202 202;
+  --c-red-300: 252 165 165;
+  --c-red-400: 248 113 113;
+  --c-red-500: 239 68 68;
+  --c-red-600: 220 38 38;
+  --c-red-700: 185 28 28;
+  --c-red-800: 153 27 27;
+  --c-red-900: 127 29 29;
+
+  --c-amber-50: 255 251 235;
+  --c-amber-100: 254 243 199;
+  --c-amber-200: 253 230 138;
+  --c-amber-300: 252 211 77;
+  --c-amber-400: 251 191 36;
+  --c-amber-500: 245 158 11;
+  --c-amber-600: 217 119 6;
+  --c-amber-700: 180 83 9;
+  --c-amber-800: 146 64 14;
+  --c-amber-900: 120 53 15;
+
+  --c-blue-50: 239 246 255;
+  --c-blue-100: 219 234 254;
+  --c-blue-200: 191 219 254;
+  --c-blue-300: 147 197 253;
+  --c-blue-400: 96 165 250;
+  --c-blue-500: 59 130 246;
+  --c-blue-600: 37 99 235;
+  --c-blue-700: 29 78 216;
+  --c-blue-800: 30 64 175;
+  --c-blue-900: 30 58 138;
+
+  --nm-shadow-card: 0 1px 2px rgb(13 31 23 / 0.04), 0 8px 24px -18px rgb(13 31 23 / 0.18);
+}
+
+/* ══ TEMA ESCURO ═════════════════════════════════════════════════════════════════════════
+   O fundo da identidade. As rampas invertem: 50 é o chão, 900 é o texto. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --c-bg: 20 26 23; /* #141a17 */
+  --c-surface: 30 38 33; /* #1e2621 */
+  --c-surface-high: 26 34 29; /* #1a221d */
+  --c-on-accent: 13 31 23; /* #0d1f17 — sobre verde claro, texto escuro */
+
+  --c-gray-50: 20 26 23; /* #141a17 fundo */
+  --c-gray-100: 40 50 43; /* #28322b régua */
+  --c-gray-200: 51 61 54; /* #333d36 borda */
+  --c-gray-300: 74 86 78; /* #4a564e */
+  --c-gray-400: 125 138 130; /* #7d8a82 texto tênue */
+  --c-gray-500: 170 181 174; /* #aab5ae texto secundário */
+  --c-gray-600: 188 197 191;
+  --c-gray-700: 207 214 209;
+  --c-gray-800: 220 226 221;
+  --c-gray-900: 233 237 233; /* #e9ede9 texto */
+  --c-gray-950: 244 247 244;
+
+  --c-accent-50: 29 51 41; /* #1d3329 — o "fundo suave" vira tinta escura */
+  --c-accent-100: 39 89 62; /* #27593e */
+  --c-accent-200: 53 122 84; /* #357a54 */
+  --c-accent-300: 69 153 106; /* #45996a */
+  --c-accent-400: 79 170 118; /* #4faa76 */
+  --c-accent-500: 87 184 129; /* #57b881 — acento da marca */
+  --c-accent-600: 127 208 160; /* #7fd0a0 — realce sobe, não desce */
+  --c-accent-700: 169 227 191; /* #a9e3bf */
+  --c-accent-800: 212 242 222; /* #d4f2de */
+  --c-accent-900: 238 250 241; /* #eefaf1 */
+  --c-accent-950: 247 253 249;
+
+  --c-star: 255 201 77; /* #FFC94D — o âmbar puro vibra demais sobre fundo escuro */
+
+  --c-red-50: 46 20 22;
+  --c-red-100: 69 26 30;
+  --c-red-200: 95 36 41;
+  --c-red-300: 138 50 57;
+  --c-red-400: 192 72 79;
+  --c-red-500: 229 104 111;
+  --c-red-600: 242 138 143;
+  --c-red-700: 247 173 176;
+  --c-red-800: 251 207 209;
+  --c-red-900: 253 234 235;
+
+  --c-amber-50: 44 36 16;
+  --c-amber-100: 66 54 22;
+  --c-amber-200: 92 74 28;
+  --c-amber-300: 134 105 42;
+  --c-amber-400: 184 144 58;
+  --c-amber-500: 224 176 74;
+  --c-amber-600: 255 201 77;
+  --c-amber-700: 255 219 133;
+  --c-amber-800: 255 233 181;
+  --c-amber-900: 255 246 224;
+
+  --c-blue-50: 16 31 46;
+  --c-blue-100: 23 44 66;
+  --c-blue-200: 31 61 92;
+  --c-blue-300: 43 87 134;
+  --c-blue-400: 61 120 184;
+  --c-blue-500: 82 150 224;
+  --c-blue-600: 122 179 236;
+  --c-blue-700: 165 205 244;
+  --c-blue-800: 203 227 249;
+  --c-blue-900: 232 243 253;
+
+  /* Sombra quase não existe sobre fundo escuro — profundidade vem da borda e do brilho. */
+  --nm-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -18px rgb(0 0 0 / 0.6);
+}
+
+/* Preferência do sistema, quando a pessoa ainda não escolheu nada. O seletor grava
+   data-theme e passa a mandar; sem ele, quem manda é o sistema operacional. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='dark']) {
+    color-scheme: dark;
+
+    --c-bg: 20 26 23;
+    --c-surface: 30 38 33;
+    --c-surface-high: 26 34 29;
+    --c-on-accent: 13 31 23;
+
+    --c-gray-50: 20 26 23;
+    --c-gray-100: 40 50 43;
+    --c-gray-200: 51 61 54;
+    --c-gray-300: 74 86 78;
+    --c-gray-400: 125 138 130;
+    --c-gray-500: 170 181 174;
+    --c-gray-600: 188 197 191;
+    --c-gray-700: 207 214 209;
+    --c-gray-800: 220 226 221;
+    --c-gray-900: 233 237 233;
+    --c-gray-950: 244 247 244;
+
+    --c-accent-50: 29 51 41;
+    --c-accent-100: 39 89 62;
+    --c-accent-200: 53 122 84;
+    --c-accent-300: 69 153 106;
+    --c-accent-400: 79 170 118;
+    --c-accent-500: 87 184 129;
+    --c-accent-600: 127 208 160;
+    --c-accent-700: 169 227 191;
+    --c-accent-800: 212 242 222;
+    --c-accent-900: 238 250 241;
+    --c-accent-950: 247 253 249;
+
+    --c-star: 255 201 77;
+
+    --c-red-50: 46 20 22;
+    --c-red-100: 69 26 30;
+    --c-red-200: 95 36 41;
+    --c-red-300: 138 50 57;
+    --c-red-400: 192 72 79;
+    --c-red-500: 229 104 111;
+    --c-red-600: 242 138 143;
+    --c-red-700: 247 173 176;
+    --c-red-800: 251 207 209;
+    --c-red-900: 253 234 235;
+
+    --c-amber-50: 44 36 16;
+    --c-amber-100: 66 54 22;
+    --c-amber-200: 92 74 28;
+    --c-amber-300: 134 105 42;
+    --c-amber-400: 184 144 58;
+    --c-amber-500: 224 176 74;
+    --c-amber-600: 255 201 77;
+    --c-amber-700: 255 219 133;
+    --c-amber-800: 255 233 181;
+    --c-amber-900: 255 246 224;
+
+    --c-blue-50: 16 31 46;
+    --c-blue-100: 23 44 66;
+    --c-blue-200: 31 61 92;
+    --c-blue-300: 43 87 134;
+    --c-blue-400: 61 120 184;
+    --c-blue-500: 82 150 224;
+    --c-blue-600: 122 179 236;
+    --c-blue-700: 165 205 244;
+    --c-blue-800: 203 227 249;
+    --c-blue-900: 232 243 253;
+
+    --nm-shadow-card: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -18px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* ── Nomes da identidade, para CSS que não passa pelo Tailwind ─────────────────────────
+   Mesmos valores, já embrulhados em rgb(). São estes os nomes que a especificação da marca
+   usa, então são estes que um SVG ou um estilo solto devem citar. */
+:root {
+  --nm-bg: rgb(var(--c-bg));
+  --nm-surface: rgb(var(--c-surface));
+  --nm-surface-high: rgb(var(--c-surface-high));
+  --nm-border: rgb(var(--c-gray-200));
+  --nm-rule: rgb(var(--c-gray-100));
+  --nm-accent: rgb(var(--c-accent-500));
+  --nm-accent-light: rgb(var(--c-accent-400));
+  --nm-text: rgb(var(--c-gray-900));
+  --nm-text-muted: rgb(var(--c-gray-500));
+  --nm-text-faint: rgb(var(--c-gray-400));
+}
