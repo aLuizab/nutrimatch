@@ -165,7 +165,7 @@ export default async function LandingPage() {
                 fazer. Foto do Pexels, servida do nosso domínio — hotlink dependeria de um
                 terceiro no meio do carregamento e entregaria o IP de cada visitante a ele. */}
             <div className="hidden lg:block relative">
-              <div className="relative rounded-3xl overflow-hidden shadow-xl shadow-emerald-900/10 rotate-1">
+              <div className="relative rounded-3xl overflow-hidden shadow-xl shadow-black/20 rotate-1">
                 <Image
                   src="/hero-prato.jpg"
                   alt="Prato equilibrado com grão-de-bico, abóbora assada, folhas, quinoa e abacate"

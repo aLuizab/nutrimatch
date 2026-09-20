@@ -40,7 +40,7 @@ sem serem tocados.
 Os tokens são canais `R G B` separados por espaço, não hexadecimal. É o que permite ao Tailwind
 escrever `rgb(var(--tok) / 0.1)` e manter `bg-white/10` funcionando.
 
-### Duas armadilhas
+### Três armadilhas
 
 **`bg-white` não existe mais** — use `bg-surface`. Um cartão precisa acompanhar o tema, e
 branco fixo não acompanha. Se precisar de branco de verdade (véu sobre fundo colorido), use
@@ -49,6 +49,15 @@ branco fixo não acompanha. Se precisar de branco de verdade (véu sobre fundo c
 **`text-white` não é branco** — aponta para `--c-on-accent`, que é branco no claro e
 `#0d1f17` no escuro. A razão: `text-white` quase sempre está sobre preenchimento de acento, e
 no tema escuro esse preenchimento é verde claro — branco ali dá 2,8:1 e some.
+
+**Sombra não pode usar a rampa.** `shadow-gray-900/5` parece certo e inverte junto com tudo:
+no tema escuro o degrau 900 é quase branco, e a sombra vira um **halo luminoso** em volta do
+elemento. Sombra usa `shadow-black/N`, que não é redefinido e portanto não inverte. Sobre
+fundo escuro ela quase não aparece, o que é o comportamento correto — profundidade ali vem da
+borda, não da sombra.
+
+A regra geral por trás das três: **um token que inverte só serve onde a inversão é desejada.**
+Fundo, texto e borda invertem de propósito. Sombra, véu e "texto sobre acento" não.
 
 ## Cor
 
