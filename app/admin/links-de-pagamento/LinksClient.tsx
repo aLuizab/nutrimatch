@@ -129,10 +129,14 @@ export default function LinksClient({
               </div>
             </div>
 
+            {/* A cobrança acontece mesmo sem chave: o que trava é o repasse, dias depois.
+                Dizer "nada é cobrado" aqui era verdade quando a chave era pré-requisito da
+                cobrança, e virou mentira quando deixou de ser. */}
             {!row.hasPixKey && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4 leading-relaxed">
-                Sem chave Pix cadastrada não há para onde repassar os 90%. Enquanto isso, nada é
-                cobrado do paciente mesmo com o link preenchido.
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4 leading-relaxed">
+                Sem chave Pix, a consulta é cobrada normalmente mas o repasse dos 90%{' '}
+                <strong>fica retido</strong> — não há para onde mandar. Peça a chave antes que o
+                dinheiro comece a acumular.
               </p>
             )}
 

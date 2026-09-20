@@ -38,27 +38,29 @@ export function paymentHoldDeadline(now: Date = new Date()): Date {
 
 export interface PaymentRequirement {
   required: boolean
-  reason:
-    | 'PROFESSIONAL_WITHOUT_LINK'
-    | 'PROFESSIONAL_WITHOUT_PIX'
-    | 'COVERED_BY_PACKAGE'
-    | 'REQUIRED'
+  reason: 'PROFESSIONAL_WITHOUT_LINK' | 'COVERED_BY_PACKAGE' | 'REQUIRED'
 }
 
 /**
  * Decide se esta consulta passa pelo caixa da plataforma.
  *
- * Exige as duas pontas do caminho do dinheiro, e a distinção importa: sem o link de pagamento
- * não há como cobrar o paciente, e sem a chave Pix não há como devolver os 90% ao profissional.
- * Faltando a segunda, cobrar seria reter dinheiro de alguém sem ter para onde mandar — pior do
- * que não cobrar.
+ * A única condição é existir o **link de pagamento** que o admin cadastrou para o profissional.
+ * É por ele que o paciente paga; sem ele não há como cobrar, e a consulta volta a ser combinada
+ * direto entre as duas pessoas — a mesma degradação graciosa de sempre.
  *
- * Nos dois casos o app segue funcionando como antes de existir pagamento: a consulta acontece e
- * o valor é combinado direto entre paciente e profissional. Mesma degradação graciosa de sempre.
+ * Antes exigia também a chave Pix, e isso deixou de fazer sentido. A regra vinha da época do
+ * Stripe Connect, quando o repasse era automático: sem chave, cobrar seria reter dinheiro sem
+ * ter para onde mandar. Hoje o repasse é manual — o dinheiro entra na conta da plataforma e sai
+ * por transferência feita por um admin, dias depois. Travar a cobrança por um dado que só é
+ * necessário no fim impedia a consulta de ser paga por algo que dá tempo de resolver.
+ *
+ * A chave Pix continua obrigatória para **repassar**: a fila de repasses em /admin/financeiro
+ * não deixa pagar quem não tem chave, e /admin/links-de-pagamento marca quem está pendente. O
+ * dinheiro fica retido até a chave existir, o que é bem melhor que a consulta nunca ser cobrada.
  */
 export function paymentRequirementFor(
   professional:
-    | { price: number; paymentLinkUrl?: string | null; paymentLinkAmount?: number | null; pixKey?: string | null }
+    | { price: number; paymentLinkUrl?: string | null; paymentLinkAmount?: number | null }
     | null
     | undefined,
   coveredByEnrollment: boolean
@@ -67,9 +69,6 @@ export function paymentRequirementFor(
   if (!professional) return { required: false, reason: 'PROFESSIONAL_WITHOUT_LINK' }
   if (!professionalPaymentLink(professional)) {
     return { required: false, reason: 'PROFESSIONAL_WITHOUT_LINK' }
-  }
-  if (!professional.pixKey?.trim()) {
-    return { required: false, reason: 'PROFESSIONAL_WITHOUT_PIX' }
   }
   return { required: true, reason: 'REQUIRED' }
 }

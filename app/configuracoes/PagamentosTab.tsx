@@ -102,8 +102,9 @@ export default function PagamentosTab({
                 <div>
                   <p className="text-sm font-bold text-amber-900">Sem chave Pix cadastrada</p>
                   <p className="text-sm text-amber-800 mt-0.5">
-                    Enquanto não houver uma chave, suas consultas seguem combinadas diretamente com
-                    o paciente — a plataforma não tem para onde repassar.
+                    Suas consultas continuam sendo cobradas normalmente, mas{' '}
+                    <strong>o dinheiro fica retido com a plataforma</strong> até você cadastrar uma
+                    chave — não há para onde transferir. Cadastre agora para não acumular.
                   </p>
                 </div>
               </div>
