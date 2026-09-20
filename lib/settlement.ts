@@ -1,5 +1,5 @@
 import { prisma } from './prisma'
-import { refundUnusedEnrollment } from './payments'
+import { settleUnusedEnrollment } from './payments'
 import { sendEmail } from './email'
 import { packageRefunded } from './email-templates'
 import { formatCents } from './money'
@@ -12,7 +12,7 @@ import { formatCents } from './money'
 // numa ação é maior do que o de devolver.
 //
 // Roda por cron. É seguro rodar mais de uma vez: refundedAt marca o acerto já feito e
-// refundUnusedEnrollment sai fora quando encontra a marca.
+// settleUnusedEnrollment sai fora quando encontra a marca.
 
 /** Carência depois do fim do prazo antes de acertar as contas. */
 const SETTLEMENT_GRACE_HOURS = 24
@@ -35,8 +35,9 @@ export async function settleExpiredEnrollments(now: Date = new Date()): Promise<
       endsAt: { lte: cutoff },
       refundedAt: null,
       // Só faz sentido para pacote pago pela plataforma. Programa combinado direto entre
-      // paciente e profissional não tem dinheiro nosso para devolver.
-      paymentIntentId: { not: null },
+      // paciente e profissional não tem dinheiro nosso para devolver. A marca disso era o id do
+      // PaymentIntent do Stripe; agora é o valor pago, que é o que o caminho do link registra.
+      paidAmountCents: { not: null },
     },
     include: {
       carePlan: { select: { name: true } },
@@ -48,7 +49,7 @@ export async function settleExpiredEnrollments(now: Date = new Date()): Promise<
 
   for (const enrollment of expired) {
     try {
-      const outcome = await refundUnusedEnrollment(enrollment.id)
+      const outcome = await settleUnusedEnrollment(enrollment.id)
       if (!outcome) {
         result.nothingToRefund++
         continue
@@ -82,7 +83,7 @@ export async function settleExpiredEnrollments(now: Date = new Date()): Promise<
   // Pacotes vencidos sem dinheiro da plataforma envolvido só mudam de estado, para não ficarem
   // aparecendo como acompanhamento ativo para sempre.
   await prisma.enrollment.updateMany({
-    where: { status: 'ACTIVE', endsAt: { lte: cutoff }, paymentIntentId: null },
+    where: { status: 'ACTIVE', endsAt: { lte: cutoff }, paidAmountCents: null },
     data: { status: 'CANCELLED' },
   })
 

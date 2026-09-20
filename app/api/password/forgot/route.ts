@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { createResetToken } from '@/lib/password-reset'
 import { sendEmail } from '@/lib/email'
 import { passwordResetEmail } from '@/lib/email-templates'
-import { appUrl } from '@/lib/stripe'
+import { appUrl } from '@/lib/env'
 import { LIMITS, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 

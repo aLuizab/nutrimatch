@@ -40,9 +40,29 @@ export default async function LinksDePagamento() {
     })),
   }))
 
+  // O plano pago da plataforma. monthlyPrice já é em centavos, ao contrário de Professional.price
+  // e do total de um pacote, que estão em reais — por isso este não passa por reaisToCents.
+  const plano = await prisma.subscriptionPlan.findFirst({
+    where: { active: true, monthlyPrice: { gt: 0 } },
+    orderBy: { sortOrder: 'asc' },
+  })
+
   return (
     <DashboardShell sidebar={<AdminSidebar name={user.name} />}>
-      <LinksClient rows={rows} />
+      <LinksClient
+        rows={rows}
+        mensalidade={
+          plano
+            ? {
+                id: plano.id,
+                name: plano.name,
+                monthlyCents: plano.monthlyPrice,
+                link: plano.paymentLinkUrl,
+                linkAmountCents: plano.paymentLinkAmount,
+              }
+            : null
+        }
+      />
     </DashboardShell>
   )
 }

@@ -14,15 +14,28 @@ export default async function AdminFinanceiro() {
 
   const [appointments, enrollments, payouts] = await Promise.all([
     prisma.appointment.findMany({
-      where: { paymentStatus: 'AWAITING_REVIEW' },
-      orderBy: { pixClaimedAt: 'asc' },
+      // AWAITING_REVIEW é o que o paciente declarou ter pago; PENDING é o que ele nunca
+      // declarou. Antes só o primeiro chegava aqui, e quem pagava no InfinitePay sem voltar
+      // para clicar "já paguei" — a maioria, porque o link abre fora do site — sumia da fila
+      // e via a consulta expirar com o dinheiro já debitado. O admin confere o extrato do
+      // InfinitePay de qualquer jeito, então a declaração do paciente é pista útil, não
+      // pré-requisito.
+      where: {
+        paymentStatus: { in: ['AWAITING_REVIEW', 'PENDING'] },
+        status: 'AWAITING_CONFIRMATION',
+      },
+      // Declaradas primeiro (pixClaimedAt não-nulo ordena antes em asc), depois as mais
+      // antigas sem declaração.
+      orderBy: [{ pixClaimedAt: 'asc' }, { createdAt: 'asc' }],
       include: {
         patient: { include: { user: { select: { name: true } } } },
         professional: { include: { user: { select: { name: true } } } },
       },
     }),
     prisma.enrollment.findMany({
-      where: { status: 'PENDING_PAYMENT', pixClaimedAt: { not: null } },
+      // Mesmo motivo do bloco de consultas: exigir pixClaimedAt escondia do admin todo pacote
+      // pago sem a declaração de volta.
+      where: { status: 'PENDING_PAYMENT' },
       orderBy: { pixClaimedAt: 'asc' },
       include: {
         carePlan: { select: { name: true } },
@@ -53,6 +66,10 @@ export default async function AdminFinanceiro() {
         ? `${formatDateBR(a.pixClaimedAt)} às ${formatTimeBR(a.pixClaimedAt)}`
         : '—',
       note: a.pixClaimNote,
+      declared: a.paymentStatus === 'AWAITING_REVIEW',
+      deadlineLabel: a.paymentDeadline
+        ? `${formatDateBR(a.paymentDeadline)} às ${formatTimeBR(a.paymentDeadline)}`
+        : null,
     })),
     ...enrollments.map((e) => ({
       kind: 'pacote' as const,
@@ -66,6 +83,8 @@ export default async function AdminFinanceiro() {
         ? `${formatDateBR(e.pixClaimedAt)} às ${formatTimeBR(e.pixClaimedAt)}`
         : '—',
       note: e.pixClaimNote,
+      declared: e.pixClaimedAt != null,
+      deadlineLabel: null,
     })),
   ]
 

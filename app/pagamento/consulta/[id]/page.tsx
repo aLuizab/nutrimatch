@@ -61,6 +61,7 @@ export default async function PagamentoConsulta({ params }: { params: Promise<{ 
               ? `${formatDateBR(appointment.paymentDeadline)} às ${formatTimeBR(appointment.paymentDeadline)}`
               : null
           }
+          deadlineISO={appointment.paymentDeadline?.toISOString() ?? null}
         />
       </div>
     </div>

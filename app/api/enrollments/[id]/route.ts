@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
-import { isWithinWithdrawalWindow, refundEnrollmentWithdrawal } from '@/lib/payments'
+import { isWithinWithdrawalWindow } from '@/lib/payments'
 import { formatCents } from '@/lib/money'
 
 const cancelSchema = z.object({ status: z.literal('CANCELLED') })
@@ -33,13 +33,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   }
 
   // Direito de arrependimento (CDC art. 49): só o próprio paciente pode invocá-lo — é um
-  // direito do consumidor, não algo que um cancelamento pelo profissional aciona. Fora da
-  // janela de 7 dias, refundEnrollmentWithdrawal não faz nada e o cancelamento segue sem
-  // devolução automática, como sempre funcionou.
+  // direito do consumidor, não algo que um cancelamento pelo profissional aciona.
+  //
+  // Com a saída do Stripe o valor deixou de voltar sozinho: este número diz quanto a plataforma
+  // **deve**, e a devolução é feita à mão pelo mesmo caminho por onde o dinheiro entrou. A
+  // condição também deixou de exigir `paymentIntentId`, que era a marca de um pagamento pelo
+  // Stripe — exigi-la aqui faria todo pacote pago por link ficar de fora do direito legal.
   let refundedCents = 0
-  if (isOwningPatient && enrollment.paymentIntentId && isWithinWithdrawalWindow(enrollment.paidAt)) {
-    const outcome = await refundEnrollmentWithdrawal(id)
-    refundedCents = outcome?.refundedCents ?? 0
+  if (isOwningPatient && enrollment.paidAmountCents && isWithinWithdrawalWindow(enrollment.paidAt)) {
+    refundedCents = enrollment.paidAmountCents
+    await prisma.enrollment.update({ where: { id }, data: { refundedAt: new Date() } })
   }
 
   // Appointments are deliberately untouched: they were booked in good faith at a price the

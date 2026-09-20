@@ -17,6 +17,21 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Adicionado
 
+- Contador de 30 minutos na tela de pagamento da consulta, dizendo em letras que
+  passando do prazo o agendamento é cancelado e o horário volta para outros
+  pacientes. Fica vermelho nos últimos cinco minutos.
+- O nutricionista passa a ter como pagar a mensalidade sozinho: link de cobrança
+  por plano, cadastrado pelo admin em `/admin/links-de-pagamento`, e botão em
+  `/assinatura`. Antes os botões daquela tela chamavam o Stripe e falhavam.
+- Botão para o admin confirmar que a mensalidade do mês foi paga, em
+  `/admin/profissionais`, com o estado de cada um ao lado ("paga até", "vencida
+  há N dias", "nunca paga"). A rota que registra o pagamento já existia e não
+  tinha nenhuma tela chamando.
+- O admin passa a ver no financeiro as cobranças que o paciente **não** declarou.
+  Quem pagava no link e não voltava para avisar sumia da fila e via a consulta
+  expirar com o dinheiro já debitado.
+- Aviso ao nutricionista quando alguém está reservando um horário dele e pagando,
+  para o horário não sumir da agenda sem explicação.
 - Branch `staging` com ambiente próprio, para que mudança de risco seja testada
   antes de alcançar paciente e nutricionista de verdade.
 - Versionamento semântico, `CHANGELOG.md` e `npm run release`, que move as
@@ -28,6 +43,23 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Modificado
 
+- **O Stripe foi removido do projeto.** Nunca foi usado — nenhuma conta
+  conectada, nenhuma assinatura, nenhum pagamento — e mantê-lo significava
+  carregar um segundo caminho de dinheiro que ninguém exercitava. Saíram seis
+  rotas, três bibliotecas, a dependência, os domínios da CSP e três variáveis de
+  ambiente. **Consequência que precisa ser lida: não existe mais estorno
+  automático.** O cálculo de quanto se deve foi preservado, mas devolver o
+  dinheiro passou a ser manual, e a fila de devoluções pendentes ainda não existe.
+- Prazo para pagar uma consulta: 30 minutos, com contador visível. O relógio só
+  corre enquanto o paciente não avisa que pagou — depois disso quem vale é o
+  prazo de conferência, senão um pagamento às 23h expiraria antes de alguém poder
+  conferir o extrato.
+- Limite de tentativas de login passa a contar só o que **falha**, e é chaveado
+  por IP + e-mail em vez de só IP. Entrar com três contas e errar duas senhas
+  trancava a pessoa para fora, e um consultório inteiro dividia cinco tentativas.
+- O e-mail de consulta confirmada deixa de respeitar a preferência de avisos do
+  nutricionista: é o comprovante de um compromisso com hora marcada e já pago, e
+  perder esse e-mail significa faltar.
 - Design system do NutriMatch aplicado ao front end: paleta verde da marca,
   neutros com fundo esverdeado, amarelo próprio para as estrelas e a fonte Inter
   servida pelo próprio domínio.

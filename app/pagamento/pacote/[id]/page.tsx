@@ -64,6 +64,7 @@ export default async function PagamentoPacote({ params }: { params: Promise<{ id
           subtitle={`${enrollment.carePlan.name} · ${enrollment.carePlan.consultations} consultas em ${enrollment.carePlan.durationMonths} meses · ${enrollment.professional.user.name}`}
           alreadyClaimed={enrollment.pixClaimedAt !== null}
           deadlineLabel={null}
+          deadlineISO={null}
         />
       </div>
     </div>

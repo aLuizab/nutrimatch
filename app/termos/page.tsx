@@ -68,12 +68,12 @@ export default function Termos() {
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-2">4. Pagamentos</h2>
             <p className="mb-2">
-              Quando o profissional tem uma conta Stripe conectada à plataforma, o pagamento das
-              consultas e dos programas é processado pela NutriMatch, que retém{' '}
+              Quando o profissional tem link de pagamento e chave Pix cadastrados, o pagamento das
+              consultas e dos programas passa pela NutriMatch, que retém{' '}
               <strong>{feePercent}%</strong> de cada valor pago como comissão da plataforma; o
-              restante é repassado ao profissional, descontada a taxa de processamento do próprio
-              Stripe. Sem conta conectada, o valor continua sendo combinado diretamente entre
-              paciente e profissional, fora da plataforma.
+              restante é repassado ao profissional pela chave Pix informada por ele. Faltando
+              qualquer uma das duas, o valor continua sendo combinado diretamente entre paciente e
+              profissional, fora da plataforma.
             </p>
             <p>
               As regras específicas de captura, autorização e devolução de cada forma de

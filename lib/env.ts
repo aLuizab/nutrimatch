@@ -68,6 +68,37 @@ export function checkEnv(): { ok: boolean; errors: string[] } {
  * absolute ones for outgoing mail. A wrong link in an e-mail deserves a loud warning; it does
  * not deserve locking everybody out of their accounts.
  */
+let warnedAboutAppUrl = false
+
+/**
+ * Endereço público da aplicação, para montar links absolutos em e-mail.
+ *
+ * Morava em `lib/stripe.ts` por acidente histórico — era lá que os primeiros links absolutos
+ * apareceram. Quando o Stripe saiu do projeto, recuperação de senha e notificações teriam ido
+ * junto. Fica aqui, ao lado da função que valida a mesma variável.
+ *
+ * Cai para localhost quando NEXT_PUBLIC_APP_URL está ausente ou inutilizável, e avisa uma vez
+ * no log. Devolver o valor cru era pior: um endereço como "meusite.com.br", sem esquema,
+ * produzia links que o navegador lê como caminho relativo.
+ */
+export function appUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/+$/, '')
+  if (raw) {
+    try {
+      new URL(raw)
+      return raw
+    } catch {
+      // inutilizável — avisado e substituído abaixo
+    }
+  }
+
+  if (!warnedAboutAppUrl) {
+    warnedAboutAppUrl = true
+    console.warn('[appUrl]', appUrlProblem() ?? 'NEXT_PUBLIC_APP_URL indisponível')
+  }
+  return 'http://localhost:3000'
+}
+
 export function appUrlProblem(): string | null {
   const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()
   if (!raw) {

@@ -137,81 +137,43 @@ por outro depois.
 
 ---
 
-## 3. Conectar o Stripe (pagamentos + taxa de 10%)
+## 3. Ligar a cobrança (link de pagamento + taxa de 10%)
 
-Sem isso configurado, o app funciona normalmente: as consultas seguem sendo combinadas
+Sem isso configurado o app funciona normalmente: as consultas seguem sendo combinadas
 diretamente entre paciente e nutricionista, exatamente como antes. Você pode fazer esse passo
 quando quiser.
 
-### 3.1 Criar a conta e pegar as chaves
+Não há gateway nem cobrança automática. O caminho do dinheiro é um só, e tem duas pontas que
+precisam existir **juntas** — faltando qualquer uma, a consulta é marcada sem cobrança:
 
-1. Crie uma conta em [dashboard.stripe.com](https://dashboard.stripe.com/register).
-2. Deixe o **modo de teste ligado** (chave no topo do painel) enquanto estiver testando.
-3. Vá em **Desenvolvedores → Chaves de API** e copie a **Chave secreta** (`sk_test_...`).
-4. No `.env`:
-   ```
-   STRIPE_SECRET_KEY="sk_test_..."
-   PLATFORM_FEE_PERCENT="10"
-   NEXT_PUBLIC_APP_URL="http://localhost:3000"
-   ```
+1. **O link de cobrança**, que é como o paciente paga.
+   Crie no InfinitePay um link com o valor do nutricionista e cole em
+   **/admin/links-de-pagamento**.
+2. **A chave Pix do nutricionista**, que é para onde os 90% voltam.
+   Quem cadastra é ele, em **/configuracoes → Pagamentos**. Você não consegue cadastrar por
+   ele de propósito: é a conta bancária dele, e um erro de digitação seu manda o dinheiro de
+   outra pessoa para um desconhecido.
 
-### 3.2 Habilitar o Connect
+A tela de links mostra uma etiqueta vermelha **"Sem chave Pix"** em quem está pela metade.
+Vale conferir ali antes de achar que a cobrança está no ar.
 
-Pagamentos de marketplace (você recebe, o nutricionista recebe, você retém 10%) usam o Stripe
-Connect:
+### O ciclo de uma consulta paga
 
-1. No painel do Stripe, vá em **Connect** → ative a plataforma.
-2. Escolha **Express** como tipo de conta (é o que o código usa: o Stripe cuida da
-   verificação de identidade, que no Brasil exige documento e selfie).
-3. Preencha o perfil da plataforma (nome, site, descrição).
+1. O paciente escolhe o horário e envia o pedido.
+2. Ele cai na tela de pagamento, com o link e um **contador de 30 minutos**.
+3. Ele paga no InfinitePay e volta para clicar em **"já paguei"** — é esse clique que segura
+   o horário. Sem ele, o contador zera e o agendamento é cancelado.
+4. Você confere no extrato do InfinitePay e confirma em **/admin/financeiro**.
+5. Só então o nutricionista recebe o pedido para aceitar, e o prazo de 24h dele começa.
+6. Aceitando, paciente e nutricionista recebem a confirmação por e-mail.
 
-> ⚠️ **Confirme com o Stripe** se sua conta pode usar Connect com contas conectadas
-> brasileiras e se o Pix está disponível. As regras mudam conforme o país da entidade da
-> plataforma. Se algo aqui for negado, me avise que ajusto a integração.
+Cobranças que o paciente **não** declarou também aparecem em /admin/financeiro, com um aviso
+para você conferir o extrato — muita gente paga e não volta para avisar.
 
-### 3.3 Configurar os webhooks
+### A taxa de 10%
 
-São **dois** endpoints, com **segredos diferentes** — essa é a causa nº 1 de "assinatura
-inválida":
-
-**Em desenvolvimento**, instale a [Stripe CLI](https://stripe.com/docs/stripe-cli) e rode em
-dois terminais separados:
-
-```bash
-stripe listen --forward-to localhost:3000/api/stripe/webhook
-stripe listen --forward-connect-to localhost:3000/api/stripe/webhook/connect
-```
-
-Cada comando imprime um `whsec_...` diferente. Coloque no `.env`:
-```
-STRIPE_WEBHOOK_SECRET="whsec_..."          # do primeiro comando
-STRIPE_CONNECT_WEBHOOK_SECRET="whsec_..."  # do segundo
-```
-
-**Em produção**, crie os dois endpoints em **Desenvolvedores → Webhooks**:
-
-| Endpoint | Tipo | Eventos |
-|---|---|---|
-| `https://seudominio.com.br/api/stripe/webhook` | Conta da plataforma | `checkout.session.*`, `invoice.*` |
-| `https://seudominio.com.br/api/stripe/webhook/connect` | **Contas conectadas** | `account.updated` |
-
-Copie o segredo de cada um para a variável correspondente.
-
-### 3.4 Nutricionista conecta a conta dele
-
-1. Ele entra em **Configurações → Pagamentos**.
-2. Vê quanto a plataforma retém (**10%**) **antes** de conectar.
-3. Clica em **Conectar com Stripe** → é levado ao onboarding do Stripe (CPF/CNPJ, documento).
-4. Ao voltar, o status aparece: conectado, pendências, ou ativo.
-
-Na mesma aba tem o **simulador de repasse**: ele digita o valor da consulta e vê quanto fica
-com ele. O simulador mostra só o que a NutriMatch retém — **não inventa** a taxa do Stripe,
-que varia por conta e forma de pagamento, e aparece no extrato do próprio Stripe.
-
-**Conferindo:** em modo de teste, use os dados de teste que o próprio Stripe sugere no
-onboarding. Depois volte em Configurações → Pagamentos e clique em **Atualizar status**.
-
----
+O dinheiro entra na conta da plataforma. Você repassa ao nutricionista o valor menos 10%,
+por Pix, usando a chave dele. A fila de repasses pendentes fica em **/admin/financeiro**.
 
 ## 4. Testar o fluxo completo
 

@@ -8,7 +8,7 @@ import { audit } from '@/lib/audit'
 import { carePlanTotalReais, normalizePaymentLink } from '@/lib/payment-link'
 
 const bodySchema = z.object({
-  kind: z.enum(['professional', 'careplan']),
+  kind: z.enum(['professional', 'careplan', 'plan']),
   id: z.string().min(1),
   // String vazia remove o link — é como o admin desliga a cobrança de alguém sem apagar nada.
   url: z.string().trim().max(500),
@@ -69,6 +69,31 @@ export async function PATCH(request: Request) {
         action: 'PAYMENT_LINK_UPDATED',
         subjectId: id,
         metadata: { alvo: professional.user.email, valor: updated.paymentLinkAmount, removido: !normalized },
+      })
+      return NextResponse.json({ paymentLinkUrl: updated.paymentLinkUrl, paymentLinkAmount: updated.paymentLinkAmount })
+    }
+
+    // Mensalidade da plataforma. O valor do link é o preço do plano, que já está em centavos
+    // aqui (diferente de profissional e pacote, que guardam reais) — por isso não passa por
+    // conversão nenhuma.
+    if (kind === 'plan') {
+      const subscriptionPlan = await prisma.subscriptionPlan.findUnique({ where: { id } })
+      if (!subscriptionPlan) return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
+
+      const updated = await prisma.subscriptionPlan.update({
+        where: { id },
+        data: {
+          paymentLinkUrl: normalized,
+          paymentLinkAmount: normalized ? subscriptionPlan.monthlyPrice : null,
+          paymentLinkUpdatedAt: normalized ? new Date() : null,
+        },
+      })
+      audit({
+        actorId: admin.id,
+        actorRole: 'ADMIN',
+        action: 'PAYMENT_LINK_UPDATED',
+        subjectId: id,
+        metadata: { alvo: `plano ${subscriptionPlan.slug}`, valor: updated.paymentLinkAmount, removido: !normalized },
       })
       return NextResponse.json({ paymentLinkUrl: updated.paymentLinkUrl, paymentLinkAmount: updated.paymentLinkAmount })
     }

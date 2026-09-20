@@ -3,6 +3,7 @@ import { formatCents } from '@/lib/money'
 import { qrDataUrl } from '@/lib/qrcode'
 import type { ResolvedPaymentLink } from '@/lib/payment-link'
 import DeclararPagamento from './DeclararPagamento'
+import Contador from './Contador'
 
 /**
  * A tela de pagamento do paciente: valor, QR e link.
@@ -23,6 +24,7 @@ export default async function PaymentLinkCard({
   subtitle,
   alreadyClaimed,
   deadlineLabel,
+  deadlineISO,
 }: {
   link: ResolvedPaymentLink
   kind: 'consulta' | 'pacote'
@@ -31,6 +33,8 @@ export default async function PaymentLinkCard({
   subtitle: string
   alreadyClaimed: boolean
   deadlineLabel: string | null
+  /** Prazo cru, para o contador. Null quando não há relógio correndo (ex.: já avisou). */
+  deadlineISO: string | null
 }) {
   const qr = await qrDataUrl(link.url)
 
@@ -40,10 +44,16 @@ export default async function PaymentLinkCard({
         <p className="text-xs font-bold uppercase tracking-wide text-gray-400">{title}</p>
         <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
         <p className="text-3xl font-bold text-gray-900 mt-4">{formatCents(link.amountCents)}</p>
-        {deadlineLabel && (
-          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-4 inline-block">
-            Pague até {deadlineLabel} para manter o horário reservado.
-          </p>
+        {/* Enquanto o relógio corre, um contador; depois que a pessoa avisa que pagou, só a
+            data — porque nesse ponto o prazo deixa de valer e quem decide é a conferência. */}
+        {deadlineISO && !alreadyClaimed ? (
+          <Contador deadlineISO={deadlineISO} />
+        ) : (
+          deadlineLabel && (
+            <p className="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 mt-4 inline-block">
+              Reservado até {deadlineLabel}.
+            </p>
+          )
         )}
       </div>
 

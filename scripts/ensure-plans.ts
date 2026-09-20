@@ -4,7 +4,7 @@ import { FREE_PLAN_SLUG, PRO_PLAN_SLUG } from '../lib/subscription'
 // Separate from prisma/seed.ts on purpose: seed.ts creates demo people and refuses to run
 // against production, but the subscription tiers are real configuration that production needs.
 // This script is idempotent and safe to re-run on every deploy — it upserts by slug and never
-// touches stripePriceId, which the admin sets once the recurring price exists in Stripe.
+// touches paymentLinkUrl, que o admin cadastra em /admin/links-de-pagamento.
 
 const prisma = new PrismaClient()
 
@@ -35,8 +35,8 @@ async function main() {
   for (const plan of PLANS) {
     const saved = await prisma.subscriptionPlan.upsert({
       where: { slug: plan.slug },
-      // stripePriceId is intentionally absent from both branches: it is set by hand after the
-      // price is created in Stripe, and re-running this script must never wipe it.
+      // Os campos paymentLink* estão de fora das duas ramificações de propósito: são
+      // cadastrados à mão pelo admin, e rodar este script de novo nunca pode apagá-los.
       update: {
         name: plan.name,
         description: plan.description,
@@ -49,7 +49,7 @@ async function main() {
       create: plan,
     })
     const price = saved.monthlyPrice === 0 ? 'grátis' : `R$ ${(saved.monthlyPrice / 100).toFixed(2)}/mês`
-    console.log(`✔ ${saved.slug.padEnd(14)} ${price.padEnd(18)} stripePriceId=${saved.stripePriceId ?? '(não configurado)'}`)
+    console.log(`✔ ${saved.slug.padEnd(14)} ${price.padEnd(18)} link=${saved.paymentLinkUrl ?? '(não cadastrado)'}`)
   }
 
   // Every professional needs a plan row so the rest of the code never has to special-case

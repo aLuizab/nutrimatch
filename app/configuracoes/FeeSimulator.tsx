@@ -5,7 +5,7 @@ import { Calculator } from 'lucide-react'
 import { formatCents } from '@/lib/money'
 
 /**
- * Shows only what NutriMatch actually retains. Stripe's own processing fee is deliberately
+ * Shows only what NutriMatch actually retains. A taxa do InfinitePay fica de fora de propósito:
  * NOT estimated here: Brazilian card rates vary by account, instalments and negotiated
  * pricing, so printing a number would be stating a third party's price we can't guarantee —
  * and "quanto eu recebo" is the most trust-sensitive number in the whole product.
@@ -58,9 +58,9 @@ export default function FeeSimulator({ defaultPrice, feePercent }: { defaultPric
       </div>
 
       <p className="text-xs text-gray-400 mt-4 max-w-md leading-relaxed">
-        O Stripe desconta a própria taxa de processamento no repasse, que varia conforme a forma
-        de pagamento e as condições da sua conta. O valor exato de cada recebimento aparece no
-        extrato da sua conta Stripe.
+        O InfinitePay desconta a própria taxa de processamento, que varia conforme a forma de
+        pagamento. O que chega na sua chave Pix é o valor acima menos essa taxa — o número exato
+        de cada repasse aparece no seu extrato.
       </p>
     </div>
   )
