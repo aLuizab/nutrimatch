@@ -35,10 +35,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   // Direito de arrependimento (CDC art. 49): só o próprio paciente pode invocá-lo — é um
   // direito do consumidor, não algo que um cancelamento pelo profissional aciona.
   //
-  // Com a saída do Stripe o valor deixou de voltar sozinho: este número diz quanto a plataforma
-  // **deve**, e a devolução é feita à mão pelo mesmo caminho por onde o dinheiro entrou. A
-  // condição também deixou de exigir `paymentIntentId`, que era a marca de um pagamento pelo
-  // Stripe — exigi-la aqui faria todo pacote pago por link ficar de fora do direito legal.
+  // O valor não volta sozinho: este número diz quanto a plataforma **deve**, e a devolução é
+  // feita à mão pelo mesmo caminho por onde o dinheiro entrou. A condição olha `paidAmountCents`
+  // porque é o que o pagamento por link registra — todo pacote pago tem direito à janela legal.
   let refundedCents = 0
   if (isOwningPatient && enrollment.paidAmountCents && isWithinWithdrawalWindow(enrollment.paidAt)) {
     refundedCents = enrollment.paidAmountCents

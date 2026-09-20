@@ -4,9 +4,8 @@ import { formatCents } from '@/lib/money'
 /**
  * Onde o profissional paga a mensalidade.
  *
- * Substitui o botão que abria o checkout do Stripe. Não há gateway: ele paga num link do
- * InfinitePay cadastrado pelo admin, e um admin confere o extrato e registra o pagamento —
- * o mesmo arranjo que já valia para consulta e para pacote.
+ * Não há gateway: ele paga num link do InfinitePay cadastrado pelo admin, e um admin confere
+ * o extrato e registra o pagamento — o mesmo arranjo que já vale para consulta e para pacote.
  *
  * O texto diz que a liberação não é instantânea porque ela não é. Prometer imediato e demorar
  * horas gera exatamente o tipo de mensagem que consome mais tempo do que o recurso economiza.

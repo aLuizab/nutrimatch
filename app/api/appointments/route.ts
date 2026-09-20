@@ -108,9 +108,9 @@ export async function POST(request: Request) {
     // Enrollment resolution + the slot insert happen in one transaction: the row lock taken
     // on a candidate enrollment (if any — see lib/enrollments.ts) serializes concurrent
     // bookings against the same program, and the unique index on (professionalId, slotHeldAt)
-    // is the final guard against two people winning the same time slot. Stripe is never
-    // called inside this transaction — an external network call while holding a row lock is
-    // how a lock ends up held for minutes instead of milliseconds.
+    // is the final guard against two people winning the same time slot. No external service
+    // is called inside this transaction — a network call while holding a row lock is how a lock
+    // ends up held for minutes instead of milliseconds.
     const { appointment, payment } = await prisma.$transaction(async (tx) => {
       // A previous booking that was never confirmed still owns the unique (professionalId,
       // slotHeldAt) key even though availability already treats the slot as free. Release it

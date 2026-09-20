@@ -81,9 +81,31 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Corrigido
 
+- O link de pagamento não aparecia depois de agendar. A cobrança exigia chave
+  Pix **e** link; a chave só é necessária no repasse, dias depois, então a
+  consulta deixava de ser cobrada por um dado que dava tempo de resolver. Agora
+  a única condição é existir o link do InfinitePay.
+- Nenhum e-mail saía da plataforma: o `.env.example` trazia `EMAIL_FROM` entre
+  aspas, e copiado para o painel de deploy as aspas iam junto. A Resend recusava
+  com 422 e o único sinal era uma linha de log. As aspas saíram do exemplo e o
+  valor passa a ser normalizado antes do envio, com aviso no log se ainda assim
+  não servir.
 - A extração de notas do release lia `[0.1.0]` como classe de caracteres de
   expressão regular e nunca casava com o título da seção — a página do release
   sairia vazia no primeiro uso.
+
+### Removido
+
+- Últimas menções ao Stripe no código. O que restava eram comentários, e alguns
+  já eram falsos: `fees.ts` descontava uma "taxa de processamento do Stripe" que
+  não existe, `subscription.ts` apontava para `stripe-connect.ts` (apagado) e o
+  limitador dizia poupar webhooks cujo chamador seria o Stripe — não há webhook
+  algum. Ficam de fora desta limpeza os padrões `sk_live_…`/`whsec_…` em
+  `.gitleaks.toml` e `scripts/check-secrets.mjs`: são o detector de segredos,
+  não integração, e servem para barrar uma chave colada por engano.
+- As colunas do Stripe **continuam no banco de propósito** e saem num passo
+  separado, depois que este código estiver em todos os ambientes. Derrubá-las
+  antes disso já quebrou a aplicação uma vez (`P2022`).
 
 ## [0.1.0] — 2026-09-18
 

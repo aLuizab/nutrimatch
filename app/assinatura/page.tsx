@@ -34,9 +34,6 @@ export default async function AssinaturaPage() {
       </div>
 
       <div className="p-8 max-w-4xl space-y-6">
-        {/* Aqui havia dois avisos lidos de ?status=, que o Stripe anexava ao devolver o
-            navegador do checkout. O link do InfinitePay não devolve ninguém nem avisa nada, então
-            o estado real é o que está no cartão abaixo: até quando está pago. */}
         {/* Current state, stated plainly — including the uncomfortable part, that today's access
             may be coming from the grace period and not from anything they bought. */}
         <section className="bg-white border border-gray-100 rounded-2xl p-6">
@@ -44,10 +41,9 @@ export default async function AssinaturaPage() {
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Plano atual</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{entitlements.planName}</p>
-              {/* "Pago até", não "renova em": não existe renovação automática. Enquanto havia
-                  Stripe, a data era uma promessa do gateway; agora é um fato sobre o que já foi
-                  pago, e deixar "renova" faria o profissional perder o acesso esperando uma
-                  cobrança que nunca vai chegar. */}
+              {/* "Pago até", não "renova em": não existe renovação automática. A data é um
+                  fato sobre o que já foi pago. Dizer "renova" faria o profissional perder o
+                  acesso esperando uma cobrança que nunca vai chegar. */}
               {sub?.currentPeriodEnd && isPaying && (
                 <p className="text-sm text-gray-500 mt-1">
                   Pago até <strong>{formatDateBR(sub.currentPeriodEnd)}</strong>. A renovação não é

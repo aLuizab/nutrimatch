@@ -35,8 +35,8 @@ export async function settleExpiredEnrollments(now: Date = new Date()): Promise<
       endsAt: { lte: cutoff },
       refundedAt: null,
       // Só faz sentido para pacote pago pela plataforma. Programa combinado direto entre
-      // paciente e profissional não tem dinheiro nosso para devolver. A marca disso era o id do
-      // PaymentIntent do Stripe; agora é o valor pago, que é o que o caminho do link registra.
+      // paciente e profissional não tem dinheiro nosso para devolver. A marca é o valor pago,
+      // que é o que o caminho do link registra.
       paidAmountCents: { not: null },
     },
     include: {

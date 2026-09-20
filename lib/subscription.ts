@@ -1,7 +1,7 @@
 import type { Prisma, Professional, ProfessionalSubscription, SubscriptionPlan } from '@prisma/client'
 import { prisma } from './prisma'
 
-// The freemium gate, in one place — the same shape as isPaidProfessional in stripe-connect.ts.
+// The freemium gate, in one place.
 //
 // The rule that matters most here is what this file does NOT do: a paid subscription never
 // touches Professional.rankScore. Ranking stays a pure merit computation over ratings,
@@ -49,10 +49,9 @@ export interface Entitlements {
 /**
  * Derived from the paid period, not from status.
  *
- * This used to trust `status`, which was right while Stripe owned it: Stripe flips a
- * subscription to PAST_DUE and then CANCELLED on its own as charges fail. Payment is manual
- * now — an admin records each R$ 9,90 — and nobody flips anything, so an ACTIVE row whose month
- * ran out would keep the professional listed forever. Reading the entitlement from
+ * Trusting `status` would only work if something flipped it as charges failed. Payment is
+ * manual — an admin records each R$ 9,90 — and nobody flips anything, so an ACTIVE row whose
+ * month ran out would keep the professional listed forever. Reading the entitlement from
  * currentPeriodEnd is the same "derive on read, no cron" shape as effectiveAttendance() in
  * lib/reputation.ts and isExpiredAwaiting() in lib/appointment-status.ts.
  *
