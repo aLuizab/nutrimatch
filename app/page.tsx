@@ -18,11 +18,13 @@ import { listedWhere } from '@/lib/subscription'
 import { PROFESSIONAL_CARD_INCLUDE, toProfessionalCard } from '@/lib/professionals'
 import { SPECIALTIES } from '@/lib/specialties'
 
-// Usados só enquanto nenhum profissional está publicado, e a tela diz que são exemplos.
+// Perfis de exemplo, usados só enquanto nenhum profissional real está publicado. Os nomes são
+// fictícios e não correspondem a ninguém — os cartões e a prévia dizem isso na tela, porque
+// nome e nota inventados sem aviso viram promessa que o produto não cumpre.
 const EXEMPLOS: DemoProfissional[] = [
-  { id: null, nome: 'Exemplo — Nutrição Esportiva', especialidade: 'Nutrição Esportiva', rating: 0, reviewCount: 0, preco: 150, cidade: 'São Paulo, SP', online: true, iniciais: 'NE', cor: 'bg-orange-500' },
-  { id: null, nome: 'Exemplo — Nutrição Clínica', especialidade: 'Nutrição Clínica', rating: 0, reviewCount: 0, preco: 120, cidade: 'Belo Horizonte, MG', online: false, iniciais: 'NC', cor: 'bg-blue-500' },
-  { id: null, nome: 'Exemplo — Nutrição Infantil', especialidade: 'Nutrição Infantil', rating: 0, reviewCount: 0, preco: 140, cidade: 'Curitiba, PR', online: true, iniciais: 'NI', cor: 'bg-purple-500' },
+  { id: null, nome: 'Dra. Helena Duarte', especialidade: 'Nutrição Esportiva', rating: 0, reviewCount: 0, preco: 150, cidade: 'São Paulo, SP', online: true, iniciais: 'HD', cor: 'bg-orange-500' },
+  { id: null, nome: 'Dr. Marcos Vilela', especialidade: 'Nutrição Clínica', rating: 0, reviewCount: 0, preco: 120, cidade: 'Belo Horizonte, MG', online: false, iniciais: 'MV', cor: 'bg-blue-500' },
+  { id: null, nome: 'Dra. Priscila Tavares', especialidade: 'Nutrição Infantil', rating: 0, reviewCount: 0, preco: 140, cidade: 'Curitiba, PR', online: true, iniciais: 'PT', cor: 'bg-purple-500' },
 ]
 
 const steps = [
