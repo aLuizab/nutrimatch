@@ -9,12 +9,6 @@ import { generateMeetingRoom } from '@/lib/meeting'
 import { isSlotAvailable } from '@/lib/availability'
 import { isWithinCancelRefundWindow, isWithinRescheduleWindow } from '@/lib/appointment-status'
 import { formatCents } from '@/lib/money'
-import {
-  captureAppointmentPayment,
-  refundConfirmedAppointmentCancellation,
-  refundUnconfirmedAppointmentPayment,
-  voidAppointmentPayment,
-} from '@/lib/payments'
 
 // Six mutually exclusive actions share this route: cancelling (either owner, future
 // appointments only), confirming a pending booking (owning professional), remarcando o horário
@@ -89,25 +83,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       )
     }
 
-    // Capture BEFORE writing CONFIRMED. If the capture fails — expired authorisation, card
-    // revoked — the professional must not end up with a confirmed consultation and no money;
-    // they get an error and the booking stays pending so they can decline it.
-    if (appointment.paymentStatus === 'AUTHORIZED') {
-      try {
-        const captured = await captureAppointmentPayment(id)
-        if (!captured) {
-          return NextResponse.json(
-            { error: 'O pagamento não pôde ser capturado. A consulta não foi confirmada.' },
-            { status: 402 }
-          )
-        }
-      } catch {
-        return NextResponse.json(
-          { error: 'O pagamento não pôde ser capturado. A consulta não foi confirmada e nada foi cobrado.' },
-          { status: 402 }
-        )
-      }
-    }
+    // Não há captura de pagamento aqui, e não é esquecimento: quando o profissional chega
+    // nesta rota o dinheiro já entrou pelo link e já foi conferido por um admin
+    // (paymentStatus PAID). Confirmar é só confirmar.
 
     await prisma.appointment.update({
       where: { id },
@@ -164,19 +142,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     //     is no cancellation-window question to weigh — unlike the patient's own choice to back
     //     out late, a professional pulling out of something they already confirmed isn't a cost
     //     the patient should ever absorb.
+    // Quanto a plataforma passa a DEVER ao paciente por este cancelamento.
+    //
+    // Este número é só um cálculo: o dinheiro entrou por um link do InfinitePay e só sai de
+    // volta quando alguém mandar, à mão. O cálculo fica em pé porque a obrigação existe
+    // independentemente de haver automação — quem cancela dentro da janela tem direito ao
+    // dinheiro, e apagar a conta não apaga a dívida.
+    //
+    // O que falta é a fila de devoluções pendentes no painel do admin. Enquanto ela não existe,
+    // este valor é informado ao paciente e registrado aqui, e a devolução depende de alguém
+    // olhar. É uma lacuna conhecida, não um descuido.
     let refundedCents = 0
-    if (appointment.paymentStatus === 'AUTHORIZED' || appointment.paymentStatus === 'PENDING') {
-      await voidAppointmentPayment(id)
-    } else if (appointment.paymentStatus === 'PAID' && appointment.status === 'AWAITING_CONFIRMATION') {
-      await refundUnconfirmedAppointmentPayment(id)
+    if (appointment.paymentStatus === 'PAID' && appointment.status === 'AWAITING_CONFIRMATION') {
+      // O profissional nunca confirmou: devolução integral, sem discussão de janela.
       refundedCents = appointment.amountCents ?? 0
     } else if (appointment.paymentStatus === 'PAID' && appointment.status === 'CONFIRMED') {
       const patientWithinRefundWindow = isOwningPatient && isWithinCancelRefundWindow(appointment.scheduledAt, now)
       if (patientWithinRefundWindow || isOwningProfessional) {
-        const outcome = await refundConfirmedAppointmentCancellation(id)
-        refundedCents = outcome?.refundedCents ?? 0
+        refundedCents = appointment.amountCents ?? 0
       }
     }
+    // PENDING não gera devolução: nada foi confirmado como pago.
 
     // slotHeldAt: null frees the slot immediately — see the schema comment on this column.
     // A consultation booked inside a package needs nothing extra here: the package's used

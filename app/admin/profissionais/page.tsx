@@ -8,7 +8,13 @@ export default async function AdminProfissionais() {
   const admin = await requireRoleOrRedirect('ADMIN')
 
   const rows = await prisma.professional.findMany({
-    include: { user: { select: { name: true } } },
+    include: {
+      user: { select: { name: true } },
+      // A mensalidade vive aqui e não em /admin/financeiro porque ela é um fato sobre o
+      // profissional, não uma cobrança na fila: quem paga é ele, e o que muda é se ele aparece
+      // na busca. Confirmar na mesma linha em que se aprova e se suspende é o lugar natural.
+      subscription: { include: { plan: { select: { name: true, monthlyPrice: true } } } },
+    },
     orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
   })
 
@@ -24,6 +30,10 @@ export default async function AdminProfissionais() {
     crn: p.crn,
     crnVerifiedAt: p.crnVerifiedAt ? p.crnVerifiedAt.toISOString() : null,
     crnVerifiedBy: p.crnVerifiedBy,
+    plano: p.subscription?.plan.name ?? null,
+    // Em centavos, como monthlyPrice. Zero no plano gratuito, que não tem o que confirmar.
+    mensalidadeCents: p.subscription?.plan.monthlyPrice ?? 0,
+    pagoAte: p.subscription?.currentPeriodEnd ? p.subscription.currentPeriodEnd.toISOString() : null,
   }))
 
   const pendingCount = professionals.filter((p) => p.status === 'PENDING').length

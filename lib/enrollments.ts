@@ -96,7 +96,7 @@ export async function getActiveEnrollmentSummary(patientId: string) {
     listPriceAtEnrollment: enrollment.listPriceAtEnrollment,
     // Direito de arrependimento (CDC art. 49) — só existe para quem pagou pela plataforma, e só
     // dentro dos 7 dias corridos da compra. Ver refundEnrollmentWithdrawal em lib/payments.ts.
-    withinWithdrawalWindow: enrollment.paymentIntentId != null && isWithinWithdrawalWindow(enrollment.paidAt),
+    withinWithdrawalWindow: enrollment.paidAmountCents != null && isWithinWithdrawalWindow(enrollment.paidAt),
     paidAmountLabel: enrollment.paidAmountCents != null ? formatCents(enrollment.paidAmountCents) : null,
   }
 }

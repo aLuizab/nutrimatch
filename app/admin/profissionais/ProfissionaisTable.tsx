@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Search, Star, MapPin, ExternalLink, BadgeCheck } from 'lucide-react'
 import { initials, formatPrice } from '@/lib/format'
 import { CFN_CONSULTA_URL } from '@/lib/crn'
+import MensalidadeCell from './MensalidadeCell'
 
 export interface ProfessionalRow {
   id: string
@@ -18,6 +19,12 @@ export interface ProfessionalRow {
   crn: string
   crnVerifiedAt: string | null
   crnVerifiedBy: string | null
+  /** Nome do plano atual. Null enquanto o profissional não tem assinatura nenhuma. */
+  plano: string | null
+  /** Em centavos. Zero no plano gratuito, que não tem mensalidade a confirmar. */
+  mensalidadeCents: number
+  /** Até quando está pago, ISO. Null no gratuito e em quem nunca pagou. */
+  pagoAte: string | null
 }
 
 const statusLabels: Record<ProfessionalRow['status'], string> = {
@@ -46,6 +53,37 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
     const matchStatus = statusFilter === 'todos' || p.status === statusFilter
     return matchSearch && matchStatus
   })
+
+  /**
+   * Registra que a mensalidade do mês foi paga.
+   *
+   * Pede confirmação porque não há como desfazer pelo painel: a rota estende `currentPeriodEnd`,
+   * e cancelar depois não devolve o mês. Um clique errado numa lista de nomes parecidos custa
+   * um mês de acesso dado de graça.
+   */
+  async function registrarMensalidade(id: string, nome: string, meses: number) {
+    const rotulo = meses === 1 ? 'o mês' : `${meses} meses`
+    if (!confirm(`Confirmar que ${nome} pagou ${rotulo}?\n\nIsto estende o acesso e não pode ser desfeito por aqui.`)) return
+    setPendingId(id)
+    setError(null)
+    try {
+      const res = await fetch(`/api/admin/professionals/${id}/mensalidade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'REGISTRAR_PAGAMENTO', months: meses }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? 'Não foi possível registrar o pagamento')
+        return
+      }
+      router.refresh()
+    } catch {
+      setError('Não foi possível conectar ao servidor')
+    } finally {
+      setPendingId(null)
+    }
+  }
 
   async function updateStatus(id: string, status: ProfessionalRow['status']) {
     setPendingId(id)
@@ -109,6 +147,7 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
               <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Preço</th>
               <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Avaliação</th>
               <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Mensalidade</th>
               <th className="py-3.5 px-4" />
             </tr>
           </thead>
@@ -152,6 +191,13 @@ export default function ProfissionaisTable({ professionals }: { professionals: P
                   <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${statusColors[p.status]}`}>
                     {statusLabels[p.status]}
                   </span>
+                </td>
+                <td className="py-4 px-4">
+                  <MensalidadeCell
+                    row={p}
+                    busy={pendingId === p.id}
+                    onRegistrar={(meses) => registrarMensalidade(p.id, p.name, meses)}
+                  />
                 </td>
                 <td className="py-4 px-4">
                   <div className="flex items-center gap-2 justify-end">

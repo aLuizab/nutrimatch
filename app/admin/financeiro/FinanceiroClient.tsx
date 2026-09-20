@@ -15,6 +15,10 @@ export interface PendingCharge {
   txid: string | null
   claimedAtLabel: string
   note: string | null
+  /** O paciente clicou em "já paguei". Falso quando ele pagou e não voltou — ou não pagou. */
+  declared: boolean
+  /** Até quando o horário fica preso sem confirmação. Null em pacote, que não prende agenda. */
+  deadlineLabel: string | null
 }
 
 export interface PendingPayout {
@@ -145,7 +149,17 @@ export default function FinanceiroClient({
                     </div>
                     <p className="text-sm text-gray-500 mt-1">{c.description}</p>
                     <p className="text-sm text-gray-500">Profissional: {c.professionalName}</p>
-                    <p className="text-xs text-gray-400 mt-2">Avisou em {c.claimedAtLabel}</p>
+                    {c.declared ? (
+                      <p className="text-xs text-gray-400 mt-2">Avisou em {c.claimedAtLabel}</p>
+                    ) : (
+                      /* Sem declaração, o extrato do InfinitePay é a única fonte — e o admin
+                         precisa saber que é ele quem tem de ir olhar, em vez de esperar. */
+                      <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mt-2 leading-relaxed">
+                        O paciente não avisou que pagou. Confira no extrato do InfinitePay antes
+                        de confirmar.
+                        {c.deadlineLabel && ` O horário fica preso até ${c.deadlineLabel}.`}
+                      </p>
+                    )}
                     {c.note && (
                       <p className="text-xs text-gray-600 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2 mt-2">
                         Observação do paciente: {c.note}

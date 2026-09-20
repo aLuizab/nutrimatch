@@ -25,7 +25,22 @@ interface ProfessionalRow {
   plans: PlanRow[]
 }
 
-export default function LinksClient({ rows }: { rows: ProfessionalRow[] }) {
+/** A mensalidade que o profissional paga à plataforma — a única cobrança que não é do paciente. */
+interface MensalidadeRow {
+  id: string
+  name: string
+  monthlyCents: number
+  link: string | null
+  linkAmountCents: number | null
+}
+
+export default function LinksClient({
+  rows,
+  mensalidade,
+}: {
+  rows: ProfessionalRow[]
+  mensalidade: MensalidadeRow | null
+}) {
   const semLink = rows.filter((r) => !r.link).length
 
   return (
@@ -47,6 +62,39 @@ export default function LinksClient({ rows }: { rows: ProfessionalRow[] }) {
               Enquanto não houver, a consulta é marcada normalmente e o valor fica combinado
               direto entre paciente e profissional — a plataforma não recebe a taxa.
             </p>
+          </div>
+        )}
+
+        {/* A mensalidade fica separada e no topo porque o dinheiro corre ao contrário de todo o
+            resto desta tela: aqui é o profissional quem paga a plataforma, não o paciente quem
+            paga o profissional. Misturar na mesma lista faria parecer mais um link de cobrança
+            de consulta. */}
+        {mensalidade && (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-400">
+                  Mensalidade da plataforma
+                </p>
+                <h2 className="font-bold text-gray-900 mt-1">Plano {mensalidade.name}</h2>
+                <p className="text-xs text-gray-500 mt-1 max-w-md leading-relaxed">
+                  Cobrada do nutricionista, não do paciente. Sem este link ele não tem como pagar
+                  por conta própria — só resta você registrar o pagamento à mão.
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400">Por mês</p>
+                <p className="font-bold text-gray-900">{formatCents(mensalidade.monthlyCents)}</p>
+              </div>
+            </div>
+            <LinkField
+              kind="plan"
+              id={mensalidade.id}
+              label="Link da mensalidade"
+              expectedCents={mensalidade.monthlyCents}
+              link={mensalidade.link}
+              linkAmountCents={mensalidade.linkAmountCents}
+            />
           </div>
         )}
 
@@ -81,10 +129,14 @@ export default function LinksClient({ rows }: { rows: ProfessionalRow[] }) {
               </div>
             </div>
 
+            {/* A cobrança acontece mesmo sem chave: o que trava é o repasse, dias depois.
+                Dizer "nada é cobrado" aqui era verdade quando a chave era pré-requisito da
+                cobrança, e virou mentira quando deixou de ser. */}
             {!row.hasPixKey && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4 leading-relaxed">
-                Sem chave Pix cadastrada não há para onde repassar os 90%. Enquanto isso, nada é
-                cobrado do paciente mesmo com o link preenchido.
+              <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-4 leading-relaxed">
+                Sem chave Pix, a consulta é cobrada normalmente mas o repasse dos 90%{' '}
+                <strong>fica retido</strong> — não há para onde mandar. Peça a chave antes que o
+                dinheiro comece a acumular.
               </p>
             )}
 
@@ -128,7 +180,7 @@ function LinkField({
   link,
   linkAmountCents,
 }: {
-  kind: 'professional' | 'careplan'
+  kind: 'professional' | 'careplan' | 'plan'
   id: string
   label: string
   expectedCents: number

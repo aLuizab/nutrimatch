@@ -9,16 +9,16 @@ const isProd = process.env.NODE_ENV === 'production'
 // 'unsafe-eval' is dev-only — the Next dev bundler needs it, production must not have it.
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"} https://js.stripe.com`,
+  `script-src 'self' 'unsafe-inline'${isProd ? '' : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
   // res.cloudinary.com serve as fotos de perfil. Sem isto o upload funciona e o navegador
   // recusa a imagem, que é um sintoma difícil de ligar à causa.
   "img-src 'self' data: blob: https://res.cloudinary.com",
   "font-src 'self' data:",
-  // Stripe endpoints the browser talks to directly during checkout.
-  "connect-src 'self' https://api.stripe.com",
-  // Stripe Checkout/Elements render in an iframe.
-  "frame-src 'self' https://js.stripe.com https://hooks.stripe.com https://checkout.stripe.com",
+  "connect-src 'self'",
+  // Nada é embutido em iframe: o link de pagamento abre em aba própria, no domínio do
+  // InfinitePay. Fechar isto evita que uma injeção consiga montar um iframe de phishing.
+  "frame-src 'self'",
   "frame-ancestors 'none'",
   "object-src 'none'",
   "base-uri 'self'",

@@ -5,19 +5,13 @@ import { requireRoleOrRedirect } from '@/lib/session'
 import { prisma } from '@/lib/prisma'
 import { formatDateBR } from '@/lib/format'
 import { platformFeePercent } from '@/lib/fees'
-import { subscriptionsEnabled } from '@/lib/stripe-subscription'
 import { ensureSubscription, entitlementsFor, inGracePeriod, subscriptionEnforcedFrom } from '@/lib/subscription'
-import SubscribeButton from './SubscribeButton'
+import PagarMensalidade from './PagarMensalidade'
 
 export const metadata = { title: 'Assinatura — NutriMatch' }
 
-export default async function AssinaturaPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string }>
-}) {
+export default async function AssinaturaPage() {
   const user = await requireRoleOrRedirect('PROFESSIONAL')
-  const { status } = await searchParams
 
   const sub = await ensureSubscription(user.professional!.id)
   const entitlements = entitlementsFor(sub)
@@ -25,6 +19,9 @@ export default async function AssinaturaPage({
     where: { active: true },
     orderBy: { sortOrder: 'asc' },
   })
+  // O plano pago — é dele que sai o link de cobrança. Um plano de preço zero não tem o que
+  // cobrar, então o botão de pagamento não aparece para quem só tem o gratuito na lista.
+  const pago = plans.find((p) => p.monthlyPrice > 0) ?? null
   const enforcedFrom = subscriptionEnforcedFrom()
   const grace = inGracePeriod()
   const isPaying = !entitlements.viaGrace && entitlements.canReceiveBookings
@@ -37,22 +34,6 @@ export default async function AssinaturaPage({
       </div>
 
       <div className="p-8 max-w-4xl space-y-6">
-        {status === 'sucesso' && (
-          <div className="flex gap-3 items-start bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3.5">
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-            <p className="text-sm text-emerald-900">
-              Pagamento recebido. A confirmação do Stripe pode levar alguns segundos — se o plano abaixo
-              ainda aparecer como gratuito, atualize a página.
-            </p>
-          </div>
-        )}
-        {status === 'cancelado' && (
-          <div className="flex gap-3 items-start bg-gray-50 border border-gray-100 rounded-xl px-4 py-3.5">
-            <X size={16} className="text-gray-400 shrink-0 mt-0.5" />
-            <p className="text-sm text-gray-600">Assinatura não concluída. Nada foi cobrado.</p>
-          </div>
-        )}
-
         {/* Current state, stated plainly — including the uncomfortable part, that today's access
             may be coming from the grace period and not from anything they bought. */}
         <section className="bg-white border border-gray-100 rounded-2xl p-6">
@@ -60,29 +41,32 @@ export default async function AssinaturaPage({
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Plano atual</p>
               <p className="text-2xl font-bold text-gray-900 mt-1">{entitlements.planName}</p>
+              {/* "Pago até", não "renova em": não existe renovação automática. A data é um
+                  fato sobre o que já foi pago. Dizer "renova" faria o profissional perder o
+                  acesso esperando uma cobrança que nunca vai chegar. */}
               {sub?.currentPeriodEnd && isPaying && (
                 <p className="text-sm text-gray-500 mt-1">
-                  {sub.cancelAtPeriodEnd
-                    ? `Acesso até ${formatDateBR(sub.currentPeriodEnd)}, sem renovação.`
-                    : `Renova em ${formatDateBR(sub.currentPeriodEnd)}.`}
+                  Pago até <strong>{formatDateBR(sub.currentPeriodEnd)}</strong>. A renovação não é
+                  automática: pague de novo antes dessa data para não sair da busca.
                 </p>
               )}
             </div>
-            <div className="flex gap-2">
-              {isPaying ? (
-                <SubscribeButton action="portal" label="Gerenciar cobrança" variant="secondary" />
-              ) : (
-                <SubscribeButton action="checkout" label="Assinar o plano Profissional" />
-              )}
-            </div>
+            {pago && (
+              <PagarMensalidade
+                url={pago.paymentLinkUrl}
+                amountCents={pago.paymentLinkAmount ?? pago.monthlyPrice}
+                jaPago={isPaying}
+              />
+            )}
           </div>
 
           {entitlements.status === 'PAST_DUE' && (
             <div className="flex gap-3 items-start bg-amber-50 border border-amber-100 rounded-xl px-4 py-3.5 mt-5">
               <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
               <p className="text-sm text-amber-900">
-                O último pagamento não passou. Seu acesso continua enquanto o Stripe tenta novamente —
-                atualize o cartão em &quot;Gerenciar cobrança&quot; para não perder os agendamentos.
+                A mensalidade venceu e ainda não foi paga. Seu acesso continua por enquanto, mas para
+                não perder os agendamentos pague pelo botão acima — e lembre que a liberação depende
+                de a administração conferir o comprovante.
               </p>
             </div>
           )}
@@ -107,12 +91,16 @@ export default async function AssinaturaPage({
             </div>
           )}
 
-          {!subscriptionsEnabled() && (
-            <p className="text-xs text-gray-400 mt-5">
-              Pagamentos não estão configurados nesta instalação, então a assinatura não pode ser
-              contratada agora.
+          {/* Como a confirmação é humana, o profissional precisa saber onde o pagamento dele
+              está — senão o silêncio entre pagar e ser liberado parece falha. */}
+          <div className="flex gap-3 items-start bg-gray-50 border border-gray-100 rounded-xl px-4 py-3.5 mt-5">
+            <Info size={16} className="text-gray-400 shrink-0 mt-0.5" />
+            <p className="text-sm text-gray-600 leading-relaxed">
+              A mensalidade é paga por link e conferida por uma pessoa — não há cobrança automática
+              no cartão, e nada é debitado sozinho. Se pagar e a data acima não mudar até o próximo
+              dia útil, fale com a administração com o comprovante em mãos.
             </p>
-          )}
+          </div>
         </section>
 
         <div className="grid md:grid-cols-2 gap-6">

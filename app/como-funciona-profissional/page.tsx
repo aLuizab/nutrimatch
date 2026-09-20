@@ -27,7 +27,7 @@ export default function ComoFuncionaProfissional() {
           <ol className="space-y-4">
             {[
               { icon: Search, text: 'O paciente encontra seu perfil na busca e escolhe um horário disponível na sua agenda.' },
-              { icon: CreditCard, text: 'Se sua conta Stripe está conectada, o pagamento é pedido nesse momento: no cartão, o valor fica reservado (não cobrado ainda); no Pix, é debitado na hora. Sem Stripe conectado, o valor continua combinado diretamente com o paciente, como sempre funcionou.' },
+              { icon: CreditCard, text: 'Se você tem link de pagamento e chave Pix cadastrados, o pagamento é pedido nesse momento: o paciente tem 30 minutos para pagar no link e avisar, senão o horário volta a ficar livre. Faltando link ou chave Pix, o valor continua combinado diretamente com o paciente, como sempre funcionou.' },
               { icon: Clock, text: 'Você tem 24 horas para confirmar ou recusar o pedido — o tempo de resposta é um dos três fatores do ranking (veja abaixo).' },
               { icon: CheckCircle2, text: 'Ao confirmar: se foi cartão, o valor é cobrado nesse instante (nunca antes); se foi Pix, já estava cobrado. Ao recusar ou deixar vencer o prazo: nada fica cobrado no cartão, e um Pix já debitado é devolvido automaticamente — o paciente não perde dinheiro por uma decisão que não foi dele.' },
             ].map(({ icon: Icon, text }, i) => (
@@ -62,17 +62,17 @@ export default function ComoFuncionaProfissional() {
           </h2>
           <p className="text-sm text-gray-600 leading-relaxed mb-3">
             A NutriMatch retém {feePercent}% de cada consulta paga pela plataforma (o restante vai
-            para sua conta Stripe, já descontada a taxa de processamento do próprio Stripe, que é
+            para sua chave Pix, já descontada a taxa de processamento do InfinitePay, que é
             separada e não controlada por nós). É o que mantém, sem custo fixo mensal:
           </p>
           <ul className="text-sm text-gray-600 space-y-1.5 list-disc pl-5">
-            <li>A infraestrutura de pagamento: conta Stripe conectada, repasses automáticos, sem você ter que cobrar cartão manualmente.</li>
+            <li>A infraestrutura de cobrança: link de pagamento pronto, conferência do que entrou e repasse pela sua chave Pix, sem você ter que cobrar ninguém.</li>
             <li>A proteção do modelo de captura: o paciente só é cobrado quando você confirma — o que reduz a hesitação de quem ainda não te conhece e aumenta a chance de o agendamento virar consulta de verdade.</li>
             <li>A visibilidade na busca, a agenda, os lembretes automáticos por e-mail e a verificação do seu CRN, que aparece no seu perfil como selo de confiança.</li>
             <li>O suporte e a manutenção da plataforma em si.</li>
           </ul>
           <p className="text-sm text-gray-600 leading-relaxed mt-3">
-            Consultas combinadas diretamente com o paciente (sem Stripe conectado) não têm taxa
+            Consultas combinadas diretamente com o paciente (sem link de pagamento) não têm taxa
             nenhuma — mas também não têm nada da lista acima automatizado.
           </p>
         </section>

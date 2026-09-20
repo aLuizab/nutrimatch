@@ -7,8 +7,7 @@ import { buildPixPayload, txidForAppointment, txidForEnrollment } from './pix'
 //
 // O desenho: o paciente paga **na chave da plataforma**, não na do profissional. O dinheiro
 // entra inteiro numa conta só, e o repasse (total − taxa) sai depois, como transferência
-// registrada na tabela Payout. É o oposto do destination charge do Stripe, onde a divisão
-// acontecia sozinha dentro da transação.
+// registrada na tabela Payout. A divisão não acontece sozinha em lugar nenhum: alguém a faz.
 //
 // O custo dessa escolha é honesto e está todo aqui: **não existe webhook**. Chave Pix estática
 // não avisa ninguém quando o dinheiro cai, então alguém precisa olhar o extrato. O BR Code

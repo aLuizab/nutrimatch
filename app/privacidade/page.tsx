@@ -28,7 +28,7 @@ export default function Privacidade() {
             <h2 className="text-base font-bold text-gray-900 mb-2">1. Quais dados coletamos</h2>
             <p className="mb-2"><strong>De todos os usuários:</strong> nome, e-mail, telefone, senha (armazenada com hash, nunca em texto puro).</p>
             <p className="mb-2"><strong>De pacientes:</strong> data de nascimento, objetivo declarado, cidade e, se você optar por registrar, peso, medida de cintura e anotações de evolução ao longo do acompanhamento — dado de saúde sensível, só coletado se você mesmo escolher preenchê-lo.</p>
-            <p className="mb-2"><strong>De profissionais:</strong> CRN e sua verificação, especialidades, biografia, cidade, valor da consulta, e dados da conta Stripe conectada (a NutriMatch nunca vê nem armazena números de cartão — isso fica inteiramente com a Stripe).</p>
+            <p className="mb-2"><strong>De profissionais:</strong> CRN e sua verificação, especialidades, biografia, cidade, valor da consulta e a chave Pix usada para receber os repasses. A NutriMatch nunca vê nem armazena números de cartão: o pagamento acontece fora daqui, na página do InfinitePay.</p>
             <p>
               <strong>De cada consulta e conversa entre as partes:</strong> data, modalidade,
               motivo informado, telefone de contato, resumo pós-consulta escrito pelo profissional,
@@ -53,7 +53,7 @@ export default function Privacidade() {
             <h2 className="text-base font-bold text-gray-900 mb-2">3. Com quem compartilhamos</h2>
             <ul className="list-disc pl-5 space-y-1.5">
               <li><strong>O profissional ou paciente do outro lado de uma consulta</strong> — só o necessário para o atendimento acontecer (nome, contato, motivo da consulta).</li>
-              <li><strong>Stripe</strong> (processamento de pagamento) — dados de pagamento necessários para cobrar e repassar valores. Não recebe seus dados de saúde.</li>
+              <li><strong>InfinitePay</strong> (processamento de pagamento) — o pagamento é feito na página deles, fora da NutriMatch. Recebem os dados necessários para a cobrança e nenhum dado de saúde.</li>
               <li><strong>Resend</strong> (envio de e-mail transacional) — seu e-mail e o conteúdo das notificações que a plataforma envia (confirmações, lembretes).</li>
               <li>
                 Não vendemos dado pessoal a terceiros, nem usamos dado de saúde para publicidade.
