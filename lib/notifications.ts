@@ -7,6 +7,7 @@ import {
   bookingReceivedProfessional,
   bookingRequestedPatient,
   bookingRequestProfessional,
+  bookingPendingPaymentProfessional,
   markedNoShow,
   professionalApproved,
   reviewReceived,
@@ -67,6 +68,32 @@ export function notifyBookingRequested(ctx: AppointmentContext) {
   const data = toEmailData(ctx)
   fire(sendEmail({ to: ctx.patientEmail, ...bookingRequestedPatient(data) }))
   fire(sendEmail({ to: ctx.professionalEmail, ...bookingRequestProfessional(data) }))
+}
+
+/**
+ * Aviso ao profissional de que alguém está reservando um horário dele e pagando agora.
+ *
+ * Só existe no caminho com cobrança, onde notifyBookingRequested é adiado até o pagamento
+ * confirmar — sem isto, o profissional vê o horário sumir da agenda sem nenhuma explicação.
+ *
+ * Diferente de notifyBookingRequested, este respeita a preferência notifyBooking: lá o e-mail
+ * é o chamado para ação cujo atraso pune o ranking, e silenciá-lo seria um tiro no pé; aqui é
+ * cortesia informativa, e quem desligou avisos de agendamento não perde nada por não receber.
+ * O pedido de verdade chega depois de qualquer jeito.
+ */
+export function notifyBookingPendingPayment(ctx: AppointmentContext) {
+  const data = toEmailData(ctx)
+  fire(
+    (async () => {
+      const pref = await prisma.user.findUnique({
+        where: { id: ctx.professionalUserId },
+        select: { notifyBooking: true },
+      })
+      if (pref?.notifyBooking) {
+        await sendEmail({ to: ctx.professionalEmail, ...bookingPendingPaymentProfessional(data) })
+      }
+    })()
+  )
 }
 
 export function notifyBookingConfirmed(ctx: AppointmentContext) {

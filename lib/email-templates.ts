@@ -177,6 +177,37 @@ export function bookingRequestProfessional(d: AppointmentEmailData) {
   }
 }
 
+/**
+ * Aviso de que alguém pediu um horário e está no meio do pagamento.
+ *
+ * Deliberadamente NÃO é um chamado para ação: enquanto a cobrança não é confirmada não há o
+ * que o profissional possa aceitar, e pedir para ele confirmar agora só geraria confusão. O
+ * pedido de verdade chega depois, em bookingRequestProfessional.
+ *
+ * Também não menciona prazo nem posicionamento na busca, ao contrário daquele: o relógio de
+ * tempo de resposta só começa a correr em `paidAt` (ver lib/ranking.ts), então dizer "confirme
+ * rápido" aqui cobraria pressa por um tempo que não está sendo medido.
+ */
+export function bookingPendingPaymentProfessional(d: AppointmentEmailData) {
+  return {
+    subject: `${d.patientName} está reservando ${d.dateLabel} às ${d.timeLabel}`,
+    html: wrap(
+      'Alguém está reservando um horário seu',
+      `<p><strong>${d.patientName}</strong> pediu este horário e está fazendo o pagamento:</p>
+       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
+          💻 ${d.modalityLabel}<br/>
+          💰 ${d.priceLabel}</p>
+       <p><strong>Você não precisa fazer nada agora.</strong> Assim que o pagamento for
+          confirmado, você recebe a solicitação para aceitar — é a partir dali que conta o
+          prazo de 24 horas.</p>
+       <p style="font-size: 13px; color: #6b7280;">
+         Este é só um aviso para você não ser pego de surpresa. Se o pagamento não sair, o
+         horário volta a ficar livre e nada mais chega.
+       </p>`
+    ),
+  }
+}
+
 export function appointmentReminderPatient(d: AppointmentEmailData & { meetingUrl?: string | null }) {
   return {
     subject: `Lembrete: consulta amanhã com ${d.professionalName}`,

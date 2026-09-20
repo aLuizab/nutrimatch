@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { AuthError, ensurePatientProfile, requireUser } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { isSlotAvailable } from '@/lib/availability'
-import { notifyBookingRequested } from '@/lib/notifications'
+import { notifyBookingPendingPayment, notifyBookingRequested } from '@/lib/notifications'
 import { lockAndResolveEnrollment } from '@/lib/enrollments'
 import { confirmationDeadlineFor, staleHoldWhere } from '@/lib/appointment-status'
 import { paymentHoldDeadline, paymentRequirementFor } from '@/lib/payments'
@@ -159,9 +159,24 @@ export async function POST(request: Request) {
       // InfinitePay do profissional, que já carrega o valor — não há código a gerar aqui.
       await recordAppointmentCharge(appointment.id, appointment.price)
 
-      // Nenhum e-mail ainda. O profissional só é avisado quando o pagamento é confirmado —
-      // senão toda cobrança abandonada o notificaria sobre uma consulta que nunca existiu, e
-      // ainda começaria a contar tempo de resposta de um pedido que ninguém fez.
+      // O pedido de verdade — aquele que o profissional precisa aceitar — só sai quando o
+      // pagamento é confirmado: uma cobrança abandonada não pode virar solicitação de uma
+      // consulta que nunca existiu. Mas ficar em silêncio até lá fazia o horário sumir da
+      // agenda dele sem explicação nenhuma, então vai um aviso informativo agora.
+      //
+      // Ele não cobra pressa nem prazo, e não precisa: o tempo de resposta é medido de
+      // `paidAt` em diante (lib/ranking.ts), então avisar antes não tira ponto de ninguém.
+      notifyBookingPendingPayment({
+        scheduledAt: scheduledAtDate,
+        modality,
+        price: appointment.price,
+        patientName: user.name,
+        patientEmail: user.email,
+        professionalName: professional.user.name,
+        professionalEmail: professional.user.email,
+        professionalUserId: professional.user.id,
+      })
+
       return NextResponse.json({
         id: appointment.id,
         price: appointment.price,
