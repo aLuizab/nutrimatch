@@ -36,8 +36,8 @@ jobs:
 
       - run: npm ci
 
-      # These are placeholders: the build must never reach a real database or a real Stripe
-      # account from CI. They only need to be well-formed enough to satisfy lib/env.ts.
+      # These are placeholders: the build must never reach a real database or any real service
+      # from CI. They only need to be well-formed enough to satisfy lib/env.ts.
       - name: Typecheck
         run: npx tsc --noEmit
         env:

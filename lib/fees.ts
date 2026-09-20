@@ -14,7 +14,7 @@ export interface FeeBreakdown {
   totalCents: number
   /** What NutriMatch keeps. */
   feeCents: number
-  /** What reaches the professional, before Stripe's own processing fee. */
+  /** What reaches the professional — the amount owed. The payout itself is a manual transfer. */
   netCents: number
   percentApplied: number
 }

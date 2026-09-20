@@ -83,11 +83,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       )
     }
 
-    // Aqui havia a captura da autorização do cartão, feita antes de gravar CONFIRMED para que
-    // o profissional nunca ficasse com consulta confirmada e sem dinheiro. Não existe mais:
-    // "autorizar agora, capturar depois" era um recurso do Stripe, e o link do InfinitePay não
-    // tem equivalente — quando o profissional chega nesta rota o dinheiro já entrou e já foi
-    // conferido por um admin (paymentStatus PAID). Não há o que capturar.
+    // Não há captura de pagamento aqui, e não é esquecimento: quando o profissional chega
+    // nesta rota o dinheiro já entrou pelo link e já foi conferido por um admin
+    // (paymentStatus PAID). Confirmar é só confirmar.
 
     await prisma.appointment.update({
       where: { id },
@@ -146,9 +144,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     //     the patient should ever absorb.
     // Quanto a plataforma passa a DEVER ao paciente por este cancelamento.
     //
-    // Antes este número era consequência de um estorno que acabara de acontecer no Stripe.
-    // Agora é só um cálculo: o dinheiro entrou por um link do InfinitePay e só sai de volta
-    // quando alguém mandar, à mão. Mantive o cálculo em vez de zerar porque a obrigação existe
+    // Este número é só um cálculo: o dinheiro entrou por um link do InfinitePay e só sai de
+    // volta quando alguém mandar, à mão. O cálculo fica em pé porque a obrigação existe
     // independentemente de haver automação — quem cancela dentro da janela tem direito ao
     // dinheiro, e apagar a conta não apaga a dívida.
     //

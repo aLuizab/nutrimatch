@@ -151,9 +151,8 @@ export function tooManyRequests(result: RateLimitResult, message: string) {
  * return rather than its own bucket bookkeeping.
  *
  * Scoped by route because one shared bucket would let a chatty endpoint (saving availability,
- * say) exhaust the allowance for an unrelated one. Deliberately NOT applied to webhooks, whose
- * caller is Stripe and whose retries are the mechanism that makes delivery reliable, nor to
- * logout, where failing closed would trap a user in a session they asked to end.
+ * say) exhaust the allowance for an unrelated one. Deliberately NOT applied to logout, where
+ * failing closed would trap a user in a session they asked to end.
  */
 export function guardMutation(userId: string, scope: string): Response | null {
   const result = rateLimit(`${scope}:${userId}`, LIMITS.mutation.limit, LIMITS.mutation.windowMs)

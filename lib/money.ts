@@ -1,7 +1,7 @@
 // Existing price fields (Professional.price, Appointment.price, CarePlan/Enrollment pricing)
 // stay whole reais — Int — as they've always been; migrating them to cents would touch every
-// price display and filter in the app for no Stripe-related reason. New payment records
-// (Fase 2+) store cents, since Stripe's API is cents-only and a 10% fee needs exact rounding.
+// price display and filter in the app for no good reason. New payment records
+// (Fase 2+) store cents, because a 10% fee over reais loses centavos and the split must be exact.
 // This file is the ONLY place a bare `* 100` / `/ 100` conversion should appear — grep for
 // stray literals if a new money field shows up elsewhere.
 export function reaisToCents(reais: number): number {

@@ -3,20 +3,16 @@ import { professionalPaymentLink } from './payment-link'
 
 // Pagamento de consulta e de pacote.
 //
-// O Stripe saiu do projeto: nunca foi usado (zero linhas no banco tinham `paymentIntentId`,
-// conta Connect ou assinatura) e mantê-lo significava carregar um segundo caminho de dinheiro
-// que ninguém exercitava — o pior tipo de código, o que parece funcionar porque nunca roda.
-//
-// O caminho real é um só: o paciente paga num **link do InfinitePay** do profissional, avisa que
-// pagou, e um admin confere o extrato e confirma. O dinheiro entra na conta da plataforma e sai
-// pela chave Pix do profissional, menos a taxa. Ver lib/payment-link.ts e lib/pix-payments.ts.
+// Existe um caminho de dinheiro só, e não há gateway nenhum: o paciente paga num **link do
+// InfinitePay** cadastrado pelo admin para aquele profissional, avisa que pagou, e um admin
+// confere o extrato e confirma. O dinheiro entra na conta da plataforma e sai pela chave Pix do
+// profissional, menos a taxa. Ver lib/payment-link.ts e lib/pix-payments.ts.
 //
 // **Consequência que não pode ficar implícita: não existe estorno automático.** Quando um
-// cancelamento gera devolução, alguém precisa mandar o dinheiro de volta à mão. As funções que
-// chamavam `stripe.refunds.create` foram removidas em vez de viradas em stubs silenciosos —
-// um stub que devolve "estornado: R$ 150" sem mover dinheiro é pior que nada. A rota de
-// cancelamento hoje registra o cancelamento e informa zero de estorno; a fila de devoluções
-// pendentes ainda precisa ser construída.
+// cancelamento gera devolução, alguém precisa mandar o dinheiro de volta à mão. Não há stub
+// que finja o contrário — devolver "estornado: R$ 150" sem mover dinheiro seria pior que nada.
+// A rota de cancelamento registra o cancelamento e informa zero de estorno; a fila de
+// devoluções pendentes ainda precisa ser construída.
 
 /**
  * Quanto tempo o horário fica preso enquanto o pagamento não é confirmado.
@@ -48,11 +44,10 @@ export interface PaymentRequirement {
  * É por ele que o paciente paga; sem ele não há como cobrar, e a consulta volta a ser combinada
  * direto entre as duas pessoas — a mesma degradação graciosa de sempre.
  *
- * Antes exigia também a chave Pix, e isso deixou de fazer sentido. A regra vinha da época do
- * Stripe Connect, quando o repasse era automático: sem chave, cobrar seria reter dinheiro sem
- * ter para onde mandar. Hoje o repasse é manual — o dinheiro entra na conta da plataforma e sai
- * por transferência feita por um admin, dias depois. Travar a cobrança por um dado que só é
- * necessário no fim impedia a consulta de ser paga por algo que dá tempo de resolver.
+ * Antes exigia também a chave Pix, e isso nunca fez sentido aqui. O repasse é manual — o
+ * dinheiro entra na conta da plataforma e sai por transferência feita por um admin, dias
+ * depois. Travar a cobrança por um dado que só é necessário no fim impedia a consulta de ser
+ * paga por algo que dá tempo de resolver.
  *
  * A chave Pix continua obrigatória para **repassar**: a fila de repasses em /admin/financeiro
  * não deixa pagar quem não tem chave, e /admin/links-de-pagamento marca quem está pendente. O
@@ -81,10 +76,9 @@ export const WITHDRAWAL_WINDOW_DAYS = 7
  * Janela do art. 49 do CDC: até 7 dias corridos da compra de um pacote, o paciente pode desistir
  * e receber 100% de volta, sem justificativa.
  *
- * Continua sendo calculada e continua decidindo o que a rota de cancelamento diz ao paciente.
- * O que mudou com a saída do Stripe é que **a devolução em si passou a ser manual** — antes um
- * `refunds.create` fechava o ciclo sozinho. Estar dentro da janela hoje significa "a plataforma
- * deve este dinheiro", não "o dinheiro já voltou".
+ * É calculada e decide o que a rota de cancelamento diz ao paciente. **A devolução em si é
+ * manual**, então estar dentro da janela significa "a plataforma deve este dinheiro", não "o
+ * dinheiro já voltou".
  */
 export function isWithinWithdrawalWindow(paidAt: Date | null, now: Date = new Date()): boolean {
   if (!paidAt) return false
@@ -94,14 +88,12 @@ export function isWithinWithdrawalWindow(paidAt: Date | null, now: Date = new Da
 /**
  * Acerto de um pacote vencido: calcula quanto sobrou sem uso e registra a dívida.
  *
- * Era `refundUnusedEnrollment`, e terminava num `stripe.refunds.create`. O cálculo é o mesmo —
- * proporcional às consultas não usadas, arredondado para baixo para nunca passar do que foi
- * pago. O que mudou é o fim: em vez de devolver o dinheiro, grava `refundedCents` e
- * `refundedAt`, e a transferência é feita à mão pelo caminho por onde o dinheiro entrou.
+ * O cálculo é proporcional às consultas não usadas, arredondado para baixo para nunca passar
+ * do que foi pago. Não devolve dinheiro: grava `refundedCents` e `refundedAt`, e a
+ * transferência é feita à mão pelo caminho por onde o dinheiro entrou.
  *
- * `refundedAt` continua sendo a marca de idempotência, então rodar o acerto duas vezes não
- * duplica dívida. Deixou de exigir `paymentIntentId`: era a marca de um pagamento pelo Stripe, e
- * exigi-la faria todo pacote pago por link nunca ser acertado.
+ * `refundedAt` é a marca de idempotência, então rodar o acerto duas vezes não duplica dívida.
+ * A condição olha `paidAmountCents`, que é o que o pagamento por link registra.
  */
 export async function settleUnusedEnrollment(
   enrollmentId: string

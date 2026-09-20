@@ -20,9 +20,8 @@ export interface PixStatus {
 /**
  * Onde o profissional diz para onde quer receber.
  *
- * Bem mais curto do que era com o Stripe Connect, e de propósito: o dinheiro entra na conta da
- * plataforma e sai por transferência, então o profissional não precisa abrir conta em gateway
- * nenhum nem enviar documento — só informar a chave.
+ * Curto de propósito: o dinheiro entra na conta da plataforma e sai por transferência, então o
+ * profissional não precisa abrir conta em gateway nenhum nem enviar documento — só a chave.
  */
 export default function PagamentosTab({
   pix,
