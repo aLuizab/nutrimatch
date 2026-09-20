@@ -59,14 +59,17 @@ enum PaymentStatus {
   NOT_REQUIRED
   // Cobrança criada, aguardando o paciente pagar. O horário fica preso, mas por pouco tempo.
   PENDING
-  // Pix: o paciente declarou que pagou e a plataforma ainda não conferiu o extrato. Chave Pix
-  // estática não emite webhook, então esta etapa é humana por necessidade, não por escolha.
+  // O paciente declarou que pagou e a plataforma ainda não conferiu o extrato. Link de
+  // cobrança não emite webhook, então esta etapa é humana por necessidade, não por escolha.
   AWAITING_REVIEW
-  // Cartão autorizado: o valor está reservado e ainda não saiu da conta do paciente.
-  AUTHORIZED
-  // Capturado de verdade, no momento em que o profissional confirmou.
+  // Conferido no extrato e confirmado por um admin. É aqui que o repasse passa a existir.
   PAID
-  // Autorização cancelada sem nunca virar cobrança — o profissional recusou ou deixou vencer.
+  // ── Inalcançáveis ────────────────────────────────────────────────────────────────────
+  // Nenhum caminho do código grava os três abaixo. AUTHORIZED e VOIDED vinham de reserva em
+  // cartão, que esta plataforma não faz; REFUNDED pressupunha estorno automático, e a
+  // devolução é manual. Continuam declarados porque remover valor de enum no Postgres é
+  // mudança de contração: só depois de garantir que nenhuma linha os usa. Ver CHANGELOG.
+  AUTHORIZED
   VOIDED
   REFUNDED
 }

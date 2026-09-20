@@ -121,9 +121,12 @@ export function appointmentDisplayStatus(
 }
 
 /**
- * How a payment state reads to a human. The distinction that matters most is AUTHORIZED:
- * "reservado" is not "pago", and a patient who sees a hold on their bank app needs the product
- * to use the same word the bank does rather than claiming the consultation is paid for.
+ * Como cada estado de pagamento se lê para uma pessoa.
+ *
+ * Só os quatro estados alcançáveis estão aqui. AUTHORIZED e VOIDED descreviam reserva em
+ * cartão, que esta plataforma nunca faz — o pagamento é num link e ou foi feito ou não foi.
+ * REFUNDED existe no enum mas nada o grava, porque a devolução é manual. Rotular estado
+ * inalcançável convida a tela a prometer um comportamento que o sistema não tem.
  */
 export const PAYMENT_LABELS: Record<string, { label: string; tone: string; hint: string }> = {
   NOT_REQUIRED: {
@@ -134,26 +137,16 @@ export const PAYMENT_LABELS: Record<string, { label: string; tone: string; hint:
   PENDING: {
     label: 'Aguardando pagamento',
     tone: 'bg-amber-50 text-amber-700 border-amber-100',
-    hint: 'O horário fica reservado por poucos minutos até o pagamento ser concluído.',
+    hint: 'O horário fica preso por 30 minutos. Passando disso, volta para a agenda.',
   },
-  AUTHORIZED: {
-    label: 'Valor reservado',
+  AWAITING_REVIEW: {
+    label: 'Conferindo o pagamento',
     tone: 'bg-blue-50 text-blue-700 border-blue-100',
-    hint: 'O valor está reservado no cartão e só será cobrado quando o profissional confirmar.',
+    hint: 'O paciente avisou que pagou e a plataforma ainda está conferindo o extrato.',
   },
   PAID: {
     label: 'Pago',
     tone: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-    hint: 'Cobrança efetivada.',
-  },
-  VOIDED: {
-    label: 'Reserva liberada',
-    tone: 'bg-gray-50 text-gray-500 border-gray-100',
-    hint: 'A reserva no cartão foi cancelada e nada foi cobrado.',
-  },
-  REFUNDED: {
-    label: 'Estornado',
-    tone: 'bg-gray-50 text-gray-500 border-gray-100',
-    hint: 'O valor foi devolvido na forma de pagamento original.',
+    hint: 'Pagamento conferido no extrato e confirmado.',
   },
 }
