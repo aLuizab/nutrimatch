@@ -10,7 +10,7 @@ export default function Loading() {
         <div className="h-12 bg-gray-200 rounded-xl animate-pulse mb-6" />
         <div className="flex gap-6">
           <aside className="w-64 shrink-0 hidden md:block">
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+            <div className="bg-surface rounded-2xl border border-gray-100 p-5 space-y-4">
               {Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="space-y-2">
                   <div className="h-3 w-24 bg-gray-200 rounded animate-pulse" />
@@ -22,7 +22,7 @@ export default function Loading() {
           </aside>
           <div className="flex-1 space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+              <div key={i} className="bg-surface border border-gray-100 rounded-2xl p-5 shadow-sm flex items-center gap-4">
                 <div className="w-14 h-14 bg-gray-200 rounded-full animate-pulse shrink-0" />
                 <div className="flex-1 space-y-2">
                   <div className="h-4 w-48 bg-gray-200 rounded animate-pulse" />

@@ -90,7 +90,7 @@ export default function LocationPicker({
           onChange={(e) => handleUfChange(e.target.value)}
           required={required}
           disabled={disabled}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface disabled:bg-gray-50 disabled:text-gray-400"
         >
           <option value="">Selecione</option>
           {BRAZIL_STATES.map((s) => (
@@ -107,7 +107,7 @@ export default function LocationPicker({
           onChange={(e) => handleCityChange(e.target.value)}
           required={required}
           disabled={disabled || !uf || loading}
-          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+          className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface disabled:bg-gray-50 disabled:text-gray-400"
         >
           <option value="">{loading ? 'Carregando...' : !uf ? 'Selecione o estado primeiro' : 'Selecione'}</option>
           {cities.map((c) => (

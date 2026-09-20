@@ -26,7 +26,7 @@ export function Panel({
   children: React.ReactNode
 }) {
   return (
-    <section className="bg-white border border-gray-100 rounded-2xl p-6">
+    <section className="bg-surface border border-gray-100 rounded-2xl p-6">
       <h2 className="text-sm font-bold text-gray-900">{title}</h2>
       {caption && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{caption}</p>}
       <div className="mt-5">{children}</div>

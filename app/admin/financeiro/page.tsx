@@ -106,7 +106,7 @@ export default async function AdminFinanceiro() {
 
   return (
     <DashboardShell sidebar={<AdminSidebar name={admin.name} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Financeiro</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Conferência dos Pix recebidos e repasses aos profissionais
@@ -126,7 +126,7 @@ export default async function AdminFinanceiro() {
             </p>
           </div>
         ) : (
-          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-5 mb-6">
+          <div className="bg-surface border border-gray-100 rounded-2xl shadow-sm p-5 mb-6">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
               Recebendo em
             </p>

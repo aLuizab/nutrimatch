@@ -20,7 +20,7 @@ export default function FeeSimulator({ defaultPrice, feePercent }: { defaultPric
   const netCents = totalCents - feeCents
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
       <h2 className="flex items-center gap-2 text-base font-bold text-gray-900 mb-1">
         <Calculator size={17} className="text-emerald-500" /> Simulador de repasse
       </h2>

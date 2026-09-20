@@ -92,13 +92,13 @@ export default function DemoBusca({
 
           <Link
             href="/resultados"
-            className="inline-flex items-center gap-2 mt-8 bg-white text-gray-900 text-sm font-bold px-5 py-3 rounded-xl hover:bg-gray-100 transition-colors"
+            className="inline-flex items-center gap-2 mt-8 bg-surface text-gray-900 text-sm font-bold px-5 py-3 rounded-xl hover:bg-gray-100 transition-colors"
           >
             Abrir a busca completa
           </Link>
         </div>
 
-        <div className="bg-white rounded-3xl shadow-2xl shadow-black/40 overflow-hidden">
+        <div className="bg-surface rounded-3xl shadow-2xl shadow-black/40 overflow-hidden">
           <div className="p-4 border-b border-gray-100">
             <div className="relative">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -119,7 +119,7 @@ export default function DemoBusca({
                   className={`text-xs font-bold px-3.5 py-2 rounded-full border whitespace-nowrap transition-colors ${
                     filtro === f
                       ? 'bg-emerald-500 text-white border-emerald-500'
-                      : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                      : 'bg-surface text-gray-600 border-gray-200 hover:bg-gray-50'
                   }`}
                 >
                   {f}

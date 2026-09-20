@@ -48,7 +48,7 @@ export default async function PatientDashboard({
 
   return (
     <DashboardShell sidebar={<PatientSidebar name={user.name} primaryRole={user.role} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5 flex justify-between items-center">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Olá, {user.name.split(' ')[0]}! 👋</h1>
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{todayName}</p>
@@ -63,7 +63,7 @@ export default async function PatientDashboard({
             <p className="text-xs font-bold text-emerald-200 uppercase tracking-widest mb-4">Próxima consulta</p>
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-14 h-14 bg-white/20 text-white rounded-full flex items-center justify-center text-lg font-bold">
+                <div className="w-14 h-14 bg-glass/20 text-white rounded-full flex items-center justify-center text-lg font-bold">
                   {initials(nextAppointment.professional.user.name)}
                 </div>
                 <div>
@@ -80,14 +80,14 @@ export default async function PatientDashboard({
                 </div>
               </div>
               <div className="flex gap-2">
-                <Link href="/patient/consultas" className="bg-white text-emerald-600 text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
+                <Link href="/patient/consultas" className="bg-surface text-emerald-600 text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
                   Ver detalhes
                 </Link>
               </div>
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
             <p className="text-sm text-gray-500">Você não tem nenhuma consulta agendada.</p>
             <Link href="/resultados" className="inline-block mt-3 text-emerald-600 text-sm font-medium border border-emerald-200 px-5 py-2.5 rounded-xl hover:bg-emerald-50 transition-colors">
               Buscar nutricionista
@@ -98,7 +98,7 @@ export default async function PatientDashboard({
         <PatientQuickSearch />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-base font-bold text-gray-900">Recomendados para você</h2>
               <Link href="/resultados" className="text-xs text-emerald-600 font-medium hover:underline flex items-center gap-1">
@@ -127,7 +127,7 @@ export default async function PatientDashboard({
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-base font-bold text-gray-900">Histórico recente</h2>
               <Link href="/patient/consultas" className="text-xs text-emerald-600 font-medium hover:underline flex items-center gap-1">

@@ -70,7 +70,7 @@ export default async function DashboardProfissional({
 
   return (
     <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5 flex justify-between items-center">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Olá, {user.name.split(' ')[0]}! 👋</h1>
           <p className="text-sm text-gray-500 mt-0.5 capitalize">{todayName}</p>
@@ -95,7 +95,7 @@ export default async function DashboardProfissional({
       <div className="p-8 space-y-8">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div key={s.label} className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${s.color} mb-3`}>
                 <s.icon size={20} />
               </div>
@@ -112,7 +112,7 @@ export default async function DashboardProfissional({
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <div className="lg:col-span-2 bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
             <div className="flex justify-between items-center mb-5">
               <h2 className="text-base font-bold text-gray-900">Agenda de hoje</h2>
               <Link href="/agenda" className="flex items-center gap-1 text-xs text-emerald-600 font-medium hover:underline">
@@ -129,7 +129,7 @@ export default async function DashboardProfissional({
                     <div
                       key={a.id}
                       className={`flex items-center gap-4 p-4 rounded-xl border ${
-                        displayStatus === 'proximo' ? 'border-emerald-200 bg-emerald-50' : 'border-gray-100 bg-white'
+                        displayStatus === 'proximo' ? 'border-emerald-200 bg-emerald-50' : 'border-gray-100 bg-surface'
                       }`}
                     >
                       <div className="text-center w-12 shrink-0">
@@ -177,7 +177,7 @@ export default async function DashboardProfissional({
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-sm font-bold text-gray-900">Acompanhamentos</h3>
                 <Link href="/programas" className="text-xs text-emerald-600 font-medium hover:underline">Gerenciar</Link>
@@ -200,7 +200,7 @@ export default async function DashboardProfissional({
               )}
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-sm font-bold text-gray-900">Pacientes recentes</h3>
                 <Link href="/pacientes" className="text-xs text-emerald-600 font-medium hover:underline">Ver todos</Link>

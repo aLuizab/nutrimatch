@@ -28,7 +28,7 @@ export default async function AssinaturaPage() {
 
   return (
     <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional!.crn} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Assinatura</h1>
         <p className="text-sm text-gray-500 mt-0.5">Seu plano na plataforma e o que ele libera</p>
       </div>
@@ -36,7 +36,7 @@ export default async function AssinaturaPage() {
       <div className="p-8 max-w-4xl space-y-6">
         {/* Current state, stated plainly — including the uncomfortable part, that today's access
             may be coming from the grace period and not from anything they bought. */}
-        <section className="bg-white border border-gray-100 rounded-2xl p-6">
+        <section className="bg-surface border border-gray-100 rounded-2xl p-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
               <p className="text-xs text-gray-400 uppercase tracking-wide font-medium">Plano atual</p>
@@ -109,7 +109,7 @@ export default async function AssinaturaPage() {
             return (
               <section
                 key={plan.id}
-                className={`bg-white rounded-2xl p-6 border ${
+                className={`bg-surface rounded-2xl p-6 border ${
                   current ? 'border-emerald-200 ring-1 ring-emerald-100' : 'border-gray-100'
                 }`}
               >
@@ -146,7 +146,7 @@ export default async function AssinaturaPage() {
 
         {/* The part a marketplace is usually vague about. Being explicit here is what keeps the
             ranking claim credible everywhere else in the product. */}
-        <section className="bg-white border border-gray-100 rounded-2xl p-6">
+        <section className="bg-surface border border-gray-100 rounded-2xl p-6">
           <h2 className="text-sm font-bold text-gray-900">O que a assinatura não compra</h2>
           <p className="text-sm text-gray-600 mt-2 leading-relaxed">
             Assinar <strong>não melhora sua posição na lista de resultados</strong>. A ordem dos

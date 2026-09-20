@@ -69,7 +69,7 @@ export default function PagamentosTab({
 
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="text-base font-bold text-gray-900 mb-1">Como você recebe</h2>
         <p className="text-sm text-gray-500 mb-5">
           O paciente paga por Pix para a NutriMatch, e nós repassamos para a sua chave já
@@ -121,7 +121,7 @@ export default function PagamentosTab({
                 <select
                   value={pixKeyType}
                   onChange={(e) => setPixKeyType(e.target.value as PixKeyType)}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-white focus:outline-none focus:border-emerald-500"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-surface focus:outline-none focus:border-emerald-500"
                 >
                   {PIX_KEY_TYPES.map((t) => (
                     <option key={t.id} value={t.id}>
@@ -156,7 +156,7 @@ export default function PagamentosTab({
       </div>
 
       {pix.platformEnabled && (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-4 flex items-center gap-2">
             <Wallet size={17} className="text-emerald-500" /> Seus repasses
           </h2>

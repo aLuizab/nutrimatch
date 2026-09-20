@@ -109,7 +109,7 @@ export default async function AuditoriaPage({
 
   return (
     <DashboardShell sidebar={<AdminSidebar name={admin.name} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Auditoria</h1>
         <p className="text-sm text-gray-500 mt-0.5">
           Quem acessou o quê, e quando — registro exigido pelo art. 37 da LGPD
@@ -148,7 +148,7 @@ export default async function AuditoriaPage({
           ))}
         </div>
 
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+        <div className="bg-surface border border-gray-100 rounded-2xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100">
             <p className="text-sm text-gray-500">
               <span className="font-bold text-gray-900">{total}</span> registro{total !== 1 ? 's' : ''}

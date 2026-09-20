@@ -10,7 +10,7 @@ export default function PatientQuickSearch() {
   const [search, setSearch] = useState('')
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
       <h2 className="text-base font-bold text-gray-900 mb-4">Encontrar nutricionista</h2>
       <div className="flex gap-3">
         <div className="relative flex-1">

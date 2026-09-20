@@ -73,7 +73,7 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
 
   return (
     <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <Link href="/pacientes" className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-3 transition-colors">
           <ArrowLeft size={15} /> Voltar aos pacientes
         </Link>
@@ -93,7 +93,7 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
 
       <div className="p-8 space-y-6">
         {program && (
-          <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-emerald-100 shadow-sm p-5">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-xs font-bold text-emerald-700 uppercase tracking-widest">Em acompanhamento</p>
@@ -119,19 +119,19 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
         )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500">Peso atual</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
               {currentWeight !== null ? `${currentWeight.toFixed(1)} kg` : '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500">Variação total</p>
             <p className={`text-2xl font-bold mt-1 ${totalDelta !== null && totalDelta < 0 ? 'text-emerald-600' : 'text-gray-900'}`}>
               {totalDelta !== null ? `${totalDelta > 0 ? '+' : ''}${totalDelta.toFixed(1)} kg` : '—'}
             </p>
           </div>
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <p className="text-sm text-gray-500 flex items-center gap-1.5">
               <Target size={13} className="text-emerald-500" /> Meta do paciente
             </p>
@@ -141,7 +141,7 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-1">Evolução do peso</h2>
           <p className="text-xs text-gray-500 mb-4">Medidas registradas pelo paciente</p>
           {chartPoints.length === 0 ? (
@@ -153,7 +153,7 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
           )}
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-5">Histórico de consultas</h2>
           <div className="space-y-3">
             {patient.appointments.map((a) => (

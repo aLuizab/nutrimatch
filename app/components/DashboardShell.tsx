@@ -26,7 +26,7 @@ export default function DashboardShell({ sidebar, children }: { sidebar: ReactNo
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
-      <div className="md:hidden sticky top-0 z-30 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
+      <div className="md:hidden sticky top-0 z-30 bg-surface border-b border-gray-100 px-4 py-3 flex items-center justify-between">
         <Link href="/" className="text-lg font-bold text-gray-900">
           Nutri<span className="text-emerald-500">Match</span>
         </Link>
@@ -47,13 +47,13 @@ export default function DashboardShell({ sidebar, children }: { sidebar: ReactNo
         <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu de navegação">
           <div className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
           {/* Any click inside (including nav links) closes the drawer. */}
-          <div className="absolute inset-y-0 left-0 w-64 bg-white shadow-xl overflow-y-auto" onClick={() => setOpen(false)}>
+          <div className="absolute inset-y-0 left-0 w-64 bg-surface shadow-xl overflow-y-auto" onClick={() => setOpen(false)}>
             {sidebar}
           </div>
           <button
             onClick={() => setOpen(false)}
             aria-label="Fechar menu"
-            className="absolute top-3 left-[17rem] p-2 bg-white rounded-full shadow"
+            className="absolute top-3 left-[17rem] p-2 bg-surface rounded-full shadow"
           >
             <X size={18} className="text-gray-700" />
           </button>

@@ -26,7 +26,7 @@ export default function PoliticaDeCancelamento() {
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 text-sm text-gray-600 leading-relaxed">
+        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 space-y-6 text-sm text-gray-600 leading-relaxed">
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
               <QrCode size={17} className="text-emerald-500" /> Como o pagamento funciona

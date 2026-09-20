@@ -59,7 +59,7 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
 
   return (
     <form onSubmit={handleSave} className="space-y-6 max-w-2xl">
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
         <h2 className="text-base font-bold text-gray-900 mb-5">Informações pessoais</h2>
 
         <div className="flex items-center gap-5 mb-6">
@@ -93,7 +93,7 @@ export default function PatientPerfilForm({ initialProfile }: { initialProfile: 
           </div>
           <div>
             <label className="text-xs font-bold text-gray-700 block mb-1.5">Objetivo principal</label>
-            <select value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-white">
+            <select value={goal} onChange={(e) => setGoal(e.target.value)} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 bg-surface">
               {GOALS.map((g) => (
                 <option key={g}>{g}</option>
               ))}

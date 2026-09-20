@@ -28,13 +28,13 @@ export default async function PatientPerfil() {
 
   return (
     <DashboardShell sidebar={<PatientSidebar name={user.name} primaryRole={user.role} />}>
-      <div className="bg-white border-b border-gray-100 px-8 py-5">
+      <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Meu Perfil</h1>
         <p className="text-sm text-gray-500 mt-0.5">Gerencie suas informações pessoais</p>
       </div>
 
       <div className="p-8 space-y-6">
-        <div className="max-w-2xl bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <div className="max-w-2xl bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-5">Foto de perfil</h2>
           <PhotoUpload
             name={user.name}
@@ -46,7 +46,7 @@ export default async function PatientPerfil() {
         {reliability.rate !== null && (
           <div
             className={`max-w-2xl rounded-2xl border p-5 ${
-              notice ? 'bg-amber-50 border-amber-200' : 'bg-white border-gray-100 shadow-sm'
+              notice ? 'bg-amber-50 border-amber-200' : 'bg-surface border-gray-100 shadow-sm'
             }`}
           >
             <div className="flex items-start gap-3">

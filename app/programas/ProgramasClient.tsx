@@ -112,7 +112,7 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
   const monthly = form.consultations && form.durationMonths ? Number(form.consultations) / Number(form.durationMonths) : 0
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
       <div className="flex items-center justify-between mb-5">
         <div>
           <h2 className="text-base font-bold text-gray-900">Meus programas</h2>
@@ -136,7 +136,7 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Ex: Acompanhamento 3 meses"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
             />
           </div>
           <div>
@@ -146,7 +146,7 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={2}
               placeholder="O que está incluído e para quem é indicado"
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500 resize-none"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500 resize-none"
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -177,7 +177,7 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
                   max={24}
                   value={form.durationMonths}
                   onChange={(e) => setForm({ ...form, durationMonths: e.target.value })}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500 mt-1.5"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500 mt-1.5"
                 />
               )}
             </div>
@@ -189,7 +189,7 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
                 max={52}
                 value={form.consultations}
                 onChange={(e) => setForm({ ...form, consultations: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
               />
             </div>
             <div>
@@ -200,7 +200,7 @@ export default function ProgramasClient({ plans, listPrice }: { plans: PlanRow[]
                 value={form.pricePerConsultation}
                 onChange={(e) => setForm({ ...form, pricePerConsultation: e.target.value })}
                 placeholder={String(Math.round(listPrice * 0.8))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-emerald-500"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm bg-surface focus:outline-none focus:border-emerald-500"
               />
             </div>
           </div>

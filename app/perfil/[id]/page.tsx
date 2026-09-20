@@ -69,7 +69,7 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Coluna principal */}
           <div className="flex-1 space-y-6">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="h-32 bg-gradient-to-r from-emerald-400 to-emerald-600" />
               <div className="px-8 pb-8">
                 <div className="flex items-end justify-between -mt-10 mb-6">
@@ -78,9 +78,9 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                       name={name}
                       photoUrl={professional.user.photoUrl}
                       size={80}
-                      className="border-4 border-white shadow-md"
+                      className="border-4 border-glass shadow-md"
                     />
-                    <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow">
+                    <div className="absolute -bottom-1 -right-1 bg-surface rounded-full p-0.5 shadow">
                       <CheckCircle2 size={18} className="text-emerald-500 fill-emerald-50" />
                     </div>
                   </div>
@@ -125,7 +125,7 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
             {/* Reputação pública. O paciente vê o nível, o que ele significa e em que ele se
                 baseia — um selo sem explicação é só um adesivo bonito, e num serviço de saúde
                 quem vai escolher merece saber o que está sendo medido. */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
               <h2 className="text-base font-bold text-gray-900 mb-3">Reputação na plataforma</h2>
               {professional.tier === 'NOVO' ? (
                 <p className="text-sm text-gray-600 leading-relaxed">
@@ -172,14 +172,14 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
             </div>
 
             {professional.bio && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
                 <h2 className="text-base font-bold text-gray-900 mb-3">Sobre a profissional</h2>
                 <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-line">{professional.bio}</p>
               </div>
             )}
 
             {professional.carePlans.length > 0 && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
                 <h2 className="text-base font-bold text-gray-900 mb-1">Programas de acompanhamento</h2>
                 <p className="text-sm text-gray-500 mb-5">
                   Consultas com valor menor que o avulso e acompanhamento da sua evolução entre elas.
@@ -235,7 +235,7 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
               </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-base font-bold text-gray-900">Avaliações dos pacientes</h2>
                 {professional.reviewCount > 0 && (
@@ -276,7 +276,7 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
 
           {/* Sidebar de agendamento */}
           <div className="w-full lg:w-80 shrink-0">
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24 space-y-5">
+            <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 sticky top-24 space-y-5">
               <div className="text-center">
                 <p className="text-3xl font-bold text-gray-900">{formatPrice(professional.price)}</p>
                 <p className="text-sm text-gray-500 mt-0.5">/consulta individual</p>

@@ -127,7 +127,7 @@ export default function EnrollButton({
       <div className="flex gap-2 mt-3">
         <button
           onClick={() => setConfirming(false)}
-          className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg hover:bg-white transition-colors"
+          className="text-sm font-medium text-gray-600 px-4 py-2 rounded-lg hover:bg-surface transition-colors"
         >
           Voltar
         </button>

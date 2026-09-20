@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { SCRIPT_ANTI_PISCADA } from './components/SeletorDeTema'
 
 /**
  * Inter servida pelo próprio domínio.
@@ -25,7 +26,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={inter.variable}>
+    // suppressHydrationWarning porque o script abaixo escreve data-theme no <html> antes do
+    // React assumir. Sem isto o React reclama de um atributo que ele não colocou — e que é
+    // exatamente o que precisa estar lá antes da primeira pintura.
+    <html lang="pt-BR" className={inter.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SCRIPT_ANTI_PISCADA }} />
+      </head>
       <body className="antialiased bg-gray-50 text-gray-900 font-sans">{children}</body>
     </html>
   )

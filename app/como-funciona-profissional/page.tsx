@@ -22,7 +22,7 @@ export default function ComoFuncionaProfissional() {
           busca decide quem aparece primeiro.
         </p>
 
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <section className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-4">O ciclo de uma consulta</h2>
           <ol className="space-y-4">
             {[
@@ -41,7 +41,7 @@ export default function ComoFuncionaProfissional() {
           </ol>
         </section>
 
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <section className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
             <Repeat size={18} className="text-emerald-500" /> Programas de acompanhamento
           </h2>
@@ -56,7 +56,7 @@ export default function ComoFuncionaProfissional() {
           </p>
         </section>
 
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+        <section className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
             <Percent size={18} className="text-emerald-500" /> Para que serve a taxa de {feePercent}%
           </h2>
@@ -77,7 +77,7 @@ export default function ComoFuncionaProfissional() {
           </p>
         </section>
 
-        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+        <section className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
             <Star size={18} className="text-emerald-500" /> Como funciona o ranking de busca
           </h2>
@@ -136,7 +136,7 @@ export default function ComoFuncionaProfissional() {
           </div>
         </section>
 
-        <section id="reputacao" className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mt-6 scroll-mt-6">
+        <section id="reputacao" className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 mt-6 scroll-mt-6">
           <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
             <Award size={18} className="text-emerald-500" /> Níveis de reputação
           </h2>

@@ -42,7 +42,7 @@ export default function EsqueciSenha() {
         </Link>
 
         {sent ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-8 text-center">
             <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <MailCheck className="text-emerald-500" size={26} />
             </div>
@@ -53,7 +53,7 @@ export default function EsqueciSenha() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Esqueceu a senha?</h1>
             <p className="text-gray-500 text-sm mb-6">
               Informe seu e-mail e enviaremos um link para criar uma nova.
@@ -72,7 +72,7 @@ export default function EsqueciSenha() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="seu@email.com"
                   required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-white"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 bg-surface"
                 />
               </div>
               <button
