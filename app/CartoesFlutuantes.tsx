@@ -1,4 +1,4 @@
-import { MapPin, Star, Video } from 'lucide-react'
+import { MapPin, Star, UserRound, Video } from 'lucide-react'
 import type { DemoProfissional } from './DemoBusca'
 
 /**
@@ -10,6 +10,17 @@ import type { DemoProfissional } from './DemoBusca'
  * `pointer-events-none` no contêiner e `aria-hidden` porque isto é enfeite — um leitor de tela
  * anunciando três perfis decorativos antes do título atrapalha, e um cartão sob o cursor
  * roubando o clique do botão de busca atrapalha ainda mais.
+ *
+ * ── Sem nome, e sem iniciais ──────────────────────────────────────────────────────────────
+ * Estes cartões vêm de `prisma.professional.findMany`: são pessoas reais, não exemplos. Usar o
+ * nome de alguém como enfeite do topo é exposição sem nenhum fluxo de consentimento por trás,
+ * e num marketplace de saúde isso pesa mais do que em outro lugar.
+ *
+ * As iniciais saíram junto pelo mesmo motivo: "AF" ao lado de "Nutrição Esportiva" e "Itajubá"
+ * identifica tão bem quanto o nome inteiro numa cidade pequena. O que sobra é o que o cartão
+ * realmente precisa dizer — que existe gente atendendo naquela especialidade, perto ou online.
+ *
+ * A cor do avatar continua vindo do profissional, para os três cartões não ficarem iguais.
  */
 const POSICOES = [
   'top-[14%] left-[2%]',
@@ -36,18 +47,22 @@ export default function CartoesFlutuantes({ profissionais }: { profissionais: De
           className={`flutuar absolute ${POSICOES[i]} bg-surface border border-gray-100 rounded-2xl shadow-lg shadow-black/10 px-4 py-3 flex items-center gap-3 w-64`}
         >
           <div
-            className={`w-10 h-10 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0 ${p.cor}`}
+            className={`w-10 h-10 rounded-full text-white flex items-center justify-center shrink-0 ${p.cor}`}
           >
-            {p.iniciais}
+            <UserRound size={18} />
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{p.nome}</p>
-            <p className="text-[11px] text-gray-500 truncate">{p.especialidade}</p>
+            {/* A especialidade vira a primeira linha: sem o nome, é ela que o cartão tem a
+                dizer — e é o que a pessoa está procurando de verdade. */}
+            <p className="text-sm font-bold text-gray-900 truncate">{p.especialidade}</p>
             <div className="flex items-center gap-1 mt-0.5">
               {p.reviewCount > 0 ? (
                 <>
                   <Star size={10} className="text-yellow-400 fill-yellow-400" />
                   <span className="text-[10px] font-bold text-gray-700">{p.rating.toFixed(1)}</span>
+                  <span className="text-[10px] text-gray-500">
+                    · {p.reviewCount} {p.reviewCount === 1 ? 'avaliação' : 'avaliações'}
+                  </span>
                 </>
               ) : (
                 <span className="text-[10px] text-gray-400">
