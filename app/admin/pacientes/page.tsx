@@ -3,24 +3,38 @@ import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { formatDateBR, initials } from '@/lib/format'
 import DashboardShell from '../../components/DashboardShell'
+import {
+  WELCOME_DISCOUNT_PERCENT,
+  WELCOME_DISCOUNT_SLOTS,
+  welcomeDiscountCode,
+} from '@/lib/welcome-discount'
 
 export default async function AdminPacientes() {
   const admin = await requireRoleOrRedirect('ADMIN')
 
-  const patients = await prisma.patient.findMany({
-    include: {
-      user: { select: { name: true, email: true } },
-      appointments: { orderBy: { scheduledAt: 'desc' }, take: 1 },
-      _count: { select: { appointments: true } },
-    },
-    orderBy: { createdAt: 'desc' },
-  })
+  const [patients, cuponsEntregues] = await Promise.all([
+    prisma.patient.findMany({
+      include: {
+        user: { select: { name: true, email: true } },
+        appointments: { orderBy: { scheduledAt: 'desc' }, take: 1 },
+        _count: { select: { appointments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.patient.count({ where: { welcomeDiscountSeq: { not: null } } }),
+  ])
+
+  const vagasRestantes = Math.max(0, WELCOME_DISCOUNT_SLOTS - cuponsEntregues)
 
   return (
     <DashboardShell sidebar={<AdminSidebar name={admin.name} />}>
       <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Pacientes</h1>
-        <p className="text-sm text-gray-500 mt-0.5">{patients.length} pacientes cadastrados</p>
+        <p className="text-sm text-gray-500 mt-0.5">
+          {patients.length} pacientes cadastrados · {cuponsEntregues} de {WELCOME_DISCOUNT_SLOTS} cupons de{' '}
+          {WELCOME_DISCOUNT_PERCENT}% entregues
+          {vagasRestantes === 0 ? ' (campanha encerrada)' : ` (${vagasRestantes} vagas restantes)`}
+        </p>
       </div>
 
       <div className="p-8">
@@ -32,6 +46,9 @@ export default async function AdminPacientes() {
                 <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden md:table-cell">E-mail</th>
                 <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden sm:table-cell">Cidade</th>
                 <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">Consultas</th>
+                <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  Cupom {WELCOME_DISCOUNT_PERCENT}%
+                </th>
                 <th className="text-left py-3.5 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Última consulta</th>
               </tr>
             </thead>
@@ -49,6 +66,22 @@ export default async function AdminPacientes() {
                   <td className="py-4 px-4 text-sm text-gray-600 hidden md:table-cell">{p.user.email}</td>
                   <td className="py-4 px-4 text-sm text-gray-600 hidden sm:table-cell">{p.city || '—'}</td>
                   <td className="py-4 px-4 text-sm text-gray-700">{p._count.appointments}</td>
+                  <td className="py-4 px-4">
+                    {p.welcomeDiscountSeq === null ? (
+                      <span className="text-sm text-gray-400">—</span>
+                    ) : (
+                      <span
+                        title={
+                          p.welcomeDiscountAt
+                            ? `Cupom de ${WELCOME_DISCOUNT_PERCENT}% concedido em ${formatDateBR(p.welcomeDiscountAt)}`
+                            : undefined
+                        }
+                        className="inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 whitespace-nowrap"
+                      >
+                        {welcomeDiscountCode(p.welcomeDiscountSeq)}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-4 px-4 text-sm text-gray-600 hidden lg:table-cell">
                     {p.appointments[0] ? formatDateBR(p.appointments[0].scheduledAt) : '—'}
                   </td>

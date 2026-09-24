@@ -426,12 +426,43 @@ export function appointmentExpiredPatient(d: AppointmentEmailData) {
 
 // ── Conta ───────────────────────────────────────────────────────────────────
 
-export function welcomePatient(d: { name: string; searchUrl: string }) {
+/**
+ * Bloco do cupom de lançamento. Fica dentro do e-mail de boas-vindas em vez de virar uma segunda
+ * mensagem: duas chegando no mesmo minuto do cadastro competem entre si e a segunda é a que
+ * costuma ir para promoções. Aqui ele é a primeira coisa depois da saudação.
+ */
+function blocoCupom(d: { code: string; percent: number }) {
+  return `<div style="border: 1px solid #a7f3d0; background: #ecfdf5; border-radius: 12px; padding: 16px; margin: 16px 0;">
+       <p style="margin: 0 0 6px; font-size: 13px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.04em;">
+         ${d.percent}% de desconto na consulta
+       </p>
+       <p style="margin: 0 0 10px; font-size: 14px; color: #374151; line-height: 1.6;">
+         Você entrou entre as primeiras pessoas cadastradas e ganhou <strong>${d.percent}% de desconto
+         na sua consulta</strong>. Seu código:
+       </p>
+       <p style="margin: 0 0 10px; font-size: 20px; font-weight: 700; color: #065f46; letter-spacing: 0.06em;">
+         ${d.code}
+       </p>
+       <p style="margin: 0; font-size: 13px; color: #6b7280; line-height: 1.6;">
+         Agende normalmente e informe este código na hora de combinar o pagamento — o desconto já
+         está registrado na sua conta.
+       </p>
+     </div>`
+}
+
+export function welcomePatient(d: {
+  name: string
+  searchUrl: string
+  discount?: { code: string; percent: number }
+}) {
   return {
-    subject: 'Bem-vinda ao NutriMatch! 🥗',
+    subject: d.discount
+      ? `Bem-vinda ao NutriMatch — e ${d.discount.percent}% de desconto na sua consulta 🥗`
+      : 'Bem-vinda ao NutriMatch! 🥗',
     html: wrap(
-      'Sua conta está pronta',
+      d.discount ? 'Sua conta está pronta — e tem desconto' : 'Sua conta está pronta',
       `<p>Olá, ${d.name}!</p>
+       ${d.discount ? blocoCupom(d.discount) : ''}
        <p>Sua conta foi criada. A partir de agora você pode comparar nutricionistas por preço,
           avaliação e disponibilidade, e agendar online ou presencial.</p>
        <p><a href="${d.searchUrl}" style="color: #10b981; font-weight: 600;">Encontrar um nutricionista</a></p>

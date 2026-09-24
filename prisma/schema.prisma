@@ -214,6 +214,17 @@ model Patient {
   targetWeightKg Float?
   createdAt      DateTime  @default(now())
 
+  // ── Campanha de boas-vindas: 10% na consulta para os primeiros inscritos ─────────────
+  // Posição na campanha (1..WELCOME_DISCOUNT_SLOTS), atribuída no cadastro e nunca reusada.
+  // Null para quem chegou depois das vagas acabarem — esta coluna é, ela mesma, a flag que o
+  // painel mostra. Número em vez de boolean porque é o que vira o código do cupom (NUTRI10-042):
+  // a paciente cita o código, o admin acha a linha. Um boolean identificaria só "tem desconto".
+  //
+  // Único de propósito: com cadastros simultâneos duas transações leem o mesmo máximo, e é este
+  // índice que impede as duas de saírem com o cupom 042. Ver lib/welcome-discount.ts.
+  welcomeDiscountSeq Int?      @unique
+  welcomeDiscountAt  DateTime?
+
   appointments    Appointment[]
   reviews         Review[]
   enrollments     Enrollment[]
