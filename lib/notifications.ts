@@ -296,6 +296,8 @@ export function notifyWelcome(args: {
   email: string
   role: 'PATIENT' | 'PROFESSIONAL' | 'ADMIN'
   monthlyLabel?: string
+  // Cupom da campanha de lançamento, quando ainda havia vaga. Ver lib/welcome-discount.ts.
+  discount?: { code: string; percent: number }
 }) {
   if (args.role === 'ADMIN') return
   const base = appUrl()
@@ -312,7 +314,12 @@ export function notifyWelcome(args: {
     )
     return
   }
-  fire(sendEmail({ to: args.email, ...welcomePatient({ name: args.name, searchUrl: `${base}/resultados` }) }))
+  fire(
+    sendEmail({
+      to: args.email,
+      ...welcomePatient({ name: args.name, searchUrl: `${base}/resultados`, discount: args.discount }),
+    })
+  )
 }
 
 /**

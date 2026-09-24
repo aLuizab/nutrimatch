@@ -9,6 +9,7 @@ import { LIMITS, clientIp, rateLimit, tooManyRequests } from '@/lib/rate-limit'
 import { notifyWelcome } from '@/lib/notifications'
 import { formatCents } from '@/lib/money'
 import { PRO_PLAN_SLUG } from '@/lib/subscription'
+import { WELCOME_DISCOUNT_PERCENT, claimWelcomeDiscount, welcomeDiscountCode } from '@/lib/welcome-discount'
 import { configFailure, unexpectedFailure } from '@/lib/api-failures'
 
 const baseFields = {
@@ -100,6 +101,9 @@ export async function POST(request: Request) {
     const passwordHash = await hashPassword(data.password)
 
     const user = await prisma.user.create({
+      // O id do paciente volta junto porque a vaga da campanha de boas-vindas é reservada logo
+      // abaixo, e buscá-lo de novo seria uma consulta a mais pelo que acabamos de escrever.
+      include: { patient: { select: { id: true } } },
       data: {
         name: data.name,
         email: data.email,
@@ -135,15 +139,29 @@ export async function POST(request: Request) {
       },
     })
 
+    // Campanha de lançamento: as primeiras pacientes ganham desconto na consulta. Reservado
+    // depois do commit, e só para paciente — nutricionista não compra consulta. Se não houver
+    // mais vaga (ou a reserva falhar), o cadastro segue igual, só sem o bloco do cupom no e-mail.
+    let discount: { code: string; percent: number } | undefined
+    if (user.patient) {
+      const seq = await claimWelcomeDiscount(user.patient.id).catch((e) => {
+        console.error('[welcome-discount]', e)
+        return null
+      })
+      if (seq !== null) discount = { code: welcomeDiscountCode(seq), percent: WELCOME_DISCOUNT_PERCENT }
+    }
+
     // Depois do commit e sem await: e-mail lento não pode atrasar o cadastro de ninguém.
     // O valor da mensalidade sai do plano no banco, não de um número escrito aqui, senão o
     // e-mail passa a mentir no dia em que o preço mudar.
-    const plano = await prisma.subscriptionPlan.findUnique({ where: { slug: PRO_PLAN_SLUG } })
+    const plano =
+      data.role === 'PROFESSIONAL' ? await prisma.subscriptionPlan.findUnique({ where: { slug: PRO_PLAN_SLUG } }) : null
     notifyWelcome({
       name: user.name,
       email: user.email,
       role: user.role,
       monthlyLabel: plano ? `${formatCents(plano.monthlyPrice)}/mês` : undefined,
+      discount,
     })
 
     const token = await signSessionToken({ userId: user.id, role: user.role })
