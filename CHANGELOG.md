@@ -17,6 +17,12 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Adicionado
 
+- Campanha de lançamento: as **200 primeiras pacientes** a se cadastrar ganham
+  10% de desconto na consulta. O cupom (`NUTRI10-042`) vai no e-mail de
+  boas-vindas e fica visível em `/admin/pacientes`, com o contador de vagas no
+  topo da tela. O desconto não é abatido sozinho no preço — quem aplica é quem
+  cobra, porque os links de pagamento têm valor fixo e continuariam cobrando
+  cheio. Nutricionista não entra na conta: não compra consulta.
 - Contador de 30 minutos na tela de pagamento da consulta, dizendo em letras que
   passando do prazo o agendamento é cancelado e o horário volta para outros
   pacientes. Fica vermelho nos últimos cinco minutos.
