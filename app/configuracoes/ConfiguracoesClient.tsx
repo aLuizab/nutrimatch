@@ -6,6 +6,7 @@ import { User, Lock, Bell, CreditCard, Calendar, CheckCircle, Plus, X } from 'lu
 import { SPECIALTY_NAMES } from '@/lib/specialties'
 import PagamentosTab, { type PixStatus } from './PagamentosTab'
 import SegurancaTab from './SegurancaTab'
+import DisponibilidadePorData, { type ExcecaoDeData } from './DisponibilidadePorData'
 import LocationPicker from '../components/LocationPicker'
 import PricingGuide from '../components/PricingGuide'
 import PhotoUpload from '../components/PhotoUpload'
@@ -49,6 +50,8 @@ export default function ConfiguracoesClient({
   initialProfile,
   photoUploadsEnabled,
   initialAvailability,
+  excecoesDeData,
+  janelaDeAgenda,
   initialPrefs,
   pix,
   feePercent,
@@ -56,6 +59,9 @@ export default function ConfiguracoesClient({
   initialProfile: ProfileData
   photoUploadsEnabled: boolean
   initialAvailability: AvailabilityData
+  excecoesDeData: ExcecaoDeData[]
+  /** Primeiro e último dia em que marcar consulta faz sentido — ver BOOKING_HORIZON_DAYS. */
+  janelaDeAgenda: { primeiroDia: string; ultimoDia: string }
   initialPrefs: NotificationPrefs
   pix: PixStatus
   feePercent: number
@@ -445,6 +451,18 @@ export default function ConfiguracoesClient({
             </button>
           </div>
         </form>
+      )}
+
+      {/* Fora do <form> acima de propósito: as exceções salvam uma data por vez, e um submit da
+          grade semanal não pode arrastá-las junto. */}
+      {activeTab === 'disponibilidade' && (
+        <div className="mt-6">
+          <DisponibilidadePorData
+            primeiroDia={janelaDeAgenda.primeiroDia}
+            ultimoDia={janelaDeAgenda.ultimoDia}
+            excecoes={excecoesDeData}
+          />
+        </div>
       )}
 
       {activeTab === 'seguranca' && <SegurancaTab />}

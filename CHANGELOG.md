@@ -39,6 +39,17 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Adicionado
 
+- **Disponibilidade por data, além da grade da semana.** O nutricionista fecha um
+  dia (feriado, viagem) ou dá a ele um horário próprio, num calendário em
+  `/configuracoes` → Disponibilidade. Uma exceção de data vence a grade semanal:
+  fechado zera o dia, e horário especial substitui o da semana em vez de somar.
+- **A agenda abre para 3 meses**, não mais 21 dias — retorno mensal é o caso mais
+  comum de um acompanhamento e simplesmente não cabia na janela anterior. O
+  paciente escolhe o dia num calendário mensal, com as vagas de cada dia à vista.
+- Visão de **mês** na agenda do nutricionista, ao lado da de semana, com a
+  contagem de consultas por dia. Clicar num dia abre a semana dele — achar uma
+  consulta marcada para dentro de dois meses deixou de exigir nove cliques em
+  "próxima semana".
 - Repasse em três etapas — **a repassar**, **em processamento** e **repassado** —
   com listagem em `/repasses` para o nutricionista e em `/admin/financeiro` para a
   administração. O nutricionista vê a receita por consulta, já líquida.

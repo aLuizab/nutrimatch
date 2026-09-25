@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Video, MapPin, FileText, Clock, UserCheck } from 'lucide-react'
 import { addDaysToDateString, mondayOfWeek, spDateString, spHour } from '@/lib/spdate'
+import CalendarioMeses from '../components/CalendarioMeses'
 import { initials, avatarColor, formatDateBR, formatTimeBR } from '@/lib/format'
 import { OPEN_BEFORE_MINUTES } from '@/lib/meeting'
 import type { AttendanceStatus, Modality } from '@prisma/client'
@@ -196,10 +197,23 @@ function SummaryEditor({ appointment, onSaved }: { appointment: AgendaAppointmen
   )
 }
 
+/** Quantas semanas separam duas datas, contadas pelas segundas-feiras de cada uma. */
+function semanasEntre(deStr: string, paraStr: string) {
+  const segunda = (d: string) => {
+    const [y, m, dd] = mondayOfWeek(d).split('-').map(Number)
+    return Date.UTC(y, m - 1, dd)
+  }
+  return Math.round((segunda(paraStr) - segunda(deStr)) / (7 * 86400_000))
+}
+
 export default function AgendaGrid({ appointments }: { appointments: AgendaAppointment[] }) {
   const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Duas leituras da mesma agenda. A semana mostra horário por horário, que é o que serve para
+  // trabalhar; o mês mostra só quantas consultas tem em cada dia, que é o que serve para achar
+  // uma consulta marcada para dentro de dois meses sem clicar em "próxima semana" nove vezes.
+  const [modo, setModo] = useState<'semana' | 'mes'>('semana')
 
   const todayStr = useMemo(() => spDateString(new Date()), [])
   const mondayStr = mondayOfWeek(todayStr, weekOffset)
@@ -234,15 +248,59 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
 
   const selected = appointments.find((a) => a.id === selectedId) ?? null
 
+  // Contagem por dia, para a visão de mês. Só dias com consulta ganham marca — o calendário
+  // trata dia sem marca como não clicável, e aqui não há o que abrir num dia vazio.
+  const marcasDoMes = useMemo(() => {
+    const porDia = new Map<string, number>()
+    for (const a of appointments) {
+      const dia = spDateString(a.scheduledAt)
+      porDia.set(dia, (porDia.get(dia) ?? 0) + 1)
+    }
+    const marcas: Record<string, { tone: string; nota?: string; title?: string }> = {}
+    for (const [dia, n] of porDia) {
+      marcas[dia] = {
+        tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        nota: String(n),
+        title: `${n} ${n === 1 ? 'consulta' : 'consultas'}`,
+      }
+    }
+    return marcas
+  }, [appointments])
+
+  // A janela do calendário acompanha o que existe de verdade na agenda, para trás e para frente,
+  // com uma folga de um mês de cada lado. Fixar três meses à frente esconderia uma consulta
+  // marcada para além disso, e é justamente ela que ninguém quer perder de vista.
+  const janelaDoMes = useMemo(() => {
+    const dias = appointments.map((a) => spDateString(a.scheduledAt))
+    const menor = dias.reduce((acc, d) => (d < acc ? d : acc), todayStr)
+    const maior = dias.reduce((acc, d) => (d > acc ? d : acc), todayStr)
+    return { primeiroDia: addDaysToDateString(menor, -31), ultimoDia: addDaysToDateString(maior, 31) }
+  }, [appointments, todayStr])
+
   return (
     <>
       <div className="bg-surface border-b border-gray-100 px-8 py-5 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie suas consultas semanais</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {modo === 'semana' ? 'Suas consultas, horário por horário' : 'Visão do mês — clique num dia para abrir a semana dele'}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            {(['semana', 'mes'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setModo(m)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  modo === m ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {m === 'semana' ? 'Semana' : 'Mês'}
+              </button>
+            ))}
+          </div>
+          <div className={`flex items-center gap-1 bg-gray-100 rounded-xl p-1 ${modo === 'mes' ? 'hidden' : ''}`}>
             <button onClick={() => setWeekOffset(weekOffset - 1)} aria-label="Semana anterior" className="p-2 rounded-lg hover:bg-surface transition-colors">
               <ChevronLeft size={18} className="text-gray-600" />
             </button>
@@ -255,7 +313,9 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
           </div>
           <button
             onClick={() => setWeekOffset(0)}
-            className="px-4 py-2 text-sm font-medium text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors"
+            className={`px-4 py-2 text-sm font-medium text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors ${
+              modo === 'mes' ? 'hidden' : ''
+            }`}
           >
             Hoje
           </button>
@@ -268,7 +328,26 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
           <div className="flex items-center gap-1.5"><MapPin size={12} className="text-emerald-500" /> Presencial</div>
         </div>
 
-        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {modo === 'mes' && (
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 max-w-lg">
+            <CalendarioMeses
+              primeiroDia={janelaDoMes.primeiroDia}
+              ultimoDia={janelaDoMes.ultimoDia}
+              marcas={marcasDoMes}
+              selecionado={null}
+              onSelecionar={(dateStr) => {
+                setWeekOffset(semanasEntre(todayStr, dateStr))
+                setSelectedId(null)
+                setModo('semana')
+              }}
+            />
+            <p className="text-xs text-gray-400 mt-4">
+              O número em cada dia é quantas consultas você tem nele.
+            </p>
+          </div>
+        )}
+
+        <div className={`bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${modo === 'mes' ? 'hidden' : ''}`}>
           <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: '64px repeat(5, 1fr)' }}>
             <div className="border-r border-gray-100" />
             {weekDates.map((dateStr, i) => (
