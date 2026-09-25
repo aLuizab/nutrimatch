@@ -48,7 +48,6 @@ export interface ProfileData {
 
 export default function ConfiguracoesClient({
   initialProfile,
-  photoUploadsEnabled,
   initialAvailability,
   excecoesDeData,
   janelaDeAgenda,
@@ -57,7 +56,6 @@ export default function ConfiguracoesClient({
   feePercent,
 }: {
   initialProfile: ProfileData
-  photoUploadsEnabled: boolean
   initialAvailability: AvailabilityData
   excecoesDeData: ExcecaoDeData[]
   /** Primeiro e último dia em que marcar consulta faz sentido — ver BOOKING_HORIZON_DAYS. */
@@ -267,7 +265,6 @@ export default function ConfiguracoesClient({
               <PhotoUpload
                 name={initialProfile.name}
                 photoUrl={initialProfile.photoUrl}
-                enabled={photoUploadsEnabled}
               />
             </div>
 

@@ -1,4 +1,4 @@
-import { avatarUrl } from '@/lib/cloudinary'
+import { avatarUrl } from '@/lib/avatar'
 import { avatarColor, initials } from '@/lib/format'
 
 /**
@@ -25,8 +25,8 @@ export default function Avatar({
 
   if (src) {
     return (
-      /* Cloudinary já entrega no tamanho e formato certos pela própria URL; next/image só
-         acrescentaria uma segunda camada de resize sobre uma imagem que já chegou pronta. */
+      /* A imagem já foi reduzida antes de subir (ver PhotoUpload), então chega no tamanho de
+         exibição; next/image só acrescentaria uma segunda camada de resize sobre ela. */
       // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}

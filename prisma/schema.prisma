@@ -123,10 +123,22 @@ model User {
   // não solicitada se não houver como sair.
   notifyNews         Boolean @default(true)
 
-  // Foto de perfil hospedada no Cloudinary. Guardamos a URL servida e o publicId, que é o
-  // que permite apagar a imagem antiga ao trocar — sem ele cada troca deixa um arquivo órfão
-  // consumindo a cota para sempre.
+  // ── Foto de perfil ───────────────────────────────────────────────────────────────────
+  // A imagem fica no próprio banco, em StoredFile. Antes ia para o Cloudinary, e o resultado
+  // prático era que ninguém tinha foto: as três credenciais nunca foram configuradas, a rota
+  // devolvia 503 e o botão ficava desabilitado dizendo "não configurado neste servidor". Trocar
+  // um serviço externo por uma tabela resolveu o problema de verdade — que era a configuração
+  // que não existia, não o código de upload.
+  //
+  // photoUrl guarda o caminho servido (/api/foto/<id>), que é o que toda tela quer; avatarFileId
+  // guarda o arquivo, que é o que permite apagar o anterior ao trocar. A imagem é reduzida no
+  // navegador antes de subir (ver PhotoUpload), então o que chega aqui já é pequeno.
   photoUrl      String?
+  avatarFileId  String?     @unique
+  avatarFile    StoredFile? @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  // Legado do Cloudinary. Nada escreve mais aqui; continua declarado porque derrubar coluna é
+  // mudança de contração, e porque é o único vestígio de onde as fotos antigas foram guardadas,
+  // se alguma chegou a existir.
   photoPublicId String?
 
   professional Professional?
@@ -241,6 +253,7 @@ model Patient {
   enrollments     Enrollment[]
   progressEntries ProgressEntry[]
   goals           Goal[]
+  habits          Habit[]
 }
 
 /// A grade que se repete toda semana. É o padrão; uma data específica pode fugir dele —
@@ -466,9 +479,29 @@ model ProgressEntry {
   patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   recordedAt DateTime
   weightKg   Float?
-  waistCm    Float?
-  note       String?
-  createdAt  DateTime @default(now())
+
+  // ── Composição corporal ──────────────────────────────────────────────────────────────
+  // O que separa perder gordura de perder músculo. Peso sozinho não distingue os dois, e é
+  // exatamente essa distinção que faz um acompanhamento nutricional valer a pena.
+  //
+  // Duas colunas e não uma: a balança de bioimpedância mostra o percentual de gordura, e a
+  // massa magra vem em quilos. Derivar uma da outra exigiria o peso do mesmo dia, que pode não
+  // ter sido registrado — e uma conta feita com o peso de outra data mentiria.
+  bodyFatPercent Float?
+  leanMassKg     Float?
+
+  // ── Medidas corporais, em centímetros ────────────────────────────────────────────────
+  // Circunferências. Todas opcionais porque ninguém mede todas sempre: quem acompanha
+  // emagrecimento mede cintura e quadril, quem acompanha ganho de massa mede braço e coxa.
+  // Obrigar o conjunto inteiro faria a pessoa inventar número para preencher campo.
+  waistCm Float?
+  hipCm   Float?
+  chestCm Float?
+  armCm   Float?
+  thighCm Float?
+
+  note      String?
+  createdAt DateTime @default(now())
 
   @@unique([patientId, recordedAt])
   @@index([patientId, recordedAt])
@@ -646,6 +679,7 @@ model StoredFile {
   createdAt  DateTime @default(now())
 
   payoutReceipt Payout? @relation("PayoutReceipt")
+  userAvatar    User?   @relation("UserAvatar")
 
   @@index([uploadedBy, createdAt])
 }
@@ -663,6 +697,55 @@ model Review {
   createdAt      DateTime     @default(now())
 
   @@index([professionalId])
+}
+
+/// Hábito a repetir: beber água, caminhar, não pular o café.
+///
+/// Separado de Goal de propósito, e a diferença não é de tamanho — é de forma. Uma meta tem um
+/// alvo e um prazo, e um dia é alcançada ou abandonada. Um hábito não termina: ele é marcado, dia
+/// após dia, e o que interessa nele é a constância, não a conclusão. Tentar representar os dois
+/// com a mesma tabela obrigaria toda leitura a perguntar qual dos dois aquela linha é.
+model Habit {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// Quantas vezes por semana a pessoa quer cumprir. Null quando ela só quer marcar os dias sem
+  /// se cobrar um número — que é um jeito legítimo de usar isto, e transformá-lo em obrigação
+  /// seria inventar uma cobrança que ninguém pediu.
+  targetPerWeek Int?
+
+  /// Arquivado em vez de apagado: apagar o hábito levaria consigo o histórico de quem o cumpriu
+  /// por três meses, e esse histórico é a única coisa que o hábito produziu.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  logs HabitLog[]
+
+  @@index([patientId, active])
+}
+
+/// Um dia em que o hábito foi cumprido. A existência da linha é o "sim" — não há coluna de
+/// estado, porque não marcar e marcar como não feito são a mesma coisa para quem olha depois.
+///
+/// A chave única é o que torna o clique idempotente: marcar duas vezes o mesmo dia não cria duas
+/// linhas, e desmarcar é apagar.
+model HabitLog {
+  id      String @id @default(cuid())
+  habitId String
+  habit   Habit  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  /// 'YYYY-MM-DD' no fuso de São Paulo, pelo mesmo motivo de AvailabilityOverride.date: o que se
+  /// guarda é um dia do calendário, não um instante.
+  date String
+
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([habitId, date])
 }
 
 enum GoalStatus {

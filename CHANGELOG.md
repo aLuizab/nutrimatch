@@ -39,6 +39,16 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Adicionado
 
+- **Mais medidas em Minha Evolução.** Além de peso e cintura, agora cabem
+  composição corporal (percentual de gordura, massa magra) e circunferências
+  (quadril, tórax, braço, coxa), atrás de um botão "mais medidas" — todas
+  opcionais, porque ninguém mede tudo sempre. O nutricionista passa a ver o
+  retrato mais recente na ficha do paciente, não só o gráfico de peso.
+- **Acompanhamento de hábitos**, em Minha Evolução: uma faixa de sete dias por
+  hábito, com meta semanal opcional e contagem de dias seguidos. A sequência não
+  zera enquanto o dia de hoje está em branco — às dez da manhã ninguém cumpriu o
+  hábito ainda, e zerar ali transformaria o único número motivador da tela em
+  castigo por acordar. Arquivar um hábito preserva o histórico dele.
 - **Disponibilidade por data, além da grade da semana.** O nutricionista fecha um
   dia (feriado, viagem) ou dá a ele um horário próprio, num calendário em
   `/configuracoes` → Disponibilidade. Uma exceção de data vence a grade semanal:
@@ -126,6 +136,14 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
   ambiente de homologação existe para fazer.
 
 ### Corrigido
+
+- **A foto de perfil volta a funcionar.** Ela nunca funcionou: dependia de três
+  credenciais do Cloudinary que jamais foram configuradas, e o botão ficava
+  desabilitado dizendo "não configurado neste servidor". A imagem passa a ser
+  guardada no próprio banco, reduzida no navegador antes de subir (uns 60KB), e
+  servida por `/api/foto/[id]`. Foto de nutricionista ativo é pública, porque já
+  está no perfil público dele; a de paciente só é servida a ela mesma, à
+  administração e aos nutricionistas que a atendem. O Cloudinary saiu do projeto.
 
 - O link de pagamento não aparecia depois de agendar. A cobrança exigia chave
   Pix **e** link; a chave só é necessária no repasse, dias depois, então a
