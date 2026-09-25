@@ -27,13 +27,18 @@ enum Modality {
 }
 
 enum AppointmentStatus {
-  // Booked by the patient, waiting for the professional to accept. Holds the slot, but is
-  // not a real booking yet — and the time it sits here is what "tempo de resposta" measures.
+  // Marcada pelo paciente e aguardando **o pagamento** — nunca mais aguardando o profissional.
+  // Segura o horário, mas ainda não é consulta de verdade. Quem a transforma em CONFIRMED é a
+  // conferência do extrato pelo admin (ver lib/pix-payments.ts), e não uma resposta dele.
   AWAITING_CONFIRMATION
   CONFIRMED
   CANCELLED
-  // The professional let the confirmation deadline pass. Distinct from CANCELLED so the
-  // ranking can tell "declined by inaction" apart from "cancelled by someone".
+  // O prazo passou sem o pagamento ser confirmado. Distinto de CANCELLED porque ninguém decidiu
+  // nada: o pedido simplesmente não virou consulta.
+  //
+  // **Não conta contra a confiabilidade de ninguém.** Quando existia o aceite, expirar era o
+  // profissional deixando o prazo correr, e pesava contra ele; hoje é o paciente que não pagou,
+  // ou a plataforma que não conferiu a tempo. Ver lib/reputation.ts.
   EXPIRED
 }
 
@@ -102,6 +107,17 @@ model User {
   role         Role
   createdAt    DateTime @default(now())
 
+  // ── Aceite dos Termos de Uso ─────────────────────────────────────────────────────────
+  // Quando a pessoa aceitou, e qual texto ela aceitou. As duas colunas, e não um booleano:
+  // "aceitou" sem data e sem versão não prova nada no dia em que alguém contesta — e os termos
+  // mudam. Sem a versão, uma alteração futura faria parecer que todo mundo concordou com um
+  // texto que nunca leu.
+  //
+  // Anuláveis porque as contas criadas antes desta mudança existem e não podem ser apagadas.
+  // Elas ficam com null, que é a verdade: não há registro de aceite para elas.
+  termsAcceptedAt DateTime?
+  termsVersion    String?
+
   // Session revocation epoch: lib/session.ts rejects any token issued before this instant,
   // so changing the password logs out every other device. Without it a stolen cookie is
   // valid for its full 7-day life with no way to kill it.
@@ -118,10 +134,22 @@ model User {
   // não solicitada se não houver como sair.
   notifyNews         Boolean @default(true)
 
-  // Foto de perfil hospedada no Cloudinary. Guardamos a URL servida e o publicId, que é o
-  // que permite apagar a imagem antiga ao trocar — sem ele cada troca deixa um arquivo órfão
-  // consumindo a cota para sempre.
+  // ── Foto de perfil ───────────────────────────────────────────────────────────────────
+  // A imagem fica no próprio banco, em StoredFile. Antes ia para o Cloudinary, e o resultado
+  // prático era que ninguém tinha foto: as três credenciais nunca foram configuradas, a rota
+  // devolvia 503 e o botão ficava desabilitado dizendo "não configurado neste servidor". Trocar
+  // um serviço externo por uma tabela resolveu o problema de verdade — que era a configuração
+  // que não existia, não o código de upload.
+  //
+  // photoUrl guarda o caminho servido (/api/foto/<id>), que é o que toda tela quer; avatarFileId
+  // guarda o arquivo, que é o que permite apagar o anterior ao trocar. A imagem é reduzida no
+  // navegador antes de subir (ver PhotoUpload), então o que chega aqui já é pequeno.
   photoUrl      String?
+  avatarFileId  String?     @unique
+  avatarFile    StoredFile? @relation("UserAvatar", fields: [avatarFileId], references: [id], onDelete: SetNull)
+  // Legado do Cloudinary. Nada escreve mais aqui; continua declarado porque derrubar coluna é
+  // mudança de contração, e porque é o único vestígio de onde as fotos antigas foram guardadas,
+  // se alguma chegou a existir.
   photoPublicId String?
 
   professional Professional?
@@ -131,27 +159,38 @@ model User {
 }
 
 model Professional {
-  id          String             @id @default(cuid())
-  userId      String             @unique
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   crn         String
   specialties String[]
   bio         String
   city        String
   modality    Modality
   price       Int
-  status      ProfessionalStatus @default(ACTIVE)
-  rating      Float              @default(0)
-  reviewCount Int                @default(0)
-  createdAt   DateTime           @default(now())
+
+  /// Onde o profissional atende presencialmente. É **pré-requisito** do formato presencial: sem
+  /// endereço, `modality` não pode ser PRESENCIAL nem AMBOS (ver lib/office.ts). A regra existe
+  /// porque um paciente que marca presencial sem saber para onde ir descobre isso no dia da
+  /// consulta, e nesse momento não há mais o que fazer.
+  officeAddress String?
+  status        ProfessionalStatus @default(ACTIVE)
+  rating        Float              @default(0)
+  reviewCount   Int                @default(0)
+  createdAt     DateTime           @default(now())
 
   // Weighted ranking score, materialised because Postgres can't ORDER BY / paginate over a
   // score computed in application memory. Recomputed by lib/ranking.ts whenever an input
   // changes (new review, new confirmation). Paid subscriptions deliberately do NOT feed this
   // — sponsored placement is a separate, labelled slot, never a hidden boost.
   rankScore          Float     @default(0)
-  // Median seconds from booking to the professional accepting it, over recent bookings.
-  // Null until they have enough samples to be meaningful.
+  // ── Legado ───────────────────────────────────────────────────────────────────────────
+  // Media de segundos entre o agendamento e o profissional aceitar. Nada escreve mais aqui:
+  // desde que a confirmação passou a ser do admin (o profissional não aceita mais, só pode
+  // cancelar), o que este número mediria seria a demora do admin em conferir o extrato — e
+  // rankear o profissional por isso seria cobrar dele o tempo de outra pessoa. Continua
+  // declarada porque derrubar coluna é mudança de contração: só depois de nenhuma leitura
+  // sobrar. Ver CHANGELOG.
   medianResponseSecs Int?
   rankUpdatedAt      DateTime?
 
@@ -193,13 +232,15 @@ model Professional {
   // tipo, e isso não deveria custar uma migração.
   pixKeyType String?
 
-  subscription      ProfessionalSubscription?
-  payouts           Payout[]
-  availabilityRules AvailabilityRule[]
-  appointments      Appointment[]
-  reviews           Review[]
-  carePlans         CarePlan[]
-  enrollments       Enrollment[]
+  subscription          ProfessionalSubscription?
+  payouts               Payout[]
+  availabilityRules     AvailabilityRule[]
+  availabilityOverrides AvailabilityOverride[]
+  agendaEntries         AgendaEntry[]
+  appointments          Appointment[]
+  reviews               Review[]
+  carePlans             CarePlan[]
+  enrollments           Enrollment[]
 
   @@index([status])
 }
@@ -230,6 +271,51 @@ model Patient {
   enrollments     Enrollment[]
   progressEntries ProgressEntry[]
   goals           Goal[]
+  habits          Habit[]
+}
+
+/// A grade que se repete toda semana. É o padrão; uma data específica pode fugir dele —
+/// ver AvailabilityOverride.
+/// O que o profissional tem na agenda que a plataforma não marcou.
+///
+/// Duas coisas cabem aqui, e a distinção importa para quem lê a agenda depois: uma consulta
+/// combinada fora da plataforma (paciente antigo, convênio, indicação) e um compromisso que
+/// simplesmente ocupa o horário (almoço, supervisão, médico). As duas bloqueiam o horário do
+/// mesmo jeito — a diferença é o que a agenda mostra e o que ele consegue relembrar dali a um mês.
+///
+/// Separado de Appointment de propósito. Appointment carrega paciente da plataforma, pagamento,
+/// repasse, avaliação e comparecimento; nada disso existe numa consulta que a plataforma não
+/// intermediou. Enfiar as duas na mesma tabela encheria metade das colunas de null e faria toda
+/// consulta de receita, reputação e repasse precisar lembrar de excluir estas linhas — que é
+/// exatamente o tipo de filtro que alguém esquece.
+model AgendaEntry {
+  id             String          @id @default(cuid())
+  professionalId String
+  professional   Professional    @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  kind           AgendaEntryKind
+
+  /// Como aparece na agenda. Para consulta externa, o nome de quem ele vai atender costuma ser
+  /// o título mais útil — e é ele quem escreve, porque a plataforma não conhece essa pessoa.
+  title String
+
+  /// Só faz sentido em consulta externa: um compromisso pessoal não tem modalidade.
+  modality Modality?
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  @@index([professionalId, startsAt])
+}
+
+enum AgendaEntryKind {
+  /// Consulta combinada fora da plataforma.
+  CONSULTA_EXTERNA
+  /// Qualquer outra coisa que ocupa o horário e não é consulta.
+  COMPROMISSO
 }
 
 model AvailabilityRule {
@@ -242,6 +328,40 @@ model AvailabilityRule {
   slotMinutes    Int          @default(50)
 
   @@index([professionalId])
+}
+
+/// O que acontece numa data específica, quando ela não segue a semana: feriado, viagem,
+/// congresso, ou um sábado de mutirão que não existe na grade normal.
+///
+/// Existe como tabela separada, e não como mais linhas em AvailabilityRule, porque as duas
+/// respondem a perguntas diferentes e têm ciclos de vida diferentes: a grade semanal é
+/// permanente e reescrita inteira a cada salvamento, enquanto uma exceção vale para um dia só e
+/// deixa de importar quando aquele dia passa. Misturá-las faria "salvar meus horários" apagar as
+/// férias que a pessoa marcou três telas antes.
+///
+/// A data é `String` no formato 'YYYY-MM-DD', e não DateTime, pelo mesmo motivo que lib/spdate.ts
+/// existe: o que se quer guardar aqui é um dia do calendário de São Paulo, não um instante. Um
+/// DateTime obrigaria toda leitura a lembrar do fuso para não exibir o dia anterior.
+model AvailabilityOverride {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  date           String
+
+  /// Dia fechado: nenhum horário, mesmo que a grade semanal diga o contrário. Uma linha assim
+  /// vence qualquer outra da mesma data — é a forma de dizer "não atendo neste dia" sem
+  /// precisar apagar a grade da semana inteira.
+  closed Boolean @default(false)
+
+  /// Bloco de horário especial para esta data. Quando existe ao menos um, eles **substituem** a
+  /// grade semanal naquele dia, em vez de somar: quem abre um horário fora do comum quase sempre
+  /// quer só aquele horário, e somar criaria vagas que a pessoa não pediu. Nulos quando closed.
+  startTime String?
+  endTime   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([professionalId, date])
 }
 
 model Appointment {
@@ -259,12 +379,16 @@ model Appointment {
   modality             Modality
   price                Int
   status               AppointmentStatus @default(AWAITING_CONFIRMATION)
-  // When the professional accepted. createdAt → confirmedAt is the response-time sample
-  // that feeds lib/ranking.ts.
+  // Quando a consulta passou a valer. Hoje é o instante em que o admin confirmou o pagamento,
+  // não uma resposta do profissional — ele não aceita mais consulta nenhuma.
   confirmedAt          DateTime?
-  // Past this instant with no confirmation, the slot is treated as free. Derived at read
-  // time (see lib/availability.ts) — no cron required, matching how the rest of this
-  // codebase handles time-based state.
+  // Prazo para a conferência do pagamento declarado. Passado ele sem confirmação, o horário é
+  // tratado como livre. Derivado na leitura (ver lib/availability.ts) — sem cron, como todo
+  // estado baseado em tempo neste projeto.
+  //
+  // O nome ficou do tempo em que este era o prazo do profissional aceitar. Renomear coluna é
+  // mudança de contração, e "até quando esta consulta pode ficar sem confirmação" continua
+  // descrevendo o que ela guarda. Ver paymentReviewDeadlineFor em lib/appointment-status.ts.
   confirmationDeadline DateTime?
   reason               String?
   phone                String?
@@ -415,9 +539,29 @@ model ProgressEntry {
   patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
   recordedAt DateTime
   weightKg   Float?
-  waistCm    Float?
-  note       String?
-  createdAt  DateTime @default(now())
+
+  // ── Composição corporal ──────────────────────────────────────────────────────────────
+  // O que separa perder gordura de perder músculo. Peso sozinho não distingue os dois, e é
+  // exatamente essa distinção que faz um acompanhamento nutricional valer a pena.
+  //
+  // Duas colunas e não uma: a balança de bioimpedância mostra o percentual de gordura, e a
+  // massa magra vem em quilos. Derivar uma da outra exigiria o peso do mesmo dia, que pode não
+  // ter sido registrado — e uma conta feita com o peso de outra data mentiria.
+  bodyFatPercent Float?
+  leanMassKg     Float?
+
+  // ── Medidas corporais, em centímetros ────────────────────────────────────────────────
+  // Circunferências. Todas opcionais porque ninguém mede todas sempre: quem acompanha
+  // emagrecimento mede cintura e quadril, quem acompanha ganho de massa mede braço e coxa.
+  // Obrigar o conjunto inteiro faria a pessoa inventar número para preencher campo.
+  waistCm Float?
+  hipCm   Float?
+  chestCm Float?
+  armCm   Float?
+  thighCm Float?
+
+  note      String?
+  createdAt DateTime @default(now())
 
   @@unique([patientId, recordedAt])
   @@index([patientId, recordedAt])
@@ -540,20 +684,64 @@ model Payout {
   // Snapshot da chave no momento do repasse: se o profissional trocar a chave depois, o
   // histórico precisa continuar mostrando para onde o dinheiro realmente foi.
   pixKeySnapshot String?
+  // Quando o admin declarou ter feito a transferência (entrada em PROCESSING). Separado de
+  // paidAt porque são dois fatos com datas diferentes: "mandei" e "está comprovado".
+  sentAt         DateTime?
   paidAt         DateTime?
   paidBy         String?
   note           String?
   createdAt      DateTime     @default(now())
+
+  // Comprovante da transferência. É o que separa PROCESSING de PAID: sem arquivo aqui o
+  // repasse não é dado como concluído. SetNull e não Cascade — apagar o arquivo não pode
+  // apagar o registro do dinheiro que saiu.
+  receiptFileId String?     @unique
+  receiptFile   StoredFile? @relation("PayoutReceipt", fields: [receiptFileId], references: [id], onDelete: SetNull)
 
   @@index([professionalId, status])
   @@index([status, createdAt])
 }
 
 enum PayoutStatus {
+  // Devido e ainda não transferido. É também onde fica quem não tem chave Pix cadastrada: a
+  // consulta acontece, o dinheiro fica retido, e a dívida segue registrada.
   PENDING
+  // O admin declarou que fez a transferência e o comprovante ainda não foi anexado. Estado
+  // próprio, e não um bóóleano em PAID, porque é exatamente o que o profissional precisa ver
+  // para saber que o dinheiro saiu mas ainda não foi comprovado.
+  PROCESSING
+  // Transferido **e** comprovado. Sem comprovante anexado nada chega aqui — ver
+  // lib/payouts.ts: "pago" sem documento é só a palavra de quem pagou.
   PAID
   // A consulta foi cancelada e estornada antes do repasse sair — não há mais o que repassar.
   CANCELLED
+}
+
+/// Arquivo guardado no próprio banco: comprovante de repasse hoje, foto de perfil depois.
+///
+/// Bytes no Postgres em vez de um serviço de arquivos. É uma escolha de escala, não de
+/// preguiça: são poucos arquivos, pequenos, e a alternativa era uma credencial externa a mais
+/// para criar, girar e vazar. Quando o volume não couber mais aqui, é este model que troca de
+/// implementação — quem o usa referencia um id, nunca um caminho de arquivo.
+///
+/// Não há rota pública que liste isto. Comprovante de repasse é documento financeiro de duas
+/// pessoas específicas; quem pode ver cada arquivo é decidido em /api/arquivos/[id].
+model StoredFile {
+  id         String   @id @default(cuid())
+  mimeType   String
+  /// Guardado em coluna própria para a listagem mostrar o tamanho sem carregar os bytes.
+  sizeBytes  Int
+  /// Nome original, só para o download sair com algo reconhecível.
+  fileName   String
+  bytes      Bytes
+  /// Quem enviou. Arquivo no banco sem responsável é arquivo que ninguém responde por.
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  payoutReceipt Payout? @relation("PayoutReceipt")
+  userAvatar    User?   @relation("UserAvatar")
+
+  @@index([uploadedBy, createdAt])
 }
 
 model Review {
@@ -569,6 +757,55 @@ model Review {
   createdAt      DateTime     @default(now())
 
   @@index([professionalId])
+}
+
+/// Hábito a repetir: beber água, caminhar, não pular o café.
+///
+/// Separado de Goal de propósito, e a diferença não é de tamanho — é de forma. Uma meta tem um
+/// alvo e um prazo, e um dia é alcançada ou abandonada. Um hábito não termina: ele é marcado, dia
+/// após dia, e o que interessa nele é a constância, não a conclusão. Tentar representar os dois
+/// com a mesma tabela obrigaria toda leitura a perguntar qual dos dois aquela linha é.
+model Habit {
+  id        String  @id @default(cuid())
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  name String
+
+  /// Quantas vezes por semana a pessoa quer cumprir. Null quando ela só quer marcar os dias sem
+  /// se cobrar um número — que é um jeito legítimo de usar isto, e transformá-lo em obrigação
+  /// seria inventar uma cobrança que ninguém pediu.
+  targetPerWeek Int?
+
+  /// Arquivado em vez de apagado: apagar o hábito levaria consigo o histórico de quem o cumpriu
+  /// por três meses, e esse histórico é a única coisa que o hábito produziu.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now())
+
+  logs HabitLog[]
+
+  @@index([patientId, active])
+}
+
+/// Um dia em que o hábito foi cumprido. A existência da linha é o "sim" — não há coluna de
+/// estado, porque não marcar e marcar como não feito são a mesma coisa para quem olha depois.
+///
+/// A chave única é o que torna o clique idempotente: marcar duas vezes o mesmo dia não cria duas
+/// linhas, e desmarcar é apagar.
+model HabitLog {
+  id      String @id @default(cuid())
+  habitId String
+  habit   Habit  @relation(fields: [habitId], references: [id], onDelete: Cascade)
+
+  /// 'YYYY-MM-DD' no fuso de São Paulo, pelo mesmo motivo de AvailabilityOverride.date: o que se
+  /// guarda é um dia do calendário, não um instante.
+  date String
+
+  createdAt DateTime @default(now())
+
+  @@unique([habitId, date])
+  @@index([habitId, date])
 }
 
 enum GoalStatus {

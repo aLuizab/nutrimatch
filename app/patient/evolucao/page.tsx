@@ -4,21 +4,25 @@ import DashboardShell from '../../components/DashboardShell'
 import PatientSidebar from '../../components/PatientSidebar'
 import WeightChart from './WeightChart'
 import ProgressForm, { type EntryRow } from './ProgressForm'
+import HabitTracker from './HabitTracker'
 import EnrollmentCard from './EnrollmentCard'
 import { prisma } from '@/lib/prisma'
 import { requirePatientProfileOrRedirect } from '@/lib/session'
 import { formatDateBR } from '@/lib/format'
 import { spDateString } from '@/lib/spdate'
 import { getActiveEnrollmentSummary } from '@/lib/enrollments'
+import { getHabits } from '@/lib/habits'
 
 export default async function Evolucao() {
   const user = await requirePatientProfileOrRedirect()
   if (!user.patient) return null
   const patientId = user.patient.id
 
-  const [entries, program] = await Promise.all([
+  const hoje = spDateString(new Date())
+  const [entries, program, habits] = await Promise.all([
     prisma.progressEntry.findMany({ where: { patientId }, orderBy: { recordedAt: 'asc' } }),
     getActiveEnrollmentSummary(patientId),
+    getHabits(patientId, hoje),
   ])
 
   const target = user.patient.targetWeightKg
@@ -41,6 +45,12 @@ export default async function Evolucao() {
         dateLabel: formatDateBR(e.recordedAt),
         weightKg: e.weightKg,
         waistCm: e.waistCm,
+        bodyFatPercent: e.bodyFatPercent,
+        leanMassKg: e.leanMassKg,
+        hipCm: e.hipCm,
+        chestCm: e.chestCm,
+        armCm: e.armCm,
+        thighCm: e.thighCm,
         note: e.note,
         weightDelta: e.weightKg !== null && prev !== null ? e.weightKg - prev : null,
       }
@@ -108,7 +118,9 @@ export default async function Evolucao() {
           )}
         </div>
 
-        <ProgressForm today={spDateString(new Date())} entries={rows} />
+        <ProgressForm today={hoje} entries={rows} />
+
+        <HabitTracker habits={habits} today={hoje} />
       </div>
     </DashboardShell>
   )

@@ -14,13 +14,22 @@ import {
 // separate, labelled slot (see lib/subscription.ts); mixing it into this score would make
 // paid placement indistinguishable from merit, which is exactly what CDC art. 37 forbids.
 
+// A componente de "tempo de resposta" saiu daqui quando o aceite do profissional deixou de
+// existir: a consulta passou a ser marcada pela conferência do pagamento, e o que `confirmedAt`
+// mede hoje é a demora do ADMIN em olhar o extrato. Rankear o profissional por isso seria cobrar
+// dele o tempo de outra pessoa.
+//
+// Os 0.25 que ela carregava não foram diluídos igualmente. Foram para onde há evidência:
+//   - rating 0.5 → 0.6, porque continua sendo o sinal mais rico que existe sobre alguém.
+//   - reliability 0.15 → 0.3, dobrado, porque virou o **único** sinal de comportamento. Com o
+//     aceite fora, cancelar uma consulta marcada é a principal forma de deixar um paciente na
+//     mão, e precisa doer no ranking na mesma proporção.
+//   - recency 0.1, intocada: nada sobre inatividade mudou.
 export const WEIGHTS = {
-  rating: 0.5,
-  responsiveness: 0.25,
-  // Cumprir o que aceitou: consultas realizadas contra canceladas-após-confirmar e pedidos
-  // deixados expirar. Entra com peso real (não simbólico) porque é o que o paciente sente
-  // quando dá errado — mas abaixo da avaliação, que continua sendo o sinal principal.
-  reliability: 0.15,
+  rating: 0.6,
+  // Cumprir o que está marcado: consultas realizadas contra canceladas-após-confirmar e pedidos
+  // deixados expirar.
+  reliability: 0.3,
   recency: 0.1,
 } as const
 
@@ -39,17 +48,6 @@ export function shrunkRating(rating: number, reviewCount: number, platformMean: 
   return (rating * reviewCount + platformMean * PRIOR_WEIGHT) / (reviewCount + PRIOR_WEIGHT)
 }
 
-/** Maps median response seconds onto 0..1. Under 1h is excellent; beyond 48h adds nothing. */
-export function responsivenessScore(medianSecs: number | null): number {
-  if (medianSecs == null) return 0.5 // unknown sits mid-pack, never at the bottom
-  const HOUR = 3600
-  if (medianSecs <= HOUR) return 1
-  if (medianSecs >= 48 * HOUR) return 0
-  // Log scale: the difference between 1h and 4h matters far more than 40h vs 44h.
-  const t = Math.log(medianSecs / HOUR) / Math.log(48)
-  return Math.max(0, Math.min(1, 1 - t))
-}
-
 /** Decays over ~90 days of inactivity, so an abandoned profile drifts down instead of sticking. */
 export function recencyScore(lastActivity: Date | null, now: Date = new Date()): number {
   if (!lastActivity) return 0
@@ -63,10 +61,9 @@ export function computeScore(input: {
   rating: number
   reviewCount: number
   platformMean: number
-  medianResponseSecs: number | null
   lastActivity: Date | null
-  /** 0..1 de lib/reputation.ts#reliabilityScore. Ausente = 0.5, o mesmo "desconhecido fica no
-   *  meio do pelotão" que responsivenessScore aplica. */
+  /** 0..1 de lib/reputation.ts#reliabilityScore. Ausente = 0.5: "desconhecido" fica no meio do
+   *  pelotão, nunca no fundo — quem não tem histórico não fez nada de errado. */
   reliability?: number
   now?: Date
 }): number {
@@ -75,17 +72,9 @@ export function computeScore(input: {
   const ratingNorm = (shrunkRating(input.rating, input.reviewCount, input.platformMean) - 1) / 4
   const score =
     WEIGHTS.rating * Math.max(0, Math.min(1, ratingNorm)) +
-    WEIGHTS.responsiveness * responsivenessScore(input.medianResponseSecs) +
     WEIGHTS.reliability * (input.reliability ?? 0.5) +
     WEIGHTS.recency * recencyScore(input.lastActivity, input.now)
   return Math.round(score * 10000) / 10000
-}
-
-function median(values: number[]): number | null {
-  if (values.length === 0) return null
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = Math.floor(sorted.length / 2)
-  return sorted.length % 2 === 0 ? Math.round((sorted[mid - 1] + sorted[mid]) / 2) : sorted[mid]
 }
 
 /** Platform-wide mean rating, used as the shrinkage prior. Falls back to 4.5 when there is
@@ -96,19 +85,11 @@ export async function platformMeanRating(): Promise<number> {
   return agg._avg.rating
 }
 
-const RESPONSE_SAMPLE_SIZE = 20
-
 export async function recomputeRankScore(professionalId: string, meanOverride?: number) {
-  const [professional, confirmations, lastAppointment, platformMean, reliabilityCounts] = await Promise.all([
+  const [professional, lastAppointment, platformMean, reliabilityCounts] = await Promise.all([
     prisma.professional.findUnique({
       where: { id: professionalId },
       select: { rating: true, reviewCount: true },
-    }),
-    prisma.appointment.findMany({
-      where: { professionalId, confirmedAt: { not: null } },
-      select: { createdAt: true, confirmedAt: true, paidAt: true },
-      orderBy: { confirmedAt: 'desc' },
-      take: RESPONSE_SAMPLE_SIZE,
     }),
     prisma.appointment.findFirst({
       where: { professionalId },
@@ -120,22 +101,11 @@ export async function recomputeRankScore(professionalId: string, meanOverride?: 
   ])
   if (!professional) return
 
-  // The clock starts when the professional could actually act, not when the patient started
-  // booking. On a paid consultation the professional isn't told anything until the payment is
-  // authorised, so counting the patient's time at the checkout — up to PAYMENT_HOLD_MINUTES —
-  // would charge the professional for someone else's hesitation and quietly lower their rank.
-  const samples = confirmations.map((a) => {
-    const start = (a.paidAt ?? a.createdAt).getTime()
-    return Math.max(0, Math.round((a.confirmedAt!.getTime() - start) / 1000))
-  })
-  const medianResponseSecs = median(samples)
-
   const reliability = reliabilityScore(reliabilityCounts)
   const rankScore = computeScore({
     rating: professional.rating,
     reviewCount: professional.reviewCount,
     platformMean,
-    medianResponseSecs,
     lastActivity: lastAppointment?.createdAt ?? null,
     reliability,
   })
@@ -145,7 +115,6 @@ export async function recomputeRankScore(professionalId: string, meanOverride?: 
   const reputationScore = computeReputationScore({
     shrunkRating: shrunkRating(professional.rating, professional.reviewCount, platformMean),
     reliability,
-    responsiveness: responsivenessScore(medianResponseSecs),
   })
   const tier = tierFor(reputationScore, reliabilityCounts.fulfilled)
 
@@ -153,7 +122,10 @@ export async function recomputeRankScore(professionalId: string, meanOverride?: 
     where: { id: professionalId },
     data: {
       rankScore,
-      medianResponseSecs,
+      // Zerada de propósito, e não deixada como estava: um número velho na coluna volta a ser
+      // exibido no dia em que alguém reintroduzir a leitura, e aí estaria mostrando o tempo de
+      // resposta de uma regra que não existe mais. Ver o comentário no schema.
+      medianResponseSecs: null,
       rankUpdatedAt: new Date(),
       reputationScore,
       tier,
@@ -170,14 +142,4 @@ export async function recomputeAllRankScores() {
     await recomputeRankScore(p.id, mean)
   }
   return all.length
-}
-
-/** Human-readable responsiveness, for the professional's card. */
-export function responseLabel(medianSecs: number | null): string | null {
-  if (medianSecs == null) return null
-  const hours = medianSecs / 3600
-  if (hours < 1) return 'Responde em minutos'
-  if (hours < 24) return `Responde em ~${Math.round(hours)}h`
-  const days = Math.round(hours / 24)
-  return days === 1 ? 'Responde em ~1 dia' : `Responde em ~${days} dias`
 }

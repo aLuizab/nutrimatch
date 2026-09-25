@@ -61,24 +61,25 @@ export function awaitsAttendanceMark(
 // ── Reputação do profissional ─────────────────────────────────────────────────────────────
 
 /**
- * Confiabilidade: o profissional cumpre o que aceitou? 0..1.
+ * Confiabilidade: o profissional cumpre o que está marcado? 0..1.
  *
- * Pesa dois tipos de falha bem diferentes. Cancelar depois de ter confirmado é o pior caso —
- * o paciente reorganizou o dia por causa daquele horário — e pesa dobrado. Deixar o pedido
- * expirar sem responder é ruim, mas o paciente nunca chegou a contar com nada, então pesa
- * simples.
+ * Uma falha só entra na conta: **cancelar uma consulta já marcada**. O paciente reorganizou o
+ * dia por causa daquele horário, e é a pior coisa que o profissional pode fazer com ele. Pesa
+ * dobrado por isso.
+ *
+ * Consulta EXPIRADA saiu desta conta, e a saída é o ponto. Enquanto o profissional precisava
+ * aceitar, expirar significava que ele não respondeu — falha dele, e pesava simples. Hoje
+ * expirar significa que o **paciente** não pagou, ou que a plataforma não conferiu o extrato a
+ * tempo. Continuar contando isso contra o profissional seria rebaixá-lo no ranking pela
+ * desistência de outra pessoa, sem que ele pudesse fazer nada a respeito.
  *
  * Sem histórico nenhum devolve 0.5: "desconhecido" fica no meio do pelotão, nunca no fundo —
- * mesma lógica de `responsivenessScore` em lib/ranking.ts.
+ * quem não tem histórico não fez nada de errado.
  */
 export const LATE_CANCELLATION_PENALTY = 2
 
-export function reliabilityScore(input: {
-  fulfilled: number
-  lateCancellations: number
-  expired: number
-}): number {
-  const failures = input.lateCancellations * LATE_CANCELLATION_PENALTY + input.expired
+export function reliabilityScore(input: { fulfilled: number; lateCancellations: number }): number {
+  const failures = input.lateCancellations * LATE_CANCELLATION_PENALTY
   const total = input.fulfilled + failures
   if (total === 0) return 0.5
   return Math.max(0, Math.min(1, input.fulfilled / total))
@@ -90,23 +91,22 @@ export function reliabilityScore(input: {
  * reputação diz se dá para confiar, e **inatividade não é falta de confiança**: quem passou
  * dois meses sem atender não ficou menos ético por isso, então recência não entra aqui.
  */
+// Tempo de resposta saiu daqui pelo mesmo motivo que saiu de lib/ranking.ts: não existe mais
+// um aceite do profissional para cronometrar. Os 0.15 foram para confiabilidade, não para a
+// nota — reputação é sobre comportamento, e comportamento é o que ficou sem medida.
 export const REPUTATION_WEIGHTS = {
-  rating: 0.5,
-  reliability: 0.35,
-  responsiveness: 0.15,
+  rating: 0.6,
+  reliability: 0.4,
 } as const
 
 export function computeReputationScore(input: {
   /** Já encolhida pela média da plataforma — ver shrunkRating em lib/ranking.ts. */
   shrunkRating: number
   reliability: number
-  responsiveness: number
 }): number {
   const ratingNorm = Math.max(0, Math.min(1, (input.shrunkRating - 1) / 4))
   const score =
-    REPUTATION_WEIGHTS.rating * ratingNorm +
-    REPUTATION_WEIGHTS.reliability * input.reliability +
-    REPUTATION_WEIGHTS.responsiveness * input.responsiveness
+    REPUTATION_WEIGHTS.rating * ratingNorm + REPUTATION_WEIGHTS.reliability * input.reliability
   return Math.round(score * 10000) / 10000
 }
 
@@ -298,7 +298,6 @@ export async function countOpenAppointments(patientId: string, now: Date = new D
 export interface ProfessionalReliabilityCounts {
   fulfilled: number
   lateCancellations: number
-  expired: number
 }
 
 /**
@@ -312,21 +311,20 @@ export async function getProfessionalReliabilityCounts(
   professionalId: string,
   now: Date = new Date()
 ): Promise<ProfessionalReliabilityCounts> {
-  const [past, lateCancellations, expired] = await Promise.all([
+  const [past, lateCancellations] = await Promise.all([
     prisma.appointment.findMany({
       where: { professionalId, status: 'CONFIRMED', scheduledAt: { lte: now } },
       select: { attendance: true, scheduledAt: true, status: true },
     }),
-    // Cancelou algo que ele mesmo já tinha confirmado — o paciente já contava com o horário.
+    // Cancelou uma consulta que já estava marcada — o paciente já contava com o horário.
     prisma.appointment.count({
       where: { professionalId, status: 'CANCELLED', cancelledBy: 'PROFESSIONAL', confirmedAt: { not: null } },
     }),
-    prisma.appointment.count({ where: { professionalId, status: 'EXPIRED' } }),
   ])
 
   // Consulta realizada = aconteceu de verdade. Falta do paciente não conta como consulta
   // realizada (não houve atendimento), mas também não é falha do profissional: fica fora dos
   // dois lados da conta.
   const fulfilled = past.filter((a) => effectiveAttendance(a, now) === 'ATTENDED').length
-  return { fulfilled, lateCancellations, expired }
+  return { fulfilled, lateCancellations }
 }

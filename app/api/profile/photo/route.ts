@@ -3,13 +3,14 @@ import { prisma } from '@/lib/prisma'
 import { AuthError, getCurrentUser } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { unexpectedFailure } from '@/lib/api-failures'
-import {
-  ALLOWED_PHOTO_TYPES,
-  MAX_PHOTO_BYTES,
-  deletePhoto,
-  photoUploadsEnabled,
-  uploadPhoto,
-} from '@/lib/cloudinary'
+import { avatarPath } from '@/lib/avatar'
+import { AVATAR_RULES, checkUpload, isRejection, storeFile } from '@/lib/stored-files'
+
+// Troca e remoção da foto de perfil.
+//
+// Não há mais 503 "não configurado neste servidor": a imagem vai para o próprio banco, então o
+// recurso funciona em qualquer instalação, incluindo a máquina de quem desenvolve. Era esse 503 —
+// e não um defeito no upload — que mantinha o botão desabilitado para todo mundo.
 
 async function currentUser() {
   const user = await getCurrentUser()
@@ -29,34 +30,27 @@ export async function POST(request: Request) {
   const limited = guardMutation(user.id, 'profile-photo')
   if (limited) return limited
 
-  if (!photoUploadsEnabled()) {
-    return NextResponse.json(
-      { error: 'O envio de fotos ainda não está configurado neste servidor.' },
-      { status: 503 }
-    )
-  }
-
   try {
     const form = await request.formData().catch(() => null)
-    const file = form?.get('file')
-    if (!(file instanceof File)) {
-      return NextResponse.json({ error: 'Nenhum arquivo enviado' }, { status: 400 })
-    }
-    // Checked here rather than trusting the accept attribute on the input, which is a hint to
-    // the file picker and nothing more.
-    if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
-      return NextResponse.json({ error: 'Envie uma imagem JPG, PNG ou WebP' }, { status: 400 })
-    }
-    if (file.size > MAX_PHOTO_BYTES) {
-      return NextResponse.json({ error: 'A imagem precisa ter no máximo 2MB' }, { status: 400 })
-    }
+    // Tipo e tamanho conferidos aqui de novo, e não só no navegador: o `accept` do input é dica
+    // para o seletor de arquivos, e um cliente que não é o navegador não validou nada. O limite é
+    // apertado (512KB) porque a imagem chega já reduzida — ver PhotoUpload.
+    const checked = checkUpload(form?.get('file'), AVATAR_RULES)
+    if (isRejection(checked)) return NextResponse.json({ error: checked.error }, { status: 400 })
 
-    const uploaded = await uploadPhoto(file, user.id)
+    const anterior = user.avatarFileId
+    const fileId = await storeFile(checked, user.id)
+
     await prisma.user.update({
       where: { id: user.id },
-      data: { photoUrl: uploaded.url, photoPublicId: uploaded.publicId },
+      data: { avatarFileId: fileId, photoUrl: avatarPath(fileId), photoPublicId: null },
     })
-    return NextResponse.json({ photoUrl: uploaded.url })
+
+    // Só depois de a nova foto estar no ar. Apagar antes deixaria a pessoa sem foto nenhuma se a
+    // gravação falhasse no meio.
+    if (anterior) await prisma.storedFile.delete({ where: { id: anterior } }).catch(() => undefined)
+
+    return NextResponse.json({ photoUrl: avatarPath(fileId) })
   } catch (e) {
     return unexpectedFailure('profile-photo', e)
   }
@@ -75,18 +69,16 @@ export async function DELETE() {
   if (limited) return limited
 
   try {
-    const existing = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { photoPublicId: true },
-    })
-    // The database row is cleared first: if the remote delete fails, the person still sees the
-    // photo gone, which is what they asked for. The reverse order can leave them looking at an
-    // image they just removed.
+    // A linha do usuário é limpa primeiro: se apagar o arquivo falhar, a pessoa ainda vê a foto
+    // sumir, que é o que ela pediu. Na ordem inversa ela continuaria olhando o que acabou de
+    // remover.
     await prisma.user.update({
       where: { id: user.id },
-      data: { photoUrl: null, photoPublicId: null },
+      data: { avatarFileId: null, photoUrl: null, photoPublicId: null },
     })
-    if (existing?.photoPublicId) await deletePhoto(existing.photoPublicId)
+    if (user.avatarFileId) {
+      await prisma.storedFile.delete({ where: { id: user.avatarFileId } }).catch(() => undefined)
+    }
     return NextResponse.json({ photoUrl: null })
   } catch (e) {
     return unexpectedFailure('profile-photo-delete', e)

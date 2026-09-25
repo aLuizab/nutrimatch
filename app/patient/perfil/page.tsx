@@ -4,7 +4,6 @@ import PatientPerfilForm from './PatientPerfilForm'
 import { requirePatientProfileOrRedirect } from '@/lib/session'
 import DashboardShell from '../../components/DashboardShell'
 import { getPatientReliability, patientReliabilityNotice } from '@/lib/reputation'
-import { photoUploadsEnabled } from '@/lib/cloudinary'
 import PhotoUpload from '../../components/PhotoUpload'
 
 export default async function PatientPerfil() {
@@ -39,7 +38,6 @@ export default async function PatientPerfil() {
           <PhotoUpload
             name={user.name}
             photoUrl={user.photoUrl ?? null}
-            enabled={photoUploadsEnabled()}
           />
         </div>
 

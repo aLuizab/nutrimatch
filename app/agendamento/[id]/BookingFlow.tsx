@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Clock, Video, Users, CheckCircle } from 'lucide-react'
-import { formatDateBR, formatPrice, formatTimeBR, formatWeekdayShortBR } from '@/lib/format'
+import { Calendar, Clock, Video, Users, CheckCircle, MapPin } from 'lucide-react'
+import { formatDateBR, formatPrice, formatTimeBR } from '@/lib/format'
 import { RESCHEDULE_CUTOFF_HOURS } from '@/lib/appointment-status'
+import CalendarioMeses from '../../components/CalendarioMeses'
 import type { Modality } from '@prisma/client'
 
 interface DayOption {
@@ -13,10 +14,18 @@ interface DayOption {
   times: Date[]
 }
 
+/** Primeiro e último dia navegáveis no calendário — a janela de BOOKING_HORIZON_DAYS. */
+export interface JanelaDeAgenda {
+  primeiroDia: string
+  ultimoDia: string
+}
+
 interface ProfessionalSummary {
   id: string
   name: string
   specialty: string
+  /** Onde a consulta presencial acontece. Mostrado antes de marcar, nao depois. */
+  officeAddress?: string | null
   price: number
   modality: Modality
   initials: string
@@ -40,6 +49,7 @@ export default function BookingFlow({
   program,
   paymentRequired,
   days,
+  janela,
   initialHorario,
   reschedule,
 }: {
@@ -47,6 +57,7 @@ export default function BookingFlow({
   program: ProgramSummary | null
   paymentRequired: boolean
   days: DayOption[]
+  janela: JanelaDeAgenda
   initialHorario?: string
   reschedule?: RescheduleTarget | null
 }) {
@@ -61,6 +72,20 @@ export default function BookingFlow({
     }
     return { dayIndex: 0, time: null as Date | null }
   }, [days, initialHorario])
+
+  // Só os dias com horário livre viram marca. O calendário trata data sem marca como não
+  // clicável, então esta é a própria regra de "este dia dá para marcar".
+  const marcasDoCalendario = useMemo(() => {
+    const marcas: Record<string, { tone: string; nota?: string; title?: string }> = {}
+    for (const d of days) {
+      marcas[d.dateStr] = {
+        tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        nota: `${d.times.length}`,
+        title: `${d.times.length} ${d.times.length === 1 ? 'horário livre' : 'horários livres'}`,
+      }
+    }
+    return marcas
+  }, [days])
 
   const [selectedDay, setSelectedDay] = useState(initialSelection.dayIndex)
   const [selectedTime, setSelectedTime] = useState<Date | null>(initialSelection.time)
@@ -214,6 +239,17 @@ export default function BookingFlow({
                 <Users size={16} /> Presencial
               </button>
             </div>
+            {/* O endereço aparece na hora de escolher, não depois de marcar: é o que decide se o
+                presencial faz sentido para esta pessoa. Sem endereço o formato nem chega aqui
+                (ver effectiveModality em lib/office.ts), então o `&&` é só a leitura segura. */}
+            {modality === 'PRESENCIAL' && professional.officeAddress && (
+              <p className="flex items-start gap-1.5 text-xs text-gray-500 mt-3 leading-relaxed">
+                <MapPin size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                <span>
+                  A consulta acontece em <strong className="text-gray-700">{professional.officeAddress}</strong>
+                </span>
+              </p>
+            )}
           </div>
         )}
 
@@ -223,30 +259,27 @@ export default function BookingFlow({
           ) : (
             <>
               <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                <Calendar size={16} className="text-emerald-500" /> Próximos dias disponíveis
+                <Calendar size={16} className="text-emerald-500" /> Escolha o dia
               </h3>
-              <div className="flex gap-2 mb-5 overflow-x-auto no-scrollbar pb-1">
-                {days.map((d, i) => (
-                  <button
-                    type="button"
-                    key={d.dateStr}
-                    onClick={() => {
-                      setSelectedDay(i)
-                      setSelectedTime(null)
-                    }}
-                    className={`shrink-0 w-16 flex flex-col items-center py-3 rounded-xl border-2 text-xs font-medium transition-colors ${
-                      selectedDay === i ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 text-gray-600 hover:border-emerald-300'
-                    }`}
-                  >
-                    <span>{formatWeekdayShortBR(d.date)}</span>
-                    <span className="text-lg font-bold mt-0.5">{d.dateStr.slice(8, 10)}</span>
-                    <span className="text-[10px] mt-0.5 opacity-70">{d.times.length} vagas</span>
-                  </button>
-                ))}
-              </div>
+              <CalendarioMeses
+                primeiroDia={janela.primeiroDia}
+                ultimoDia={janela.ultimoDia}
+                marcas={marcasDoCalendario}
+                selecionado={days[selectedDay]?.dateStr ?? null}
+                onSelecionar={(dateStr) => {
+                  const i = days.findIndex((d) => d.dateStr === dateStr)
+                  if (i < 0) return
+                  setSelectedDay(i)
+                  setSelectedTime(null)
+                }}
+              />
+              <p className="text-xs text-gray-400 mt-3 mb-5">
+                Os dias em verde têm horário livre. Dá para marcar com até 3 meses de antecedência.
+              </p>
 
               <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                <Clock size={16} className="text-emerald-500" /> Horários disponíveis
+                <Clock size={16} className="text-emerald-500" />
+                Horários de {formatDateBR(days[selectedDay].date)}
               </h3>
               <div className="grid grid-cols-4 gap-2">
                 {days[selectedDay].times.map((t) => (
@@ -347,16 +380,16 @@ export default function BookingFlow({
             </p>
           ) : (
             <>
-              {/* The distinction the patient most needs, and it differs by method: card reserves
-                  now and charges later, Pix charges immediately and is refunded if declined.
-                  Saying "sem cobranças" alone would be false for Pix, and describing only the
-                  card's hold would be misleading for whoever pays with the other one. */}
+              {/* O que o paciente mais precisa saber antes de clicar: o valor sai da conta dele
+                  agora, e o que ele ganha em troca é a consulta marcada assim que a plataforma
+                  conferir o pagamento — não um pedido que alguém ainda pode recusar. Dizer
+                  "sem cobranças" aqui seria falso. */}
               <p className="text-center text-xs text-gray-400 leading-relaxed">
                 {program
                   ? 'Esta consulta já está paga no seu pacote.'
                   : paymentRequired
-                    ? 'No cartão, o valor fica reservado e só é cobrado quando o profissional confirmar. No Pix, o valor é debitado na hora e devolvido automaticamente se o profissional não confirmar.'
-                    : 'Sem cobranças até confirmar'}
+                    ? 'O valor é debitado na hora. Conferido o pagamento, sua consulta fica marcada — o profissional não precisa aceitar. Se o pagamento não for encontrado, o valor é devolvido integralmente.'
+                    : 'Sem cobrança pela plataforma: o valor é combinado direto com o profissional.'}
               </p>
               {paymentRequired && !program && (
                 <p className="text-center text-xs text-gray-400">

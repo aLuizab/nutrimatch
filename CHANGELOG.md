@@ -15,8 +15,81 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 <!-- Entradas novas entram aqui. No release, viram uma seção com número e data. -->
 
+### Alterado
+
+- Os dados de demonstração passam a ter **10 nutricionistas** (eram 8), cobrindo
+  as sete especialidades, com uma, duas ou três cada, e os quatro níveis de
+  reputação. As avaliações subiram de 17 para 44, de nove pacientes diferentes:
+  com duas avaliações por perfil o encolhimento bayesiano puxava todo mundo para
+  a média e a busca saía embolada — quem tinha 3 consultas aparecia acima de quem
+  tinha 58.
+- **O nutricionista não aceita mais consulta.** Conferido o pagamento, a consulta
+  fica marcada na hora, nos três painéis. Ele continua podendo cancelar o que não
+  puder atender — o valor volta integralmente ao paciente e o cancelamento pesa na
+  confiabilidade dele. `AWAITING_CONFIRMATION` passou a significar apenas
+  "aguardando pagamento".
+- Sem o aceite não há tempo de resposta a medir: a componente saiu do ranking
+  (0.25) e da reputação (0.15). O peso foi para avaliações e, principalmente, para
+  confiabilidade, que dobrou por virar o único sinal de comportamento. A coluna
+  `medianResponseSecs` parou de ser alimentada e o selo "responde em ~Xh" saiu da
+  busca e do perfil.
+- Consulta **expirada deixou de pesar** contra o nutricionista. Antes expirar era
+  ele não responder; hoje é o paciente não pagar, e descontar isso dele seria
+  cobrar a desistência de outra pessoa.
+- A chave Pix do nutricionista não depende mais de a plataforma ter chave própria
+  configurada. A dependência escondia o campo inteiro de quem mais precisava dele:
+  a chave da plataforma serve para cobrar, a dele para receber.
+- Política de Cancelamento, Termos de Uso e a página "como funciona" reescritos
+  para o fluxo novo. Saíram também as menções a pagamento com cartão, que esta
+  plataforma nunca teve.
+
 ### Adicionado
 
+- **Aceite dos Termos de Uso no cadastro**, obrigatório para paciente e para
+  nutricionista, com data e versão gravadas. Caixa desmarcada por padrão — um
+  aceite pré-marcado é o site respondendo pela pessoa. Ao mudar o texto de
+  `/termos` ou `/privacidade`, mude `TERMS_VERSION` em `lib/terms.ts` junto.
+- **Endereço do consultório**, e a regra que vem com ele: sem endereço, o formato
+  presencial não fica disponível. Vale no cadastro, na edição do perfil e também
+  na leitura — um perfil antigo marcado como presencial sem endereço é tratado
+  como online na busca e no agendamento, em vez de oferecer uma consulta sem
+  lugar. O endereço aparece na hora de escolher o formato, não depois de marcar.
+- **Agenda própria do nutricionista**: consultas combinadas fora da plataforma e
+  compromissos pessoais, na mesma grade das consultas daqui. O horário sai da
+  disponibilidade, então ninguém marca por cima. Marcar algo sobre uma consulta
+  já vendida não é bloqueado, mas avisa.
+- **O link da sala chega por e-mail 5 minutos antes**, para o paciente e para o
+  nutricionista. Não respeita preferência de notificação de nenhum dos dois:
+  silenciar isso é silenciar o endereço da consulta que já foi paga. **Exige o
+  cron de lembretes rodando de 5 em 5 minutos** — ver DEPLOY.md.
+- **Mais medidas em Minha Evolução.** Além de peso e cintura, agora cabem
+  composição corporal (percentual de gordura, massa magra) e circunferências
+  (quadril, tórax, braço, coxa), atrás de um botão "mais medidas" — todas
+  opcionais, porque ninguém mede tudo sempre. O nutricionista passa a ver o
+  retrato mais recente na ficha do paciente, não só o gráfico de peso.
+- **Acompanhamento de hábitos**, em Minha Evolução: uma faixa de sete dias por
+  hábito, com meta semanal opcional e contagem de dias seguidos. A sequência não
+  zera enquanto o dia de hoje está em branco — às dez da manhã ninguém cumpriu o
+  hábito ainda, e zerar ali transformaria o único número motivador da tela em
+  castigo por acordar. Arquivar um hábito preserva o histórico dele.
+- **Disponibilidade por data, além da grade da semana.** O nutricionista fecha um
+  dia (feriado, viagem) ou dá a ele um horário próprio, num calendário em
+  `/configuracoes` → Disponibilidade. Uma exceção de data vence a grade semanal:
+  fechado zera o dia, e horário especial substitui o da semana em vez de somar.
+- **A agenda abre para 3 meses**, não mais 21 dias — retorno mensal é o caso mais
+  comum de um acompanhamento e simplesmente não cabia na janela anterior. O
+  paciente escolhe o dia num calendário mensal, com as vagas de cada dia à vista.
+- Visão de **mês** na agenda do nutricionista, ao lado da de semana, com a
+  contagem de consultas por dia. Clicar num dia abre a semana dele — achar uma
+  consulta marcada para dentro de dois meses deixou de exigir nove cliques em
+  "próxima semana".
+- Repasse em três etapas — **a repassar**, **em processamento** e **repassado** —
+  com listagem em `/repasses` para o nutricionista e em `/admin/financeiro` para a
+  administração. O nutricionista vê a receita por consulta, já líquida.
+- **Comprovante obrigatório para concluir um repasse.** Sem o arquivo anexado o
+  repasse não passa de "em processamento": sem documento, "já te paguei" é só a
+  palavra de quem pagou. O arquivo fica no banco (`StoredFile`) e é servido por
+  `/api/arquivos/[id]`, visível só para a administração e para o dono do repasse.
 - Campanha de lançamento: as **200 primeiras pacientes** a se cadastrar ganham
   10% de desconto na consulta. O cupom (`NUTRI10-042`) vai no e-mail de
   boas-vindas e fica visível em `/admin/pacientes`, com o contador de vagas no
@@ -86,6 +159,30 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
   ambiente de homologação existe para fazer.
 
 ### Corrigido
+
+- **A navegação parecia travada.** Eram 37 das 38 páginas sem `loading.tsx`, e no
+  App Router isso faz o clique não mudar nada na tela até o servidor terminar de
+  renderizar — além de desligar o prefetch da rota, porque não há fronteira até
+  onde pré-buscar. Agora são 14 arquivos cobrindo todas as áreas. Medindo o banco
+  de produção: consulta quente ~19ms, mas **primeira conexão ~1.870ms** (o Neon
+  suspende a computação por inatividade, e a `DATABASE_URL` não usa o endpoint com
+  pool). As duas coisas estão descritas em DEPLOY.md com o que fazer.
+- Um e-mail de lembrete afirmava que a sala abre **15 minutos** antes; o código
+  sempre usou 5. O texto passou a sair da mesma constante que a regra.
+- O nutricionista não conseguia mudar a modalidade de atendimento depois do
+  cadastro — o campo simplesmente não existia na rota de edição de perfil.
+- **`npm run seed` apagava o banco de produção.** A trava olhava `NODE_ENV`, que
+  não é `production` na máquina de quem desenvolve — e o `.env` local aponta para
+  o banco de produção. Agora a trava olha para onde a `DATABASE_URL` aponta de
+  fato: banco remoto exige `SEED_CONFIRM_REMOTE=yes`, e o host a ser apagado
+  aparece na mensagem.
+- **A foto de perfil volta a funcionar.** Ela nunca funcionou: dependia de três
+  credenciais do Cloudinary que jamais foram configuradas, e o botão ficava
+  desabilitado dizendo "não configurado neste servidor". A imagem passa a ser
+  guardada no próprio banco, reduzida no navegador antes de subir (uns 60KB), e
+  servida por `/api/foto/[id]`. Foto de nutricionista ativo é pública, porque já
+  está no perfil público dele; a de paciente só é servida a ela mesma, à
+  administração e aos nutricionistas que a atendem. O Cloudinary saiu do projeto.
 
 - O link de pagamento não aparecia depois de agendar. A cobrança exigia chave
   Pix **e** link; a chave só é necessária no repasse, dias depois, então a

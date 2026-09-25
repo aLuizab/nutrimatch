@@ -2,6 +2,7 @@ import { PrismaClient, type Modality } from '@prisma/client'
 import { hashPassword } from '../lib/password'
 import { instantAt, spDateString } from '../lib/spdate'
 import { recomputeAllRankScores } from '../lib/ranking'
+import { TERMS_VERSION } from '../lib/terms'
 
 const prisma = new PrismaClient()
 
@@ -17,6 +18,12 @@ const AVAILABILITY = [
   { weekday: 5, startTime: '09:00', endTime: '15:00', slotMinutes: 50 },
 ]
 
+// Dez perfis para a demonstração, cobrindo as sete especialidades e os quatro níveis de
+// reputação. A variedade é de propósito: uma vitrine em que todo mundo tem 5,0 e "Referência"
+// não mostra o produto, mostra um enfeite — e é justamente o ranking que precisa ficar visível.
+//
+// `officeAddress` é obrigatório em quem atende presencialmente. Sem ele, effectiveModality
+// rebaixa o perfil para ONLINE (ver lib/office.ts) e metade da demonstração some.
 const PROFESSIONALS: {
   email: string
   name: string
@@ -25,6 +32,7 @@ const PROFESSIONALS: {
   bio: string
   city: string
   modality: Modality
+  officeAddress?: string
   price: number
 }[] = [
   {
@@ -35,6 +43,7 @@ const PROFESSIONALS: {
     bio: 'Especialista em nutrição esportiva e funcional com mais de 8 anos de experiência. Formada pela USP com pós-graduação em Nutrição Esportiva pelo GANEP. Atendo atletas amadores e profissionais, auxiliando no ganho de performance, composição corporal e saúde geral. Minha abordagem é individualizada e baseada em evidências científicas.',
     city: 'São Paulo, SP',
     modality: 'AMBOS',
+    officeAddress: 'Rua dos Pinheiros, 1240, conjunto 82 — Pinheiros, São Paulo/SP',
     price: 150,
   },
   {
@@ -55,6 +64,7 @@ const PROFESSIONALS: {
     bio: 'Nutrição funcional integrativa, investigando a raiz dos desequilíbrios do organismo para propor mudanças reais e duradouras na saúde dos pacientes.',
     city: 'São Paulo, SP',
     modality: 'PRESENCIAL',
+    officeAddress: 'Alameda Santos, 455, sala 1108 — Cerqueira César, São Paulo/SP',
     price: 180,
   },
   {
@@ -65,6 +75,7 @@ const PROFESSIONALS: {
     bio: 'Especialista em nutrição infantil, ajudando famílias a construir uma relação saudável das crianças com a alimentação desde os primeiros anos.',
     city: 'Belo Horizonte, MG',
     modality: 'AMBOS',
+    officeAddress: 'Rua Pernambuco, 1077, sala 304 — Savassi, Belo Horizonte/MG',
     price: 130,
   },
   {
@@ -81,10 +92,11 @@ const PROFESSIONALS: {
     email: 'beatriz@nutrimatch.com.br',
     name: 'Dra. Beatriz Oliveira',
     crn: 'CRN-3 27640/D',
-    specialties: ['Nutrição Vegana', 'Nutrição Funcional'],
-    bio: 'Nutrição 100% vegetal, mostrando que é possível ter uma alimentação saudável, saborosa e alinhada aos seus valores.',
+    specialties: ['Nutrição Vegana', 'Nutrição Funcional', 'Nutrição Clínica'],
+    bio: 'Nutrição 100% vegetal, mostrando que é possível ter uma alimentação saudável, saborosa e alinhada aos seus valores. Atendo também quem está reduzindo o consumo de origem animal aos poucos, sem radicalismo.',
     city: 'São Paulo, SP',
     modality: 'AMBOS',
+    officeAddress: 'Rua Harmonia, 862, casa 2 — Vila Madalena, São Paulo/SP',
     price: 110,
   },
   {
@@ -95,6 +107,7 @@ const PROFESSIONALS: {
     bio: 'Atendimento presencial com foco em emagrecimento sustentável e tratamento de doenças relacionadas à alimentação.',
     city: 'Porto Alegre, RS',
     modality: 'PRESENCIAL',
+    officeAddress: 'Av. Carlos Gomes, 222, sala 607 — Boa Vista, Porto Alegre/RS',
     price: 100,
   },
   {
@@ -105,20 +118,84 @@ const PROFESSIONALS: {
     bio: 'Nutrição oncológica especializada em apoio nutricional durante e após o tratamento de câncer, em parceria com a equipe médica do paciente.',
     city: 'São Paulo, SP',
     modality: 'AMBOS',
+    officeAddress: 'Rua Joaquim Floriano, 940, conjunto 51 — Itaim Bibi, São Paulo/SP',
     price: 200,
+  },
+  {
+    email: 'patricia@nutrimatch.com.br',
+    name: 'Dra. Patrícia Nogueira',
+    crn: 'CRN-3 24099/D',
+    specialties: ['Nutrição Estética', 'Nutrição Funcional', 'Nutrição Clínica'],
+    bio: 'Nutrição estética com base clínica: cuido de pele, cabelo e composição corporal olhando primeiro para exames, intestino e sono — porque o que aparece por fora quase sempre começa por dentro. Nada de protocolo pronto.',
+    city: 'Campinas, SP',
+    modality: 'AMBOS',
+    officeAddress: 'Av. Barão de Itapura, 2294, sala 12 — Botafogo, Campinas/SP',
+    price: 160,
+  },
+  {
+    email: 'thiago@nutrimatch.com.br',
+    name: 'Dr. Thiago Almeida',
+    crn: 'CRN-10 07731/D',
+    specialties: ['Nutrição Esportiva', 'Nutrição Clínica', 'Nutrição Estética'],
+    bio: 'Atendo corredores, triatletas e quem treina por saúde. Trabalho com periodização alimentar alinhada ao calendário de provas e acompanhamento de composição corporal ao longo da temporada. Consultas online, com retorno por mensagem entre as sessões.',
+    city: 'Florianópolis, SC',
+    modality: 'ONLINE',
+    price: 135,
   },
 ]
 
+/**
+ * O host do banco, para a trava abaixo saber contra o que está apontando.
+ *
+ * Só o host, nunca a senha: esta string vai para o terminal e para o log de quem rodou.
+ */
+function hostDoBanco(): string {
+  try {
+    return new URL(process.env.DATABASE_URL ?? '').host || '(desconhecido)'
+  } catch {
+    return '(DATABASE_URL inválida ou ausente)'
+  }
+}
+
+const HOSTS_LOCAIS = ['localhost', '127.0.0.1', '::1', 'host.docker.internal']
+
 async function main() {
-  // This wipes every user via deleteMany below — safe for a throwaway dev/demo database,
-  // catastrophic against a real one. Refuse unless someone deliberately overrides it.
+  const host = hostDoBanco()
+  const ehLocal = HOSTS_LOCAIS.some((h) => host.startsWith(h))
+
+  // Duas travas, porque uma não bastou.
+  //
+  // A primeira olha NODE_ENV. Ela não protege o caso que mais acontece: o `.env` da máquina de
+  // quem desenvolve aponta para o banco de produção (ver docs/FLUXO-DE-TRABALHO.md — dados reais
+  // já foram apagados assim uma vez), e ali NODE_ENV não é 'production'. A trava passava, o
+  // deleteMany rodava, e os usuários de verdade iam com ele.
+  //
+  // A segunda olha para onde a DATABASE_URL aponta de fato. Banco remoto exige confirmação
+  // explícita, independentemente de NODE_ENV. Continua sendo possível semear o banco da
+  // demonstração — é só dizer que é isso que se quer.
   if (process.env.NODE_ENV === 'production' && process.env.SEED_CONFIRM_PROD !== 'yes') {
     console.error(
-      'Refusing to run prisma/seed.ts with NODE_ENV=production — this deletes all users.\n' +
-        'For a one-time production bootstrap, use `npx tsx scripts/create-admin.ts` instead.\n' +
-        'If you really mean to reset production data, re-run with SEED_CONFIRM_PROD=yes.'
+      `Recusando rodar prisma/seed.ts com NODE_ENV=production — isto APAGA todos os usuários de ${host}.\n` +
+        'Para criar só o admin num banco de verdade, use `npx tsx scripts/create-admin.ts`.\n' +
+        'Se é mesmo para zerar produção, rode de novo com SEED_CONFIRM_PROD=yes.'
     )
     process.exit(1)
+  }
+
+  if (!ehLocal && process.env.SEED_CONFIRM_REMOTE !== 'yes') {
+    console.error(
+      `\n  ⚠  A DATABASE_URL aponta para um banco REMOTO: ${host}\n\n` +
+        '  Este script começa com `prisma.user.deleteMany({})`. Num banco remoto isso apaga\n' +
+        '  pacientes, nutricionistas, consultas, pagamentos e repasses reais — sem desfazer.\n\n' +
+        '  Se você quer mesmo semear ESTE banco (por exemplo, o da demonstração):\n' +
+        '      SEED_CONFIRM_REMOTE=yes npm run seed\n\n' +
+        '  Se o que você queria era semear um banco local, corrija a DATABASE_URL primeiro.\n'
+    )
+    process.exit(1)
+  }
+
+  if (!ehLocal) {
+    console.log(`Semeando banco REMOTO ${host} (SEED_CONFIRM_REMOTE=yes).`)
   }
 
   // Full reset on every run — this is dev/demo seed data, safe to recreate from scratch.
@@ -132,6 +209,8 @@ async function main() {
       email: 'admin@nutrimatch.com.br',
       passwordHash,
       role: 'ADMIN',
+      termsAcceptedAt: new Date(),
+      termsVersion: TERMS_VERSION,
     },
   })
 
@@ -143,6 +222,10 @@ async function main() {
         email: p.email,
         passwordHash,
         role: 'PROFESSIONAL',
+        // Contas de demonstração também registram aceite: um perfil sem ele apareceria no painel
+        // como pendência, e a demonstração passaria a mostrar um problema que não existe.
+        termsAcceptedAt: new Date(),
+        termsVersion: TERMS_VERSION,
         professional: {
           create: {
             crn: p.crn,
@@ -150,6 +233,7 @@ async function main() {
             bio: p.bio,
             city: p.city,
             modality: p.modality,
+            officeAddress: p.officeAddress ?? null,
             price: p.price,
             status: 'ACTIVE',
             // Chave Pix fictícia: é o que coloca o profissional no fluxo pago da demonstração.
@@ -168,10 +252,20 @@ async function main() {
   }
 
   const patients: Record<string, string> = {}
+  // Nove pacientes, e não três, por causa das avaliações: com três, a vitrine mostrava a mesma
+  // pessoa avaliando seis nutricionistas, e uma avaliação que se repete parece o que é — semeada.
+  // Os três primeiros continuam sendo os de login da demonstração; o resto existe para dar nome
+  // às avaliações.
   const PATIENTS = [
     { email: 'ana@email.com', name: 'Ana Silva', goal: 'Emagrecimento', city: 'São Paulo' },
     { email: 'carlos@email.com', name: 'Carlos Mendes', goal: 'Hipertrofia', city: 'São Paulo' },
     { email: 'fernanda@email.com', name: 'Fernanda Lopes', goal: 'Saúde geral', city: 'Rio de Janeiro' },
+    { email: 'juliana.reis@email.com', name: 'Juliana Reis', goal: 'Emagrecimento', city: 'Campinas' },
+    { email: 'marcos@email.com', name: 'Marcos Tavares', goal: 'Hipertrofia', city: 'Florianópolis' },
+    { email: 'patricia.alves@email.com', name: 'Patrícia Alves', goal: 'Saúde geral', city: 'Belo Horizonte' },
+    { email: 'rodrigo@email.com', name: 'Rodrigo Nunes', goal: 'Controle de doenças', city: 'Porto Alegre' },
+    { email: 'camila@email.com', name: 'Camila Duarte', goal: 'Saúde geral', city: 'São Paulo' },
+    { email: 'eduardo@email.com', name: 'Eduardo Prado', goal: 'Emagrecimento', city: 'Curitiba' },
   ]
   for (const p of PATIENTS) {
     const user = await prisma.user.create({
@@ -180,6 +274,8 @@ async function main() {
         email: p.email,
         passwordHash,
         role: 'PATIENT',
+        termsAcceptedAt: new Date(),
+        termsVersion: TERMS_VERSION,
         patient: { create: { goal: p.goal, city: p.city } },
       },
       include: { patient: true },
@@ -322,6 +418,8 @@ async function main() {
     'Dra. Beatriz Oliveira': { fulfilled: 6, noShows: 0, lateCancellations: 1 },
     'Dr. Lucas Ferreira': { fulfilled: 3, noShows: 0, lateCancellations: 4 },
     'Dra. Amanda Santos': { fulfilled: 5, noShows: 0, lateCancellations: 0 },
+    'Dra. Patrícia Nogueira': { fulfilled: 33, noShows: 1, lateCancellations: 0 },
+    'Dr. Thiago Almeida': { fulfilled: 16, noShows: 2, lateCancellations: 1 },
   }
 
   const patientIdList = Object.values(patients)
@@ -388,54 +486,78 @@ async function main() {
     data: { targetWeightKg: 70 },
   })
 
+  // Avaliações da demonstração. Quatro a seis por profissional, de pacientes diferentes e com
+  // notas variadas — não porque o número seja bonito, mas porque com duas avaliações cada o
+  // encolhimento bayesiano (PRIOR_WEIGHT = 8 em lib/ranking.ts) puxava todo mundo para a média da
+  // plataforma e o ranking saía embolado: quem tinha 3 consultas aparecia acima de quem tinha 58.
+  // Com volume, a nota volta a separar as pessoas — que é o que a busca precisa demonstrar.
+  //
+  // Os comentários são todos distintos de propósito. Texto repetido em dois perfis é o detalhe
+  // que denuncia uma vitrine montada, e é justamente nele que o olho de quem visita a feira cai.
   const reviews = [
-    {
-      professional: 'Dra. Carolina Matos',
-      patient: 'Ana Silva',
-      rating: 5,
-      comment: 'Excelente profissional! Mudou completamente minha relação com a alimentação. Superou todas as expectativas.',
-      appointmentKey: `Dra. Carolina Matos|Ana Silva|${days(-10).toISOString()}`,
-    },
-    {
-      professional: 'Dra. Carolina Matos',
-      patient: 'Carlos Mendes',
-      rating: 5,
-      comment: 'Muito atenciosa e detalhista. O plano alimentar foi personalizado de verdade para meu estilo de vida.',
-      appointmentKey: `Dra. Carolina Matos|Carlos Mendes|${days(-15).toISOString()}`,
-    },
-    {
-      professional: 'Dra. Carolina Matos',
-      patient: 'Fernanda Lopes',
-      rating: 4,
-      comment: 'Ótimo atendimento, plano bem estruturado. Já perdi peso seguindo as orientações.',
-      appointmentKey: null,
-    },
-    {
-      professional: 'Dr. Rafael Costa',
-      patient: 'Fernanda Lopes',
-      rating: 5,
-      comment: 'Consulta muito completa, recomendo! Atendimento online tranquilo e muito profissional.',
-      appointmentKey: `Dr. Rafael Costa|Fernanda Lopes|${days(-8).toISOString()}`,
-    },
-    {
-      professional: 'Dra. Maria Fernanda',
-      patient: 'Ana Silva',
-      rating: 5,
-      comment: 'Profissional incrível, super recomendo. Abordagem funcional fez toda diferença no meu tratamento.',
-      appointmentKey: `Dra. Maria Fernanda|Ana Silva|${days(-5).toISOString()}`,
-    },
-    { professional: 'Dra. Maria Fernanda', patient: 'Carlos Mendes', rating: 5, comment: 'Investigou a fundo meus exames e montou um plano que realmente funcionou. Vale cada centavo.', appointmentKey: null },
+    // ── Dra. Carolina Matos — esportiva + funcional, a mais estabelecida ─────────────────
+    { professional: 'Dra. Carolina Matos', patient: 'Ana Silva', rating: 5, comment: 'Excelente profissional! Mudou completamente minha relação com a alimentação. Superou todas as expectativas.', appointmentKey: `Dra. Carolina Matos|Ana Silva|${days(-10).toISOString()}` },
+    { professional: 'Dra. Carolina Matos', patient: 'Carlos Mendes', rating: 5, comment: 'Muito atenciosa e detalhista. O plano alimentar foi personalizado de verdade para meu estilo de vida.', appointmentKey: `Dra. Carolina Matos|Carlos Mendes|${days(-15).toISOString()}` },
+    { professional: 'Dra. Carolina Matos', patient: 'Fernanda Lopes', rating: 5, comment: 'Ótimo atendimento, plano bem estruturado. Já perdi peso seguindo as orientações.', appointmentKey: null },
+    { professional: 'Dra. Carolina Matos', patient: 'Marcos Tavares', rating: 5, comment: 'Treino pesado e ela soube encaixar a alimentação sem me fazer viver de frango com batata. Fez diferença na recuperação entre os treinos.', appointmentKey: null },
+    { professional: 'Dra. Carolina Matos', patient: 'Camila Duarte', rating: 5, comment: 'Pontual, prepara a consulta antes e cobra retorno. Senti que tinha alguém acompanhando de verdade, não só entregando papel.', appointmentKey: null },
+    { professional: 'Dra. Carolina Matos', patient: 'Eduardo Prado', rating: 4, comment: 'Muito boa. Só demorei a me adaptar ao volume de comida do plano inicial, mas ela ajustou rápido quando falei.', appointmentKey: null },
+
+    // ── Dr. Rafael Costa — clínica, online ──────────────────────────────────────────────
+    { professional: 'Dr. Rafael Costa', patient: 'Fernanda Lopes', rating: 5, comment: 'Consulta muito completa, recomendo! Atendimento online tranquilo e muito profissional.', appointmentKey: `Dr. Rafael Costa|Fernanda Lopes|${days(-8).toISOString()}` },
     { professional: 'Dr. Rafael Costa', patient: 'Ana Silva', rating: 4, comment: 'Consulta online muito prática, plano alimentar claro e fácil de seguir no dia a dia.', appointmentKey: null },
+    { professional: 'Dr. Rafael Costa', patient: 'Rodrigo Nunes', rating: 5, comment: 'Cheguei com pré-diabetes e hemoglobina glicada alta. Seis meses depois, exames normalizados e sem dieta de sofrimento.', appointmentKey: null },
+    { professional: 'Dr. Rafael Costa', patient: 'Patrícia Alves', rating: 4, comment: 'Explica muito bem o porquê de cada coisa. A consulta é longa, o que é bom, mas exige tempo livre de verdade.', appointmentKey: null },
+    { professional: 'Dr. Rafael Costa', patient: 'Eduardo Prado', rating: 5, comment: 'Online funcionou melhor do que eu esperava. Recebo o plano no mesmo dia e dá para tirar dúvida depois.', appointmentKey: null },
+
+    // ── Dra. Maria Fernanda — funcional + clínica, presencial ───────────────────────────
+    { professional: 'Dra. Maria Fernanda', patient: 'Ana Silva', rating: 5, comment: 'Profissional incrível, super recomendo. Abordagem funcional fez toda diferença no meu tratamento.', appointmentKey: `Dra. Maria Fernanda|Ana Silva|${days(-5).toISOString()}` },
+    { professional: 'Dra. Maria Fernanda', patient: 'Carlos Mendes', rating: 5, comment: 'Investigou a fundo meus exames e montou um plano que realmente funcionou. Vale cada centavo.', appointmentKey: null },
+    { professional: 'Dra. Maria Fernanda', patient: 'Camila Duarte', rating: 5, comment: 'Foi a primeira que olhou meu intestino antes de falar de peso. Mudou tudo, inclusive o sono.', appointmentKey: null },
+    { professional: 'Dra. Maria Fernanda', patient: 'Juliana Reis', rating: 4, comment: 'Atendimento excelente e consultório muito bom. O valor é mais alto que a média, mas entrega o que promete.', appointmentKey: null },
+    { professional: 'Dra. Maria Fernanda', patient: 'Patrícia Alves', rating: 5, comment: 'Saí da consulta entendendo meus próprios exames pela primeira vez na vida.', appointmentKey: null },
+
+    // ── Dra. Juliana Torres — infantil ──────────────────────────────────────────────────
     { professional: 'Dra. Juliana Torres', patient: 'Fernanda Lopes', rating: 5, comment: 'Minha filha adorou o atendimento. Hoje ela come de tudo, foi uma transformação e tanto.', appointmentKey: null },
     { professional: 'Dra. Juliana Torres', patient: 'Ana Silva', rating: 4, comment: 'Muito paciente com as crianças e com os pais também. Orientações práticas e realistas.', appointmentKey: null },
+    { professional: 'Dra. Juliana Torres', patient: 'Patrícia Alves', rating: 5, comment: 'Meu filho é seletivo e eu já tinha desistido. Ela montou um plano por etapas e funcionou sem briga na mesa.', appointmentKey: null },
+    { professional: 'Dra. Juliana Torres', patient: 'Juliana Reis', rating: 5, comment: 'Acolhedora com a mãe também, o que ninguém tinha feito antes. Saí sem culpa e com um caminho.', appointmentKey: null },
+
+    // ── Dr. André Lima — esportiva, online ──────────────────────────────────────────────
     { professional: 'Dr. André Lima', patient: 'Carlos Mendes', rating: 5, comment: 'Meu desempenho nos treinos melhorou visivelmente em dois meses. Acompanhamento de perto.', appointmentKey: null },
     { professional: 'Dr. André Lima', patient: 'Fernanda Lopes', rating: 5, comment: 'Atendimento online excelente, sempre disponível para ajustar o plano quando preciso.', appointmentKey: null },
+    { professional: 'Dr. André Lima', patient: 'Marcos Tavares', rating: 4, comment: 'Bom para quem já treina sério. Se você está começando, talvez seja técnico demais no começo.', appointmentKey: null },
+    { professional: 'Dr. André Lima', patient: 'Eduardo Prado', rating: 5, comment: 'Suplementação explicada com critério, sem empurrar nada. Confiança total.', appointmentKey: null },
+
+    // ── Dra. Beatriz Oliveira — vegana + funcional + clínica ────────────────────────────
     { professional: 'Dra. Beatriz Oliveira', patient: 'Ana Silva', rating: 5, comment: 'Finalmente uma nutricionista que entende alimentação vegana de verdade. Recomendo muito!', appointmentKey: null },
     { professional: 'Dra. Beatriz Oliveira', patient: 'Fernanda Lopes', rating: 4, comment: 'Plano bem montado e saboroso. Só senti falta de mais opções de receitas rápidas.', appointmentKey: null },
+    { professional: 'Dra. Beatriz Oliveira', patient: 'Camila Duarte', rating: 5, comment: 'Estava anêmica desde que parei de comer carne. Ela resolveu com comida e um suplemento só, sem drama.', appointmentKey: null },
+    { professional: 'Dra. Beatriz Oliveira', patient: 'Juliana Reis', rating: 5, comment: 'Eu só queria reduzir a carne, não virar vegana, e ela respeitou isso do começo ao fim.', appointmentKey: null },
+
+    // ── Dr. Lucas Ferreira — clínica, presencial, perfil ainda novo ─────────────────────
     { professional: 'Dr. Lucas Ferreira', patient: 'Carlos Mendes', rating: 4, comment: 'Atendimento presencial atencioso, consultório bem localizado. Estou tendo bons resultados.', appointmentKey: null },
     { professional: 'Dr. Lucas Ferreira', patient: 'Ana Silva', rating: 5, comment: 'Emagreci de forma saudável e sem sofrimento. Abordagem realista e acolhedora.', appointmentKey: null },
+    { professional: 'Dr. Lucas Ferreira', patient: 'Rodrigo Nunes', rating: 4, comment: 'Gostei da consulta e do plano. Já precisei remarcar duas vezes por mudança na agenda dele.', appointmentKey: null },
+
+    // ── Dra. Amanda Santos — oncológica + clínica ───────────────────────────────────────
     { professional: 'Dra. Amanda Santos', patient: 'Fernanda Lopes', rating: 5, comment: 'Apoio fundamental durante o tratamento da minha mãe. Profissional extremamente preparada.', appointmentKey: null },
     { professional: 'Dra. Amanda Santos', patient: 'Carlos Mendes', rating: 5, comment: 'Trabalho impecável em conjunto com a equipe médica. Fez toda a diferença na recuperação.', appointmentKey: null },
+    { professional: 'Dra. Amanda Santos', patient: 'Patrícia Alves', rating: 5, comment: 'Durante a quimioterapia eu não conseguia comer nada. Ela achou o que descia e me manteve de pé.', appointmentKey: null },
+    { professional: 'Dra. Amanda Santos', patient: 'Camila Duarte', rating: 5, comment: 'Sensibilidade e técnica na mesma consulta. Difícil achar as duas coisas juntas.', appointmentKey: null },
+
+    // ── Dra. Patrícia Nogueira — estética + funcional + clínica ─────────────────────────
+    { professional: 'Dra. Patrícia Nogueira', patient: 'Ana Silva', rating: 5, comment: 'Chegei querendo tratar queda de cabelo e saí com os exames explicados de um jeito que ninguém tinha feito antes. Três meses depois, resolvido.', appointmentKey: null },
+    { professional: 'Dra. Patrícia Nogueira', patient: 'Fernanda Lopes', rating: 5, comment: 'Atenciosa e muito técnica. Explica o porquê de cada mudança, o que faz a gente seguir de verdade.', appointmentKey: null },
+    { professional: 'Dra. Patrícia Nogueira', patient: 'Carlos Mendes', rating: 4, comment: 'Ótimo acompanhamento. O consultório em Campinas é fácil de chegar e o atendimento é pontual.', appointmentKey: null },
+    { professional: 'Dra. Patrícia Nogueira', patient: 'Juliana Reis', rating: 5, comment: 'Ela não prometeu resultado em duas semanas, e foi por isso que eu confiei. Deu certo no tempo que ela disse.', appointmentKey: null },
+    { professional: 'Dra. Patrícia Nogueira', patient: 'Camila Duarte', rating: 5, comment: 'Pele e unhas melhoraram muito, mas o que mais mudou foi a energia. Não esperava por essa.', appointmentKey: null },
+
+    // ── Dr. Thiago Almeida — esportiva + clínica + estética, online ─────────────────────
+    { professional: 'Dr. Thiago Almeida', patient: 'Carlos Mendes', rating: 5, comment: 'Ajustou minha alimentação para o calendário de provas e cortei oito minutos na meia maratona. Responde rápido entre as consultas.', appointmentKey: null },
+    { professional: 'Dr. Thiago Almeida', patient: 'Ana Silva', rating: 4, comment: 'Plano bem montado para quem treina de manhã cedo. Só achei o retorno um pouco espaçado.', appointmentKey: null },
+    { professional: 'Dr. Thiago Almeida', patient: 'Marcos Tavares', rating: 5, comment: 'Periodização de verdade, alinhada com o treinador. Primeira vez que os dois falaram a mesma língua.', appointmentKey: null },
+    { professional: 'Dr. Thiago Almeida', patient: 'Eduardo Prado', rating: 4, comment: 'Bom atendimento e muito conhecimento. Tive que remarcar uma consulta e a agenda dele estava cheia.', appointmentKey: null },
   ]
 
   for (const r of reviews) {

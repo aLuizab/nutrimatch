@@ -4,6 +4,9 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Video, MapPin, FileText, Clock, UserCheck } from 'lucide-react'
 import { addDaysToDateString, mondayOfWeek, spDateString, spHour } from '@/lib/spdate'
+import CalendarioMeses from '../components/CalendarioMeses'
+import NovoCompromisso, { type AgendaEntryView } from './NovoCompromisso'
+import { BOOKING_HORIZON_DAYS } from '@/lib/availability'
 import { initials, avatarColor, formatDateBR, formatTimeBR } from '@/lib/format'
 import { OPEN_BEFORE_MINUTES } from '@/lib/meeting'
 import type { AttendanceStatus, Modality } from '@prisma/client'
@@ -16,6 +19,9 @@ export interface AgendaAppointment {
   modality: Modality
   summary: string | null
   status: 'CONFIRMED' | 'AWAITING_CONFIRMATION'
+  // Distingue "o paciente ainda não pagou" de "ele avisou que pagou e a plataforma está
+  // conferindo". São duas esperas diferentes, e só a segunda tem alguém trabalhando nela.
+  paymentStatus: string
   confirmationDeadline: Date | null
   meetingUrl: string | null
   meetingOpen: boolean
@@ -105,67 +111,28 @@ function AttendancePanel({ appointment, onDone }: { appointment: AgendaAppointme
   )
 }
 
-function ConfirmPanel({ appointment, onDone }: { appointment: AgendaAppointment; onDone: () => void }) {
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'confirm' | 'decline' | null>(null)
-
-  async function act(status: 'CONFIRMED' | 'CANCELLED') {
-    setError(null)
-    setBusy(status === 'CONFIRMED' ? 'confirm' : 'decline')
-    try {
-      const res = await fetch(`/api/appointments/${appointment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setError(data.error ?? 'Não foi possível atualizar a consulta')
-        return
-      }
-      onDone()
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const hoursLeft = appointment.confirmationDeadline
-    ? Math.max(0, Math.round((appointment.confirmationDeadline.getTime() - Date.now()) / 3600000))
-    : null
-
+/**
+ * O que o profissional vê quando uma consulta dele está com o pagamento em aberto.
+ *
+ * Informa, não pergunta. Antes aqui havia "Confirmar" e "Recusar": a consulta chegava como pedido
+ * e ele decidia. Não é mais assim — quem marca a consulta é a conferência do pagamento pela
+ * plataforma, e o horário só aparece aqui porque está preso enquanto o paciente paga. Deixar os
+ * botões seria oferecer uma decisão que não existe.
+ *
+ * Ele não fica sem saída: consulta já marcada pode ser cancelada, no painel normal.
+ */
+function AguardandoPagamentoPanel({ appointment }: { appointment: AgendaAppointment }) {
+  const declarado = appointment.paymentStatus === 'AWAITING_REVIEW'
   return (
     <div className="mt-4 border-t border-gray-100 pt-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p className="flex items-center gap-1.5 text-sm font-bold text-orange-800">
-            <Clock size={14} /> Aguardando sua confirmação
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {hoursLeft !== null && hoursLeft > 0
-              ? `Restam ~${hoursLeft}h para confirmar. Depois disso o horário é liberado.`
-              : 'O prazo de confirmação está encerrando.'}
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button
-            onClick={() => act('CANCELLED')}
-            disabled={busy !== null}
-            className="px-4 py-2 text-sm border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {busy === 'decline' ? 'Recusando...' : 'Recusar'}
-          </button>
-          <button
-            onClick={() => act('CONFIRMED')}
-            disabled={busy !== null}
-            className="px-4 py-2 text-sm bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50"
-          >
-            {busy === 'confirm' ? 'Confirmando...' : 'Confirmar consulta'}
-          </button>
-        </div>
-      </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      <p className="flex items-center gap-1.5 text-sm font-bold text-orange-800">
+        <Clock size={14} /> {declarado ? 'Pagamento em conferência' : 'Aguardando o pagamento'}
+      </p>
+      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+        {declarado
+          ? 'O paciente avisou que pagou e a plataforma está conferindo o extrato. Assim que o pagamento for confirmado, a consulta fica marcada automaticamente — você não precisa aceitar nada.'
+          : 'O paciente reservou este horário e está fazendo o pagamento. Se ele não pagar, o horário volta a ficar livre sozinho. Você não precisa fazer nada.'}
+      </p>
     </div>
   )
 }
@@ -232,10 +199,31 @@ function SummaryEditor({ appointment, onSaved }: { appointment: AgendaAppointmen
   )
 }
 
-export default function AgendaGrid({ appointments }: { appointments: AgendaAppointment[] }) {
+/** Quantas semanas separam duas datas, contadas pelas segundas-feiras de cada uma. */
+function semanasEntre(deStr: string, paraStr: string) {
+  const segunda = (d: string) => {
+    const [y, m, dd] = mondayOfWeek(d).split('-').map(Number)
+    return Date.UTC(y, m - 1, dd)
+  }
+  return Math.round((segunda(paraStr) - segunda(deStr)) / (7 * 86400_000))
+}
+
+export default function AgendaGrid({
+  appointments,
+  entries,
+  hoje,
+}: {
+  appointments: AgendaAppointment[]
+  entries: AgendaEntryView[]
+  hoje: string
+}) {
   const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // Duas leituras da mesma agenda. A semana mostra horário por horário, que é o que serve para
+  // trabalhar; o mês mostra só quantas consultas tem em cada dia, que é o que serve para achar
+  // uma consulta marcada para dentro de dois meses sem clicar em "próxima semana" nove vezes.
+  const [modo, setModo] = useState<'semana' | 'mes'>('semana')
 
   const todayStr = useMemo(() => spDateString(new Date()), [])
   const mondayStr = mondayOfWeek(todayStr, weekOffset)
@@ -255,6 +243,21 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
     return map
   }, [appointments])
 
+  // Os compromissos próprios ocupam a célula da hora em que começam. Um bloco de duas horas
+  // aparece uma vez, na primeira: esticá-lo por várias células exigiria uma grade posicionada em
+  // pixels, e o que o profissional precisa saber — "este horário está ocupado, e com o quê" — já
+  // está dito. O intervalo completo aparece no rótulo.
+  const entriesByCell = useMemo(() => {
+    const map = new Map<string, AgendaEntryView[]>()
+    for (const e of entries) {
+      const key = `${spDateString(e.startsAt)}|${spHour(e.startsAt)}`
+      const list = map.get(key) ?? []
+      list.push(e)
+      map.set(key, list)
+    }
+    return map
+  }, [entries])
+
   // Base range 8h–18h, stretched to cover any booked hour (evening blocks etc.) so no
   // appointment is ever outside the grid.
   const hours = useMemo(() => {
@@ -265,20 +268,71 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
       if (h < min) min = h
       if (h > max) max = h
     }
+    // Compromissos entram na mesma conta: um almoço às 7h fora da faixa sumiria da grade, e um
+    // horário ocupado que não aparece é pior que não ter a funcionalidade.
+    for (const e of entries) {
+      const h = spHour(e.startsAt)
+      if (h < min) min = h
+      if (h > max) max = h
+    }
     return Array.from({ length: max - min + 1 }, (_, i) => min + i)
-  }, [appointments])
+  }, [appointments, entries])
 
   const selected = appointments.find((a) => a.id === selectedId) ?? null
+
+  // Contagem por dia, para a visão de mês. Só dias com consulta ganham marca — o calendário
+  // trata dia sem marca como não clicável, e aqui não há o que abrir num dia vazio.
+  const marcasDoMes = useMemo(() => {
+    const porDia = new Map<string, number>()
+    for (const a of appointments) {
+      const dia = spDateString(a.scheduledAt)
+      porDia.set(dia, (porDia.get(dia) ?? 0) + 1)
+    }
+    const marcas: Record<string, { tone: string; nota?: string; title?: string }> = {}
+    for (const [dia, n] of porDia) {
+      marcas[dia] = {
+        tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        nota: String(n),
+        title: `${n} ${n === 1 ? 'consulta' : 'consultas'}`,
+      }
+    }
+    return marcas
+  }, [appointments])
+
+  // A janela do calendário acompanha o que existe de verdade na agenda, para trás e para frente,
+  // com uma folga de um mês de cada lado. Fixar três meses à frente esconderia uma consulta
+  // marcada para além disso, e é justamente ela que ninguém quer perder de vista.
+  const janelaDoMes = useMemo(() => {
+    const dias = appointments.map((a) => spDateString(a.scheduledAt))
+    const menor = dias.reduce((acc, d) => (d < acc ? d : acc), todayStr)
+    const maior = dias.reduce((acc, d) => (d > acc ? d : acc), todayStr)
+    return { primeiroDia: addDaysToDateString(menor, -31), ultimoDia: addDaysToDateString(maior, 31) }
+  }, [appointments, todayStr])
 
   return (
     <>
       <div className="bg-surface border-b border-gray-100 px-8 py-5 flex justify-between items-center">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Agenda</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Gerencie suas consultas semanais</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {modo === 'semana' ? 'Suas consultas, horário por horário' : 'Visão do mês — clique num dia para abrir a semana dele'}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            {(['semana', 'mes'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setModo(m)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                  modo === m ? 'bg-surface text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {m === 'semana' ? 'Semana' : 'Mês'}
+              </button>
+            ))}
+          </div>
+          <div className={`flex items-center gap-1 bg-gray-100 rounded-xl p-1 ${modo === 'mes' ? 'hidden' : ''}`}>
             <button onClick={() => setWeekOffset(weekOffset - 1)} aria-label="Semana anterior" className="p-2 rounded-lg hover:bg-surface transition-colors">
               <ChevronLeft size={18} className="text-gray-600" />
             </button>
@@ -291,7 +345,9 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
           </div>
           <button
             onClick={() => setWeekOffset(0)}
-            className="px-4 py-2 text-sm font-medium text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors"
+            className={`px-4 py-2 text-sm font-medium text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors ${
+              modo === 'mes' ? 'hidden' : ''
+            }`}
           >
             Hoje
           </button>
@@ -299,12 +355,37 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
       </div>
 
       <div className="p-8">
-        <div className="flex gap-4 mb-5 text-xs font-medium text-gray-500">
+        <div className="flex gap-4 mb-5 text-xs font-medium text-gray-500 flex-wrap">
           <div className="flex items-center gap-1.5"><Video size={12} className="text-blue-500" /> Online</div>
           <div className="flex items-center gap-1.5"><MapPin size={12} className="text-emerald-500" /> Presencial</div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded border border-purple-300 bg-purple-50" /> Fora da plataforma
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded border border-gray-300 bg-gray-50" /> Compromisso
+          </div>
         </div>
 
-        <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        {modo === 'mes' && (
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6 max-w-lg">
+            <CalendarioMeses
+              primeiroDia={janelaDoMes.primeiroDia}
+              ultimoDia={janelaDoMes.ultimoDia}
+              marcas={marcasDoMes}
+              selecionado={null}
+              onSelecionar={(dateStr) => {
+                setWeekOffset(semanasEntre(todayStr, dateStr))
+                setSelectedId(null)
+                setModo('semana')
+              }}
+            />
+            <p className="text-xs text-gray-400 mt-4">
+              O número em cada dia é quantas consultas você tem nele.
+            </p>
+          </div>
+        )}
+
+        <div className={`bg-surface rounded-2xl border border-gray-100 shadow-sm overflow-hidden ${modo === 'mes' ? 'hidden' : ''}`}>
           <div className="grid border-b border-gray-100" style={{ gridTemplateColumns: '64px repeat(5, 1fr)' }}>
             <div className="border-r border-gray-100" />
             {weekDates.map((dateStr, i) => (
@@ -330,13 +411,31 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                   const appts = byCell.get(`${dateStr}|${h}`) ?? []
                   return (
                     <div key={dateStr} className={`border-r border-gray-50 last:border-0 p-1.5 space-y-1 ${dateStr === todayStr ? 'bg-emerald-50/30' : ''}`}>
+                      {(entriesByCell.get(`${dateStr}|${h}`) ?? []).map((e) => (
+                        <div
+                          key={e.id}
+                          title={e.note ?? undefined}
+                          className={`w-full text-left p-2 rounded-lg border text-xs font-medium ${
+                            e.kind === 'CONSULTA_EXTERNA'
+                              ? 'border-purple-300 text-purple-800 bg-purple-50'
+                              : 'border-gray-300 text-gray-600 bg-gray-50'
+                          }`}
+                        >
+                          <p className="font-bold truncate">{e.title}</p>
+                          <p className="opacity-70 mt-0.5">
+                            {formatTimeBR(e.startsAt)}–{formatTimeBR(e.endsAt)} ·{' '}
+                            {e.kind === 'CONSULTA_EXTERNA' ? 'fora daqui' : 'ocupado'}
+                          </p>
+                        </div>
+                      ))}
                       {appts.map((appt) => (
                         <button
                           key={appt.id}
                           onClick={() => setSelectedId(appt.id === selectedId ? null : appt.id)}
                           className={`w-full text-left p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm bg-surface ${
-                            // Awaiting bookings get their own colour and a dashed edge: they
-                            // need action, and must not look like a settled appointment.
+                            // Horário preso enquanto o paciente paga: cor própria e borda
+                            // tracejada, porque ainda pode evaporar e não pode se parecer com
+                            // uma consulta marcada. Não pede ação nenhuma do profissional.
                             appt.status === 'AWAITING_CONFIRMATION'
                               ? 'border-orange-300 border-dashed text-orange-800 bg-orange-50'
                               : appt.modality === 'PRESENCIAL'
@@ -354,7 +453,9 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                               <Video size={10} />
                             )}
                             {formatTimeBR(appt.scheduledAt)} ·{' '}
-                            {appt.status === 'AWAITING_CONFIRMATION' ? 'Confirmar' : (appt.reason ?? 'Consulta')}
+                            {appt.status === 'AWAITING_CONFIRMATION'
+                              ? 'Aguardando pagamento'
+                              : (appt.reason ?? 'Consulta')}
                           </p>
                         </button>
                       ))}
@@ -364,6 +465,14 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
               </div>
             ))}
           </div>
+        </div>
+
+        <div className="mt-6">
+          <NovoCompromisso
+            entries={entries}
+            hoje={hoje}
+            ultimoDia={addDaysToDateString(hoje, BOOKING_HORIZON_DAYS)}
+          />
         </div>
 
         {selected && (
@@ -395,7 +504,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                 </a>
               ) : (
                 <span
-                  title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes do horário`}
+                  title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes, e o link chega por e-mail no mesmo momento`}
                   className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-gray-400 border border-gray-200 px-4 py-2.5 rounded-xl cursor-default"
                 >
                   <Video size={14} />
@@ -406,7 +515,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
               )
             )}
             {selected.status === 'AWAITING_CONFIRMATION' ? (
-              <ConfirmPanel appointment={selected} onDone={() => router.refresh()} />
+              <AguardandoPagamentoPanel appointment={selected} />
             ) : selected.scheduledAt.getTime() <= Date.now() ? (
               <>
                 <AttendancePanel appointment={selected} onDone={() => router.refresh()} />

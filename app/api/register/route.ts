@@ -11,12 +11,20 @@ import { formatCents } from '@/lib/money'
 import { PRO_PLAN_SLUG } from '@/lib/subscription'
 import { WELCOME_DISCOUNT_PERCENT, claimWelcomeDiscount, welcomeDiscountCode } from '@/lib/welcome-discount'
 import { configFailure, unexpectedFailure } from '@/lib/api-failures'
+import { TERMS_VERSION } from '@/lib/terms'
+import { validateOffice } from '@/lib/office'
 
 const baseFields = {
   name: z.string().trim().min(2, 'Nome é obrigatório'),
   email: z.string().trim().toLowerCase().email('E-mail inválido'),
   password: z.string().min(8, 'A senha precisa ter no mínimo 8 caracteres'),
   phone: z.string().trim().optional(),
+  // `literal(true)` e não `boolean()`: um aceite que aceita `false` não é aceite. O schema
+  // recusa o cadastro em vez de gravar uma conta sem consentimento registrado — e a checagem
+  // vive aqui, no servidor, porque a caixa marcada no navegador é só a interface do gesto.
+  acceptedTerms: z.literal(true, {
+    message: 'É preciso aceitar os Termos de Uso e a Política de Privacidade para criar a conta',
+  }),
 }
 
 const patientSchema = z.object({
@@ -41,6 +49,9 @@ const professionalSchema = z.object({
   city: z.string().trim().min(2, 'Cidade é obrigatória'),
   price: z.coerce.number().int().min(1, 'Valor inválido'),
   modality: z.enum(['ONLINE', 'PRESENCIAL', 'AMBOS']),
+  // Obrigatório quando o formato é presencial, e o par é validado logo abaixo — um dos dois
+  // sozinho não diz se a combinação pode ser salva.
+  officeAddress: z.string().trim().max(300, 'Endereço muito longo').optional(),
 })
 
 const registerSchema = z.discriminatedUnion('role', [patientSchema, professionalSchema])
@@ -83,6 +94,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: crn.error }, { status: 400 })
     }
     crnFormatted = crn.formatted
+
+    // Presencial sem endereço não passa. Conferido antes de escrever qualquer coisa, junto do
+    // CRN, porque os dois são a mesma classe de problema: dado que o paciente vai depender e
+    // que não dá para corrigir depois que ele já marcou.
+    const semEndereco = validateOffice(data.modality, data.officeAddress)
+    if (semEndereco) {
+      return NextResponse.json({ error: semEndereco }, { status: 400 })
+    }
   }
 
   // This response does tell an unauthenticated caller that an email is registered. Hiding it
@@ -110,6 +129,10 @@ export async function POST(request: Request) {
         passwordHash,
         phone: data.phone || null,
         role: data.role,
+        // Data e versão gravadas no mesmo instante da conta: é o registro de que esta pessoa
+        // concordou com ESTE texto, e não com o que estiver no ar daqui a um ano.
+        termsAcceptedAt: new Date(),
+        termsVersion: TERMS_VERSION,
         ...(data.role === 'PATIENT'
           ? {
               patient: {
@@ -130,6 +153,7 @@ export async function POST(request: Request) {
                   bio: '',
                   city: data.city,
                   modality: data.modality,
+                  officeAddress: data.officeAddress || null,
                   price: data.price,
                   status: 'PENDING',
                   availabilityRules: { create: DEFAULT_AVAILABILITY },

@@ -15,6 +15,9 @@ export type AuditAction =
   // depois quem liberou o quê, já que a conferência do Pix é manual.
   | 'PIX_PAYMENT_CONFIRMED'
   | 'PIX_PAYMENT_REJECTED'
+  // Duas etapas, dois registros: declarar que a transferência saiu e comprovar que saiu são
+  // fatos diferentes, com datas diferentes, e só o segundo exige documento anexado.
+  | 'PAYOUT_MARKED_SENT'
   | 'PAYOUT_MARKED_PAID'
   // A mensalidade decide se o profissional aparece na busca, e quem confirma o pagamento é uma
   // pessoa. Sem registro não há como reconstruir por que alguém sumiu (ou voltou) da lista.

@@ -9,7 +9,6 @@ import { avatarColor, formatDateBR, formatPrice, formatTimeBR, initials, modalit
 import { getAvailableSlots } from '@/lib/availability'
 import { getCurrentUser } from '@/lib/session'
 import { tierDefinition } from '@/lib/reputation'
-import { responseLabel } from '@/lib/ranking'
 import EnrollButton from './EnrollButton'
 import { paymentRequirementFor } from '@/lib/payments'
 
@@ -152,14 +151,6 @@ export default async function PerfilProfissional({ params }: { params: Promise<{
                       </p>
                       <p className="text-xs text-gray-500 mt-0.5">nota de reputação</p>
                     </div>
-                    {professional.medianResponseSecs != null && (
-                      <div>
-                        <p className="text-xl font-bold text-gray-900">
-                          {responseLabel(professional.medianResponseSecs)?.replace('Responde em ', '') ?? '—'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">tempo de resposta</p>
-                      </div>
-                    )}
                   </div>
                 </>
               )}

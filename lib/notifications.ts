@@ -5,8 +5,6 @@ import {
   appointmentRescheduled,
   bookingConfirmedPatient,
   bookingReceivedProfessional,
-  bookingRequestedPatient,
-  bookingRequestProfessional,
   bookingPendingPaymentProfessional,
   markedNoShow,
   professionalApproved,
@@ -64,22 +62,15 @@ function toEmailData(ctx: AppointmentContext): AppointmentEmailData {
  * NOT gated on notifyBooking: a professional who silenced booking notifications would
  * otherwise silently miss requests and have their ranking punished for it.
  */
-export function notifyBookingRequested(ctx: AppointmentContext) {
-  const data = toEmailData(ctx)
-  fire(sendEmail({ to: ctx.patientEmail, ...bookingRequestedPatient(data) }))
-  fire(sendEmail({ to: ctx.professionalEmail, ...bookingRequestProfessional(data) }))
-}
-
 /**
  * Aviso ao profissional de que alguém está reservando um horário dele e pagando agora.
  *
- * Só existe no caminho com cobrança, onde notifyBookingRequested é adiado até o pagamento
- * confirmar — sem isto, o profissional vê o horário sumir da agenda sem nenhuma explicação.
+ * Só existe no caminho com cobrança: sem isto, o profissional vê o horário sumir da agenda sem
+ * nenhuma explicação e só descobre a consulta quando o pagamento é conferido.
  *
- * Diferente de notifyBookingRequested, este respeita a preferência notifyBooking: lá o e-mail
- * é o chamado para ação cujo atraso pune o ranking, e silenciá-lo seria um tiro no pé; aqui é
- * cortesia informativa, e quem desligou avisos de agendamento não perde nada por não receber.
- * O pedido de verdade chega depois de qualquer jeito.
+ * Respeita a preferência notifyBooking, e pode respeitar: é cortesia informativa, não chamado
+ * para ação. Quem desligou avisos de agendamento não perde nada — o aviso da consulta marcada
+ * chega de qualquer jeito.
  */
 export function notifyBookingPendingPayment(ctx: AppointmentContext) {
   const data = toEmailData(ctx)
@@ -105,9 +96,21 @@ export function notifyBookingPendingPayment(ctx: AppointmentContext) {
  * avise a cada pedido", não "não me diga quando tenho consulta marcada". Perder este e-mail
  * significa faltar.
  */
-export function notifyBookingConfirmed(ctx: AppointmentContext) {
+/**
+ * Consulta marcada, avisando os dois lados.
+ *
+ * `paymentConfirmed` faz o e-mail do paciente juntar as duas novidades numa só — o dinheiro foi
+ * conferido e a consulta está marcada. Sem isso ele receberia duas mensagens sobre o mesmo
+ * instante, o que é como um aviso importante passa a parecer ruído.
+ */
+export function notifyBookingConfirmed(ctx: AppointmentContext, opts?: { paymentConfirmed?: boolean }) {
   const data = toEmailData(ctx)
-  fire(sendEmail({ to: ctx.patientEmail, ...bookingConfirmedPatient(data) }))
+  fire(
+    sendEmail({
+      to: ctx.patientEmail,
+      ...bookingConfirmedPatient({ ...data, paymentConfirmed: opts?.paymentConfirmed }),
+    })
+  )
   fire(sendEmail({ to: ctx.professionalEmail, ...bookingReceivedProfessional(data) }))
 }
 

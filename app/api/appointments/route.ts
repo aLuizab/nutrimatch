@@ -4,9 +4,11 @@ import { prisma } from '@/lib/prisma'
 import { AuthError, ensurePatientProfile, requireUser } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { isSlotAvailable } from '@/lib/availability'
-import { notifyBookingPendingPayment, notifyBookingRequested } from '@/lib/notifications'
+import { notifyBookingConfirmed, notifyBookingPendingPayment } from '@/lib/notifications'
+import { generateMeetingRoom } from '@/lib/meeting'
+import { effectiveModality } from '@/lib/office'
 import { lockAndResolveEnrollment } from '@/lib/enrollments'
-import { confirmationDeadlineFor, staleHoldWhere } from '@/lib/appointment-status'
+import { paymentReviewDeadlineFor, staleHoldWhere } from '@/lib/appointment-status'
 import { paymentHoldDeadline, paymentRequirementFor } from '@/lib/payments'
 import { recordAppointmentCharge } from '@/lib/pix-payments'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
@@ -55,7 +57,11 @@ export async function POST(request: Request) {
   if (professional.userId === user.id) {
     return NextResponse.json({ error: 'Você não pode agendar uma consulta com você mesmo' }, { status: 400 })
   }
-  if (professional.modality !== 'AMBOS' && professional.modality !== modality) {
+  // effectiveModality e não professional.modality: um perfil antigo pode estar marcado como
+  // PRESENCIAL sem endereço — a coluna nasceu depois dele. Aceitar o agendamento nesse caso
+  // marcaria uma consulta presencial num lugar que ninguém sabe qual é.
+  const formatoDoProfissional = effectiveModality(professional)
+  if (formatoDoProfissional !== 'AMBOS' && formatoDoProfissional !== modality) {
     return NextResponse.json({ error: 'Modalidade não disponível para este profissional' }, { status: 400 })
   }
   if (scheduledAtDate.getTime() <= Date.now()) {
@@ -137,15 +143,26 @@ export async function POST(request: Request) {
           price,
           phone: phone || null,
           reason: reason || null,
-          // Not a booking yet — the professional has to accept. How long that takes is the
-          // response-time signal the ranking uses.
-          status: 'AWAITING_CONFIRMATION',
-          confirmationDeadline: confirmationDeadlineFor(scheduledAtDate),
+          // Duas saídas, e só duas, porque o profissional não aceita mais nada:
+          //
+          //  - Cobrança necessária: fica AWAITING_CONFIRMATION segurando o horário no relógio
+          //    curto do pagamento. Quem marca a consulta é a conferência do extrato pelo admin
+          //    (ver confirmAppointmentPixPayment), não uma resposta do profissional.
+          //  - Sem cobrança (profissional sem link, ou consulta já coberta pelo pacote pago):
+          //    não há nada a conferir, então a consulta já nasce marcada. Deixá-la esperando um
+          //    aceite que não existe mais só a deixaria pendurada para sempre.
+          status: requirement.required ? 'AWAITING_CONFIRMATION' : 'CONFIRMED',
+          confirmedAt: requirement.required ? null : new Date(),
           enrollmentId: active?.enrollment.id ?? null,
-          // A consultation that needs paying holds the slot on the short payment clock until
-          // the money is authorised; one that doesn't goes straight to the professional.
           paymentStatus: requirement.required ? 'PENDING' : 'NOT_REQUIRED',
           paymentDeadline: requirement.required ? paymentHoldDeadline() : null,
+          // Prazo da conferência, que só passa a valer quando o paciente declara o pagamento:
+          // até lá quem segura o horário é paymentDeadline, bem mais curto. Gravado aqui, e não
+          // na declaração, para que o horário nunca fique sem nenhum prazo preso a ele.
+          confirmationDeadline: requirement.required ? paymentReviewDeadlineFor(scheduledAtDate) : null,
+          // A sala nasce com a consulta confirmada, pelo mesmo motivo de sempre: o nome dela é o
+          // controle de acesso, e um pedido que pode não virar consulta não merece sala.
+          ...(!requirement.required && modality === 'ONLINE' ? { meetingRoom: generateMeetingRoom() } : {}),
         },
       })
       return { appointment: created, payment: requirement }
@@ -159,13 +176,13 @@ export async function POST(request: Request) {
       // InfinitePay do profissional, que já carrega o valor — não há código a gerar aqui.
       await recordAppointmentCharge(appointment.id, appointment.price)
 
-      // O pedido de verdade — aquele que o profissional precisa aceitar — só sai quando o
-      // pagamento é confirmado: uma cobrança abandonada não pode virar solicitação de uma
-      // consulta que nunca existiu. Mas ficar em silêncio até lá fazia o horário sumir da
-      // agenda dele sem explicação nenhuma, então vai um aviso informativo agora.
+      // O aviso da consulta marcada só sai quando o pagamento é confirmado: uma cobrança
+      // abandonada não pode virar consulta que nunca existiu. Mas ficar em silêncio até lá
+      // fazia o horário sumir da agenda do profissional sem explicação nenhuma, então vai um
+      // aviso informativo agora.
       //
-      // Ele não cobra pressa nem prazo, e não precisa: o tempo de resposta é medido de
-      // `paidAt` em diante (lib/ranking.ts), então avisar antes não tira ponto de ninguém.
+      // Ele não cobra pressa nem prazo, e não precisa: não há nada que o profissional deva
+      // fazer neste momento, nem depois, para a consulta acontecer.
       notifyBookingPendingPayment({
         scheduledAt: scheduledAtDate,
         modality,
@@ -187,7 +204,7 @@ export async function POST(request: Request) {
       })
     }
 
-    notifyBookingRequested({
+    notifyBookingConfirmed({
       scheduledAt: scheduledAtDate,
       modality,
       price: appointment.price,
@@ -204,7 +221,7 @@ export async function POST(request: Request) {
       id: appointment.id,
       price: appointment.price,
       enrollmentApplied: appointment.enrollmentId != null,
-      awaitingConfirmation: true,
+      awaitingConfirmation: false,
       paymentRequired: false,
     })
   } catch (e: unknown) {

@@ -1,7 +1,7 @@
 import type { Modality } from '@prisma/client'
 import { avatarColor, initials, modalityLabel } from './format'
 import { specialtyLabel } from './specialties'
-import { responseLabel } from './ranking'
+import { effectiveModality } from './office'
 
 export const PROFESSIONAL_CARD_INCLUDE = { user: { select: { name: true, photoUrl: true } } } as const
 
@@ -12,8 +12,8 @@ type ProfessionalCardSource = {
   reviewCount: number
   price: number
   modality: Modality
+  officeAddress?: string | null
   city: string
-  medianResponseSecs?: number | null
   tier?: string | null
   user: { name: string; photoUrl?: string | null }
 }
@@ -28,11 +28,11 @@ export function toProfessionalCard(p: ProfessionalCardSource) {
     rating: p.rating,
     reviewCount: p.reviewCount,
     price: p.price,
-    modality: p.modality,
-    modalityLabel: modalityLabel(p.modality),
+    // Como em toda leitura: sem endereço, presencial não existe. Ver lib/office.ts.
+    modality: effectiveModality(p),
+    modalityLabel: modalityLabel(effectiveModality(p)),
     city: p.city,
     tier: p.tier ?? 'NOVO',
-    responseLabel: responseLabel(p.medianResponseSecs ?? null),
     photoUrl: p.user.photoUrl ?? null,
     initials: initials(p.user.name),
     color: avatarColor(p.id),

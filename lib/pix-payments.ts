@@ -2,6 +2,7 @@ import { prisma } from './prisma'
 import { splitFee } from './fees'
 import { reaisToCents } from './money'
 import { buildPixPayload, txidForAppointment, txidForEnrollment } from './pix'
+import { generateMeetingRoom } from './meeting'
 
 // Pagamento por Pix com chave estática.
 //
@@ -30,13 +31,6 @@ export function platformPix(): PlatformPix | null {
     name: process.env.PLATFORM_PIX_NAME?.trim() || 'NutriMatch',
     city: process.env.PLATFORM_PIX_CITY?.trim() || 'Sao Paulo',
   }
-}
-
-export const pixEnabled = () => platformPix() !== null
-
-/** O profissional só entra no fluxo pago se tiver para onde receber o repasse. */
-export function canReceivePix(professional: { pixKey?: string | null } | null | undefined): boolean {
-  return Boolean(professional?.pixKey?.trim())
 }
 
 export interface PixCharge {
@@ -124,9 +118,20 @@ export function enrollmentPixCharge(enrollment: {
 }
 
 /**
- * Confirma que o dinheiro caiu, depois de alguém conferir o extrato, e abre o repasse devido ao
- * profissional na mesma transação — os dois fatos nascem juntos e não podem existir separados:
- * confirmar o recebimento sem registrar a dívida com o profissional é como um repasse some.
+ * Confirma que o dinheiro caiu, depois de alguém conferir o extrato. Três fatos nascem aqui, na
+ * mesma transação, porque nenhum deles faz sentido sozinho:
+ *
+ *  1. **O pagamento está confirmado.** O paciente pagou no link e o extrato foi conferido.
+ *  2. **A consulta está marcada.** Não há mais um passo em que o profissional aceita: dinheiro
+ *     conferido é consulta marcada, e ela aparece nos três painéis no mesmo instante. O
+ *     profissional continua podendo cancelar (o que pesa na confiabilidade dele, ver
+ *     lib/reputation.ts) — o que ele não faz mais é deixar o paciente esperando um "sim".
+ *  3. **O repasse existe como dívida.** Confirmar o recebimento sem registrar o que se passou a
+ *     dever ao profissional é como um repasse desaparece.
+ *
+ * Se o profissional não tem chave Pix, nada disso muda: o repasse nasce PENDING e fica retido
+ * até a chave existir. A consulta acontece de todo jeito — travá-la por um dado que só é
+ * necessário na hora de transferir puniria o paciente por uma pendência que não é dele.
  */
 export async function confirmAppointmentPixPayment(appointmentId: string, reviewerUserId: string) {
   const appointment = await prisma.appointment.findUnique({
@@ -151,6 +156,18 @@ export async function confirmAppointmentPixPayment(appointmentId: string, review
         pixReviewedAt: now,
         amountCents: grossCents,
         feeCents,
+        // A consulta passa a valer aqui.
+        status: 'CONFIRMED',
+        confirmedAt: now,
+        slotHeldAt: appointment.scheduledAt,
+        // Não há mais prazo para ninguém responder, então deixar o campo preenchido só faria
+        // isExpiredAwaiting mentir sobre uma consulta que já está confirmada.
+        confirmationDeadline: null,
+        // A sala de vídeo nasce com a confirmação, não com o pedido: um pedido que podia não
+        // virar consulta não merecia sala, e o nome da sala é o controle de acesso dela.
+        ...(appointment.modality === 'ONLINE' && !appointment.meetingRoom
+          ? { meetingRoom: generateMeetingRoom() }
+          : {}),
       },
     })
     // upsert e não create: reconfirmar por engano não pode gerar dois repasses da mesma consulta.
@@ -168,7 +185,16 @@ export async function confirmAppointmentPixPayment(appointmentId: string, review
     })
   })
 
-  return { alreadyPaid: false as const, netCents, grossCents, feeCents }
+  return {
+    alreadyPaid: false as const,
+    netCents,
+    grossCents,
+    feeCents,
+    scheduledAt: appointment.scheduledAt,
+    // Quem chama precisa saber disto para avisar o admin de que o dinheiro entrou mas não tem
+    // para onde sair.
+    professionalHasPixKey: Boolean(appointment.professional.pixKey?.trim()),
+  }
 }
 
 export async function confirmEnrollmentPixPayment(enrollmentId: string, reviewerUserId: string) {
@@ -189,20 +215,6 @@ export async function confirmEnrollmentPixPayment(enrollmentId: string, reviewer
     },
   })
   return { alreadyPaid: false as const }
-}
-
-/** Quanto o profissional tem a receber e quanto já recebeu. */
-export async function payoutSummary(professionalId: string) {
-  const [pending, paid] = await Promise.all([
-    prisma.payout.aggregate({ where: { professionalId, status: 'PENDING' }, _sum: { netCents: true }, _count: true }),
-    prisma.payout.aggregate({ where: { professionalId, status: 'PAID' }, _sum: { netCents: true }, _count: true }),
-  ])
-  return {
-    pendingCents: pending._sum.netCents ?? 0,
-    pendingCount: pending._count,
-    paidCents: paid._sum.netCents ?? 0,
-    paidCount: paid._count,
-  }
 }
 
 /**
