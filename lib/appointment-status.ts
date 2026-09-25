@@ -4,6 +4,10 @@ import type { Prisma } from '@prisma/client'
 // whether it now also means "…and the ones still awaiting". TypeScript cannot catch a missed
 // one (the old clauses stay valid), so the decision lives here as named intents instead of
 // being retyped — and re-read — at 17 call sites.
+//
+// Desde a reorganização do fluxo de pagamento, AWAITING_CONFIRMATION significa **só** "o
+// pagamento ainda não foi conferido". O profissional não aceita mais consulta: quem a marca é a
+// conferência do extrato. Ele continua podendo cancelar, o que pesa na confiabilidade dele.
 
 /** Occupies the professional's calendar: confirmed, or awaiting and still within deadline. */
 export const OCCUPYING_STATUSES = ['CONFIRMED', 'AWAITING_CONFIRMATION'] as const
@@ -13,19 +17,18 @@ export const OCCUPYING_STATUSES = ['CONFIRMED', 'AWAITING_CONFIRMATION'] as cons
 export const BOOKED_STATUSES = ['CONFIRMED'] as const
 
 /**
- * Slot occupancy for availability checks. An awaiting appointment holds its slot only until its
- * deadline; past it the slot is free again without anything having to run.
+ * Slot occupancy for availability checks.
  *
- * There are now TWO deadlines, because there are two different reasons a booking can be sitting
- * unconfirmed, and they deserve very different patience:
+ * AWAITING_CONFIRMATION quer dizer **uma coisa só**: aguardando pagamento. Não existe mais
+ * consulta esperando o profissional aceitar — dinheiro conferido é consulta marcada (ver
+ * confirmAppointmentPixPayment). Sobraram duas esperas, e elas merecem paciência diferente:
  *
- *  - PENDING payment — the patient opened the checkout and hasn't paid. Minutes, not hours: an
- *    abandoned cart must not hold someone's calendar. See PAYMENT_HOLD_MINUTES.
- *  - anything else — payment is settled (or was never required) and we're waiting on the
- *    professional. That gets the full 24h confirmation window.
- *
- * Collapsing the two into one deadline would either give abandoned carts a full day of the
- * professional's calendar, or give the professional 20 minutes to answer.
+ *  - `PENDING` — o paciente abriu a cobrança e não pagou. Minutos, não horas: carrinho
+ *    abandonado não pode ocupar a agenda de alguém. Ver PAYMENT_HOLD_MINUTES.
+ *  - `AWAITING_REVIEW` — o paciente declarou que pagou e ninguém conferiu o extrato ainda. Aqui
+ *    o horário fica preso pelo prazo de conferência: quem pagou de verdade não pode perder o
+ *    horário porque o admin demorou, e uma declaração que ninguém confirma também não pode
+ *    prender a agenda para sempre. O prazo é o meio termo, e é curto por isso.
  */
 export function slotOccupiedWhere(now: Date = new Date()): Prisma.AppointmentWhereInput {
   return {
@@ -38,7 +41,7 @@ export function slotOccupiedWhere(now: Date = new Date()): Prisma.AppointmentWhe
       },
       {
         status: 'AWAITING_CONFIRMATION',
-        paymentStatus: { not: 'PENDING' },
+        paymentStatus: 'AWAITING_REVIEW',
         confirmationDeadline: { gt: now },
       },
     ],
@@ -68,18 +71,25 @@ export function staleHoldWhere(now: Date = new Date()): Prisma.AppointmentWhereI
     status: 'AWAITING_CONFIRMATION',
     OR: [
       { paymentStatus: 'PENDING', paymentDeadline: { lte: now } },
-      { paymentStatus: { not: 'PENDING' }, confirmationDeadline: { lte: now } },
+      { paymentStatus: 'AWAITING_REVIEW', confirmationDeadline: { lte: now } },
     ],
   }
 }
 
-/** Hours a professional has to accept a booking before the slot is released. */
-export const CONFIRMATION_WINDOW_HOURS = 24
+/**
+ * Prazo para um admin conferir um pagamento declarado, antes de o horário ser liberado.
+ *
+ * Mesmo número e mesma conta de quando isto era o prazo do profissional aceitar — o que mudou é
+ * de quem é o prazo. A coluna continua se chamando `confirmationDeadline` porque renomear coluna
+ * é mudança de contração, e o nome antigo ainda descreve o que ela guarda: até quando esta
+ * consulta pode ficar sem confirmação.
+ */
+export const PAYMENT_REVIEW_WINDOW_HOURS = 24
 
-export function confirmationDeadlineFor(scheduledAt: Date, now: Date = new Date()): Date {
-  const standard = new Date(now.getTime() + CONFIRMATION_WINDOW_HOURS * 60 * 60 * 1000)
-  // A consultation booked for tomorrow morning can't have a 24h window — the deadline would
-  // fall after the consultation itself. Cap it at the appointment time.
+export function paymentReviewDeadlineFor(scheduledAt: Date, now: Date = new Date()): Date {
+  const standard = new Date(now.getTime() + PAYMENT_REVIEW_WINDOW_HOURS * 60 * 60 * 1000)
+  // Uma consulta marcada para amanhã de manhã não pode ter janela de 24h: o prazo cairia depois
+  // da própria consulta. Trava no horário marcado.
   return standard < scheduledAt ? standard : scheduledAt
 }
 

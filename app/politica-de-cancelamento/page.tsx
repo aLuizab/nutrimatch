@@ -1,6 +1,10 @@
 import { AlertTriangle, QrCode, Package, Clock, CalendarClock } from 'lucide-react'
 import PublicHeader from '../components/PublicHeader'
-import { CONFIRMATION_WINDOW_HOURS, CANCEL_REFUND_CUTOFF_HOURS, RESCHEDULE_CUTOFF_HOURS } from '@/lib/appointment-status'
+import {
+  PAYMENT_REVIEW_WINDOW_HOURS,
+  CANCEL_REFUND_CUTOFF_HOURS,
+  RESCHEDULE_CUTOFF_HOURS,
+} from '@/lib/appointment-status'
 import { WITHDRAWAL_WINDOW_DAYS } from '@/lib/payments'
 
 export const metadata = { title: 'Política de Cancelamento e Reembolso — NutriMatch' }
@@ -37,27 +41,32 @@ export default function PoliticaDeCancelamento() {
               serviço.
             </p>
             <p className="mb-2">
-              O Pix é debitado da sua conta no instante em que você paga. A confirmação do
-              recebimento é feita pela nossa equipe, conferindo o extrato: normalmente em algumas
-              horas, em dia útil. Enquanto isso, <strong>seu horário fica reservado</strong> — você
-              não perde a vaga porque a conferência não é instantânea.
+              O valor sai da sua conta no instante em que você paga. A confirmação do recebimento é
+              feita pela nossa equipe, conferindo o extrato: normalmente em algumas horas, em dia
+              útil. Enquanto isso, <strong>seu horário fica reservado</strong> por até{' '}
+              {PAYMENT_REVIEW_WINDOW_HOURS} horas — você não perde a vaga porque a conferência não é
+              instantânea.
             </p>
             <p>
-              Só depois de confirmado o pagamento é que o profissional recebe o pedido e tem até{' '}
-              {CONFIRMATION_WINDOW_HOURS} horas para aceitar. Se ele recusar, ou deixar esse prazo
-              passar sem responder, <strong>o valor é devolvido integralmente</strong> por Pix para
-              a conta de onde veio. A devolução é feita manualmente pela nossa equipe, então leva
-              até 2 dias úteis.
+              <strong>Confirmado o pagamento, sua consulta está marcada.</strong> Não existe uma
+              etapa em que o profissional precisa aceitar: ela aparece na agenda dele já
+              confirmada. Se a conferência não acontecer dentro desse prazo, o horário é liberado e
+              o valor é devolvido integralmente para a conta de onde veio.
+            </p>
+            <p>
+              O profissional pode <strong>cancelar</strong> uma consulta que não tenha como
+              atender. Nesse caso o valor volta integralmente para você, conforme a seção seguinte.
+              Toda devolução é feita manualmente pela nossa equipe e leva até 2 dias úteis.
             </p>
           </section>
 
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-3 flex items-center gap-2">
-              <Clock size={17} className="text-emerald-500" /> Consulta já confirmada pelo profissional
+              <Clock size={17} className="text-emerald-500" /> Consulta já marcada
             </h2>
             <p className="mb-2">
-              Depois que o profissional confirma a consulta, o valor pago já está com a plataforma.
-              A partir daí:
+              Confirmado o pagamento, o valor está com a plataforma e a consulta está marcada. A
+              partir daí:
             </p>
             <ul className="list-disc pl-5 space-y-1.5">
               <li>
@@ -69,9 +78,9 @@ export default function PoliticaDeCancelamento() {
                 cancelamento é aceito, mas sem devolução do valor pago.
               </li>
               <li>
-                <strong>O profissional cancela</strong> uma consulta que já havia confirmado, a
-                qualquer momento: reembolso integral, sempre — a decisão não foi sua, então o
-                custo não é seu.
+                <strong>O profissional cancela</strong>, a qualquer momento: reembolso integral,
+                sempre — a decisão não foi sua, então o custo não é seu. Cancelamentos em cima da
+                hora também pesam na confiabilidade que aparece no perfil dele.
               </li>
             </ul>
           </section>

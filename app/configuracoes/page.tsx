@@ -4,7 +4,7 @@ import { requireRoleOrRedirect } from '@/lib/session'
 import { initials } from '@/lib/format'
 import { photoUploadsEnabled } from '@/lib/cloudinary'
 import { prisma } from '@/lib/prisma'
-import { payoutSummary, pixEnabled } from '@/lib/pix-payments'
+import { payoutTotals } from '@/lib/payouts'
 import { platformFeePercent } from '@/lib/fees'
 import DashboardShell from '../components/DashboardShell'
 
@@ -31,7 +31,7 @@ export default async function Configuracoes() {
     days: rules.map((r) => ({ weekday: r.weekday, startTime: r.startTime, endTime: r.endTime })),
   }
 
-  const payouts = await payoutSummary(user.professional.id)
+  const payouts = await payoutTotals(user.professional.id)
 
   return (
     <DashboardShell sidebar={<ProfessionalSidebar name={user.name} crn={user.professional.crn} />}>
@@ -55,11 +55,12 @@ export default async function Configuracoes() {
           notifyReviews: user.notifyReviews,
         }}
         pix={{
-          platformEnabled: pixEnabled(),
           pixKey: user.professional.pixKey,
           pixKeyType: user.professional.pixKeyType,
           pendingCents: payouts.pendingCents,
           pendingCount: payouts.pendingCount,
+          processingCents: payouts.processingCents,
+          processingCount: payouts.processingCount,
           paidCents: payouts.paidCents,
         }}
         feePercent={platformFeePercent()}

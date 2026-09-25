@@ -3,7 +3,6 @@ import { sendEmail } from './email'
 import {
   appointmentReminderPatient,
   appointmentReminderProfessional,
-  confirmationNudge,
   type AppointmentEmailData,
 } from './email-templates'
 import { formatDateBR, formatPrice, formatTimeBR, modalityLabel } from './format'
@@ -17,9 +16,12 @@ import { meetingUrl } from './meeting'
 // first and recording after would double-send on a crash between the two; claiming first can at
 // worst drop a reminder if delivery fails, which is the better failure for the reader.
 
+// CONFIRMATION_NUDGE saiu daqui junto com o aceite do profissional: não existe mais consulta
+// esperando um "sim" para cobrar. As linhas já gravadas em SentReminder com esse kind ficam —
+// são registro de e-mail que saiu de verdade, e apagar histórico para limpar um enum é trocar
+// uma verdade por uma arrumação.
 export const REMINDER_KIND = {
   dayBefore: 'DAY_BEFORE',
-  confirmationNudge: 'CONFIRMATION_NUDGE',
 } as const
 
 /** How far ahead the day-before reminder looks, and how wide the window is. */
@@ -58,13 +60,11 @@ function emailData(a: {
 
 export interface ReminderRun {
   dayBefore: { considered: number; sent: number; skipped: number }
-  nudges: { considered: number; sent: number; skipped: number }
 }
 
 export async function runReminders(now: Date = new Date()): Promise<ReminderRun> {
   const result: ReminderRun = {
     dayBefore: { considered: 0, sent: 0, skipped: 0 },
-    nudges: { considered: 0, sent: 0, skipped: 0 },
   }
 
   // ── Day-before reminders ──────────────────────────────────────────────────
@@ -99,38 +99,6 @@ export async function runReminders(now: Date = new Date()): Promise<ReminderRun>
       })
     }
     result.dayBefore.sent++
-  }
-
-  // ── Nudges for bookings still awaiting confirmation ───────────────────────
-  // Only worth sending while there is still time to act: past the deadline the slot is already
-  // treated as free, so a nudge would be asking for something that can no longer happen.
-  const nudgeCutoff = new Date(now.getTime() + 12 * 3600_000)
-  const pending = await prisma.appointment.findMany({
-    where: {
-      status: 'AWAITING_CONFIRMATION',
-      confirmationDeadline: { gt: now, lte: nudgeCutoff },
-      scheduledAt: { gt: now },
-    },
-    include: {
-      patient: { include: { user: { select: { name: true, email: true } } } },
-      professional: { include: { user: { select: { name: true, email: true } } } },
-    },
-  })
-  result.nudges.considered = pending.length
-
-  for (const a of pending) {
-    if (!(await claim(a.id, REMINDER_KIND.confirmationNudge))) {
-      result.nudges.skipped++
-      continue
-    }
-    const hoursLeft = Math.max(
-      1,
-      Math.round(((a.confirmationDeadline?.getTime() ?? now.getTime()) - now.getTime()) / 3600_000)
-    )
-    // Not gated on notifyBooking, for the same reason notifyBookingRequested isn't: silencing
-    // this e-mail would cost the professional the slot and hurt their response-time ranking.
-    await sendEmail({ to: a.professional.user.email, ...confirmationNudge({ ...emailData(a), hoursLeft }) })
-    result.nudges.sent++
   }
 
   return result

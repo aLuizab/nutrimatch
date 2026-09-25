@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Search, CreditCard, Clock, CheckCircle2, Repeat, Percent, Star, Zap, Activity, ShieldCheck, Award } from 'lucide-react'
+import { Search, CreditCard, Clock, CheckCircle2, Repeat, Percent, Star, Activity, ShieldCheck, Award } from 'lucide-react'
 import PublicHeader from '../components/PublicHeader'
 import TierBadge from '../components/TierBadge'
 import { platformFeePercent } from '@/lib/fees'
@@ -28,8 +28,9 @@ export default function ComoFuncionaProfissional() {
             {[
               { icon: Search, text: 'O paciente encontra seu perfil na busca e escolhe um horário disponível na sua agenda.' },
               { icon: CreditCard, text: 'Se você tem link de pagamento e chave Pix cadastrados, o pagamento é pedido nesse momento: o paciente tem 30 minutos para pagar no link e avisar, senão o horário volta a ficar livre. Faltando link ou chave Pix, o valor continua combinado diretamente com o paciente, como sempre funcionou.' },
-              { icon: Clock, text: 'Você tem 24 horas para confirmar ou recusar o pedido — o tempo de resposta é um dos três fatores do ranking (veja abaixo).' },
-              { icon: CheckCircle2, text: 'Ao confirmar: se foi cartão, o valor é cobrado nesse instante (nunca antes); se foi Pix, já estava cobrado. Ao recusar ou deixar vencer o prazo: nada fica cobrado no cartão, e um Pix já debitado é devolvido automaticamente — o paciente não perde dinheiro por uma decisão que não foi dele.' },
+              { icon: Clock, text: 'A plataforma confere o pagamento no extrato e, confirmado o recebimento, a consulta fica marcada na sua agenda. Você não precisa aceitar nada — e não tem prazo nenhum para cumprir aqui.' },
+              { icon: CheckCircle2, text: 'O valor da consulta, menos a taxa da plataforma, aparece em Repasses. A transferência para a sua chave Pix é feita pela plataforma e só é dada como concluída com o comprovante anexado, que você pode abrir ali. Sem chave cadastrada, o dinheiro fica retido até você cadastrar uma.' },
+              { icon: Clock, text: 'Se você não puder atender um horário já marcado, cancele o quanto antes: o paciente recebe o valor de volta integralmente, e cancelar em cima da hora pesa na sua confiabilidade (veja abaixo).' },
             ].map(({ icon: Icon, text }, i) => (
               <li key={i} className="flex gap-3">
                 <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
@@ -94,16 +95,10 @@ export default function ComoFuncionaProfissional() {
                 text: `Sua nota média, mas com um ajuste que protege quem está começando: um perfil novo, sem avaliações ainda, entra próximo da média geral da plataforma em vez de ficar no zero — cada avaliação nova pesa mais a partir daí. Não adianta pedir uma avaliação falsa para "destravar": o cálculo já assume uma nota razoável até você ter as suas de verdade.`,
               },
               {
-                icon: Zap,
-                label: 'Tempo de resposta',
-                weight: WEIGHTS.responsiveness,
-                text: 'Quanto mais rápido você confirma ou recusa um pedido, melhor. Responder em até 1 hora vale o máximo; passar de 48 horas sem responder zera esse fator (numa escala que desacelera entre esses dois pontos, não uma queda brusca).',
-              },
-              {
                 icon: ShieldCheck,
                 label: 'Confiabilidade',
                 weight: WEIGHTS.reliability,
-                text: 'Você cumpre o que aceitou? Contam as consultas realizadas contra duas falhas: cancelar depois de já ter confirmado (pesa dobrado, porque o paciente reorganizou o dia por causa daquele horário) e deixar um pedido expirar sem resposta. Falta do paciente não pesa contra você.',
+                text: 'Você cumpre o que está marcado? Contam as consultas realizadas contra uma única falha: cancelar uma consulta já marcada, que pesa dobrado porque o paciente reorganizou o dia por causa daquele horário. Falta do paciente não pesa contra você, e pagamento que o paciente não concluiu também não — você não tem como interferir em nenhum dos dois. Como você não precisa mais aceitar consulta nenhuma, este é o único fator de comportamento que sobrou, e por isso ele pesa o dobro do que pesava antes.',
               },
               {
                 icon: Activity,
@@ -142,9 +137,8 @@ export default function ComoFuncionaProfissional() {
           </h2>
           <p className="text-sm text-gray-600 leading-relaxed mb-4">
             Sua reputação é uma nota de 0 a 100 que combina{' '}
-            <strong>{Math.round(REPUTATION_WEIGHTS.rating * 100)}% avaliações</strong>,{' '}
-            <strong>{Math.round(REPUTATION_WEIGHTS.reliability * 100)}% confiabilidade</strong> e{' '}
-            <strong>{Math.round(REPUTATION_WEIGHTS.responsiveness * 100)}% tempo de resposta</strong>.
+            <strong>{Math.round(REPUTATION_WEIGHTS.rating * 100)}% avaliações</strong> e{' '}
+            <strong>{Math.round(REPUTATION_WEIGHTS.reliability * 100)}% confiabilidade</strong>.
             Atividade recente entra no ranking da busca, mas não aqui: passar um tempo sem atender
             não torna ninguém menos confiável.
           </p>

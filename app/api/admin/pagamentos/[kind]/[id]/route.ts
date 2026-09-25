@@ -5,14 +5,14 @@ import { AuthError, requireRole } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
 import { confirmAppointmentPixPayment, confirmEnrollmentPixPayment } from '@/lib/pix-payments'
-import { notifyBookingRequested, notifyPaymentConfirmed, notifyPaymentRejected } from '@/lib/notifications'
+import { notifyBookingConfirmed, notifyPaymentConfirmed, notifyPaymentRejected } from '@/lib/notifications'
 import { formatCents, reaisToCents } from '@/lib/money'
-import { confirmationDeadlineFor } from '@/lib/appointment-status'
 
-// Conferência humana do Pix: o admin olha o extrato e diz se o dinheiro entrou.
+// Conferência humana do pagamento: o admin olha o extrato e diz se o dinheiro entrou.
 //
-// É aqui que a consulta finalmente vira um pedido de verdade para o profissional. Avisar antes
-// disso seria pedir que ele segurasse um horário por uma declaração não verificada.
+// É aqui que a consulta passa a existir de verdade. Não há mais um passo em que o profissional
+// aceita: dinheiro conferido é consulta marcada, nos três painéis, no mesmo instante. Avisar
+// antes disso seria pedir que alguém segurasse um horário por uma declaração não verificada.
 const actionSchema = z.union([
   z.object({ action: z.literal('CONFIRM') }).strict(),
   z.object({ action: z.literal('REJECT'), reason: z.string().trim().max(300).optional() }).strict(),
@@ -73,35 +73,27 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
       return NextResponse.json({ ok: true, confirmed: false })
     }
 
+    // Confirmar o pagamento **é** marcar a consulta: o estado, a sala de vídeo e a dívida com o
+    // profissional saem todos daqui, numa transação só. Ver confirmAppointmentPixPayment.
     const result = await confirmAppointmentPixPayment(id, admin.id)
     if (!result) return NextResponse.json({ error: 'Consulta não encontrada' }, { status: 404 })
     if (result.alreadyPaid) return NextResponse.json({ ok: true, confirmed: true, alreadyPaid: true })
 
-    // O relógio de 24h do profissional começa agora: até este instante ele não sabia que a
-    // consulta existia, e lib/ranking.ts mede a resposta dele a partir de paidAt pelo mesmo
-    // motivo.
-    await prisma.appointment.update({
-      where: { id },
-      data: { confirmationDeadline: confirmationDeadlineFor(appointment.scheduledAt, now) },
-    })
-
-    notifyPaymentConfirmed({
-      patientName: appointment.patient.user.name,
-      patientEmail: appointment.patient.user.email,
-      what: `consulta com ${appointment.professional.user.name}`,
-      amountLabel: formatCents(result.grossCents),
-    })
-
-    notifyBookingRequested({
-      scheduledAt: appointment.scheduledAt,
-      modality: appointment.modality,
-      price: appointment.price,
-      patientName: appointment.patient.user.name,
-      patientEmail: appointment.patient.user.email,
-      professionalName: appointment.professional.user.name,
-      professionalEmail: appointment.professional.user.email,
-      professionalUserId: appointment.professional.user.id,
-    })
+    // Um e-mail só para o paciente, juntando as duas novidades — o dinheiro foi conferido e a
+    // consulta está marcada. Antes eram dois, porque eram dois instantes diferentes; agora é um.
+    notifyBookingConfirmed(
+      {
+        scheduledAt: appointment.scheduledAt,
+        modality: appointment.modality,
+        price: appointment.price,
+        patientName: appointment.patient.user.name,
+        patientEmail: appointment.patient.user.email,
+        professionalName: appointment.professional.user.name,
+        professionalEmail: appointment.professional.user.email,
+        professionalUserId: appointment.professional.user.id,
+      },
+      { paymentConfirmed: true }
+    )
 
     audit({
       actorId: admin.id,
@@ -110,7 +102,16 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ki
       subjectId: id,
       metadata: { grossCents: result.grossCents, netCents: result.netCents },
     })
-    return NextResponse.json({ ok: true, confirmed: true })
+    // O repasse nasceu aqui. Sem chave Pix ele fica retido, e quem confirmou precisa saber —
+    // senão o dinheiro fica parado sem ninguém notar que falta um dado do profissional.
+    return NextResponse.json({
+      ok: true,
+      confirmed: true,
+      payoutHeld: !result.professionalHasPixKey,
+      payoutHeldReason: result.professionalHasPixKey
+        ? null
+        : `${appointment.professional.user.name} ainda não cadastrou a chave Pix. A consulta está marcada e o repasse fica retido até a chave existir.`,
+    })
   }
 
   const enrollment = await prisma.enrollment.findUnique({

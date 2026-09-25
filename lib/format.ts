@@ -98,14 +98,17 @@ export const APPOINTMENT_STATUS_LABELS: Record<AppointmentDisplayStatus, string>
   proximo: 'Em breve',
   pendente: 'Agendada',
   cancelado: 'Cancelada',
-  aguardando: 'Aguardando confirmação',
+  aguardando: 'Aguardando pagamento',
   expirado: 'Não confirmada',
 }
 
-// Time-derived where it can be ('concluído' is just "in the past"), stored where it can't —
-// waiting on the professional is a real state, not a function of the clock. Note 'pendente'
-// already meant "confirmed, still in the future", so awaiting gets its own label rather than
-// overloading a word that already means something else here.
+// Time-derived where it can be ('concluído' is just "in the past"), stored where it can't.
+// Note 'pendente' already meant "confirmed, still in the future", so awaiting gets its own label
+// rather than overloading a word that already means something else here.
+//
+// 'aguardando' quer dizer **aguardando pagamento**, e não mais "aguardando o profissional
+// aceitar": não existe mais essa etapa. O rótulo mudou junto com a regra, porque um estado que
+// diz uma coisa e significa outra é pior do que não ter rótulo.
 export function appointmentDisplayStatus(
   scheduledAt: Date,
   status: 'CONFIRMED' | 'CANCELLED' | 'AWAITING_CONFIRMATION' | 'EXPIRED',

@@ -254,7 +254,7 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   {appt.status === 'AWAITING_CONFIRMATION' && (
                     <span className="flex items-center gap-1.5 text-xs font-medium text-orange-700 bg-orange-50 border border-orange-100 px-2.5 py-1 rounded-full">
-                      <Clock size={11} /> Aguardando confirmação
+                      <Clock size={11} /> Aguardando pagamento
                     </span>
                   )}
                   <div className="flex gap-2">
@@ -269,9 +269,9 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
                   <button
                     disabled={cancellingId === appt.id}
                     onClick={() =>
-                      // Sem prejuízo em jogo antes da confirmação (ver a rota de cancelamento) —
-                      // só a consulta já confirmada tem um "sem reembolso" possível, e é aí que
-                      // vale parar para confirmar antes de agir.
+                      // Sem prejuízo em jogo enquanto o pagamento não foi confirmado (ver a
+                      // rota de cancelamento) — só a consulta já marcada tem um "sem reembolso"
+                      // possível, e é aí que vale parar para confirmar antes de agir.
                       appt.status === 'CONFIRMED' ? setConfirmingCancelId(appt.id) : handleCancel(appt.id)
                     }
                     className="text-sm font-medium text-red-500 border border-red-100 px-4 py-2.5 rounded-xl hover:bg-red-50 transition-colors disabled:opacity-50"

@@ -3,21 +3,23 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
-import { notifyBookingConfirmed, notifyCancelled, notifyMarkedNoShow, notifyRescheduled } from '@/lib/notifications'
+import { notifyCancelled, notifyMarkedNoShow, notifyRescheduled } from '@/lib/notifications'
 import { recomputeRankScore } from '@/lib/ranking'
-import { generateMeetingRoom } from '@/lib/meeting'
 import { isSlotAvailable } from '@/lib/availability'
 import { isWithinCancelRefundWindow, isWithinRescheduleWindow } from '@/lib/appointment-status'
 import { formatCents } from '@/lib/money'
 
-// Six mutually exclusive actions share this route: cancelling (either owner, future
-// appointments only), confirming a pending booking (owning professional), remarcando o horário
-// (owning patient, CONFIRMED only), writing the post-consultation summary (owning professional,
-// past appointments only), marcando comparecimento (owning professional, past CONFIRMED only) e
-// contestando uma falta (owning patient).
+// Cinco ações mutuamente exclusivas dividem esta rota: cancelar (qualquer um dos dois donos,
+// só consulta futura), remarcar o horário (paciente dono, só CONFIRMED), escrever o resumo
+// pós-consulta (profissional dono, só consulta passada), marcar comparecimento (profissional
+// dono, só CONFIRMED passada) e contestar uma falta (paciente dono).
+//
+// **Aceitar não está mais aqui.** Quem marca a consulta é a conferência do pagamento pelo admin
+// (ver confirmAppointmentPixPayment); o profissional não recebe mais um pedido para aprovar. O
+// que ele tem é a saída: cancelar o que não puder atender, com o valor voltando integralmente
+// ao paciente e o cancelamento pesando na confiabilidade dele.
 const actionSchema = z.union([
   z.object({ status: z.literal('CANCELLED') }).strict(),
-  z.object({ status: z.literal('CONFIRMED') }).strict(),
   z.object({ reschedule: z.string().datetime() }).strict(),
   z.object({ summary: z.string().trim().min(1, 'O resumo não pode ficar vazio').max(4000) }).strict(),
   z.object({ attendance: z.enum(['ATTENDED', 'NO_SHOW']) }).strict(),
@@ -59,65 +61,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const action = parsed.data
   const now = new Date()
 
-  if ('status' in action && action.status === 'CONFIRMED') {
-    if (!isOwningProfessional) {
-      return NextResponse.json({ error: 'Apenas o profissional pode confirmar a consulta' }, { status: 403 })
-    }
-    if (appointment.status !== 'AWAITING_CONFIRMATION') {
-      return NextResponse.json({ error: 'Esta consulta não está aguardando confirmação' }, { status: 400 })
-    }
-    if (appointment.confirmationDeadline && appointment.confirmationDeadline <= now) {
-      return NextResponse.json(
-        { error: 'O prazo de confirmação expirou e o horário foi liberado' },
-        { status: 400 }
-      )
-    }
-
-    // A consultation whose payment was never authorised has no business being confirmed: the
-    // slot is only held on the short payment clock, and confirming would promise the
-    // professional money that was never reserved.
-    if (appointment.paymentStatus === 'PENDING') {
-      return NextResponse.json(
-        { error: 'O paciente ainda não concluiu o pagamento desta consulta.' },
-        { status: 409 }
-      )
-    }
-
-    // Não há captura de pagamento aqui, e não é esquecimento: quando o profissional chega
-    // nesta rota o dinheiro já entrou pelo link e já foi conferido por um admin
-    // (paymentStatus PAID). Confirmar é só confirmar.
-
-    await prisma.appointment.update({
-      where: { id },
-      // confirmedAt is the response-time measurement — see lib/ranking.ts, which starts the
-      // clock at paidAt when there was a payment.
-      // The video room is created here rather than at booking time: an unconfirmed request
-      // may never become a consultation, and shouldn't get a room.
-      data: {
-        status: 'CONFIRMED',
-        confirmedAt: now,
-        ...(appointment.modality === 'ONLINE' && !appointment.meetingRoom
-          ? { meetingRoom: generateMeetingRoom() }
-          : {}),
-      },
-    })
-    // The professional's responsiveness just changed, so their ranking input did too.
-    await recomputeRankScore(appointment.professionalId)
-
-    notifyBookingConfirmed({
-      scheduledAt: appointment.scheduledAt,
-      modality: appointment.modality,
-      price: appointment.price,
-      patientName: appointment.patient.user.name,
-      patientEmail: appointment.patient.user.email,
-      professionalName: appointment.professional.user.name,
-      professionalEmail: appointment.professional.user.email,
-      professionalUserId: appointment.professional.user.id,
-    })
-
-    return NextResponse.json({ ok: true })
-  }
-
   if ('status' in action) {
     if (appointment.status === 'CANCELLED') {
       return NextResponse.json({ error: 'Esta consulta já foi cancelada' }, { status: 400 })
@@ -125,26 +68,20 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     if (appointment.scheduledAt <= now) {
       return NextResponse.json({ error: 'Não é possível cancelar uma consulta já realizada' }, { status: 400 })
     }
-    // Money first, because this is the branch where a professional declines a consultation the
-    // patient has already paid for. Cancelling the authorisation means nothing is ever charged —
-    // no refund, no days without the money. Pix has no hold to cancel though — it captures the
-    // instant the patient pays, before the professional ever responds — so a PAID appointment
-    // still AWAITING_CONFIRMATION gets a real refund instead: the professional never accepted
-    // it, so there's no ambiguity to resolve.
+    // O dinheiro primeiro. Não há reserva em cartão para soltar: o pagamento é capturado no
+    // instante em que o paciente paga no link, então todo cancelamento de consulta paga vira
+    // dívida de devolução, nunca uma autorização que se deixa expirar.
     //
-    // A PAID appointment that was already CONFIRMED is different: the professional accepted it
-    // and the money was captured for real work they're now not doing. Two rules —
-    //   - Patient cancels: refunded only with CANCEL_REFUND_CUTOFF_HOURS notice (see
-    //     lib/appointment-status.ts and /politica-de-cancelamento). Past that, cancelling still
-    //     works, just without a refund — they can also remarcar instead, see the RESCHEDULE
-    //     branch below, up to a shorter window.
-    //   - Professional cancels: always refunded in full. The patient didn't cause this, so there
-    //     is no cancellation-window question to weigh — unlike the patient's own choice to back
-    //     out late, a professional pulling out of something they already confirmed isn't a cost
-    //     the patient should ever absorb.
-    // Quanto a plataforma passa a DEVER ao paciente por este cancelamento.
+    // Duas regras, e a diferença entre elas é de quem foi a decisão:
+    //   - Paciente cancela: devolve só com CANCEL_REFUND_CUTOFF_HOURS de antecedência (ver
+    //     lib/appointment-status.ts e /politica-de-cancelamento). Passado isso o cancelamento
+    //     continua valendo, só sem devolução — e ele ainda pode remarcar, numa janela mais curta,
+    //     no branch de RESCHEDULE abaixo.
+    //   - Profissional cancela: devolve sempre, integralmente. O paciente não causou isso, então
+    //     não há janela a ponderar — quem desmarca uma consulta que a plataforma já tinha dado
+    //     como marcada não transfere esse custo para quem pagou.
     //
-    // Este número é só um cálculo: o dinheiro entrou por um link do InfinitePay e só sai de
+    // O que sai daqui é quanto a plataforma passa a DEVER ao paciente, e é só um cálculo: o dinheiro entrou por um link do InfinitePay e só sai de
     // volta quando alguém mandar, à mão. O cálculo fica em pé porque a obrigação existe
     // independentemente de haver automação — quem cancela dentro da janela tem direito ao
     // dinheiro, e apagar a conta não apaga a dívida.
@@ -153,16 +90,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     // este valor é informado ao paciente e registrado aqui, e a devolução depende de alguém
     // olhar. É uma lacuna conhecida, não um descuido.
     let refundedCents = 0
-    if (appointment.paymentStatus === 'PAID' && appointment.status === 'AWAITING_CONFIRMATION') {
-      // O profissional nunca confirmou: devolução integral, sem discussão de janela.
-      refundedCents = appointment.amountCents ?? 0
-    } else if (appointment.paymentStatus === 'PAID' && appointment.status === 'CONFIRMED') {
+    if (appointment.paymentStatus === 'PAID') {
       const patientWithinRefundWindow = isOwningPatient && isWithinCancelRefundWindow(appointment.scheduledAt, now)
       if (patientWithinRefundWindow || isOwningProfessional) {
         refundedCents = appointment.amountCents ?? 0
       }
     }
-    // PENDING não gera devolução: nada foi confirmado como pago.
+    // PENDING e AWAITING_REVIEW não geram devolução: nada foi confirmado como recebido, então
+    // não há o que devolver — se o dinheiro tiver entrado mesmo, a conferência é que resolve.
 
     // slotHeldAt: null frees the slot immediately — see the schema comment on this column.
     // A consultation booked inside a package needs nothing extra here: the package's used
@@ -177,6 +112,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         cancelledAt: now,
         cancelledBy: isOwningPatient ? 'PATIENT' : 'PROFESSIONAL',
       },
+    })
+
+    // O repasse desta consulta não existe mais: ela não vai acontecer, então não há o que
+    // transferir. CANCELLED e não apagar, para o histórico continuar mostrando que existiu.
+    // updateMany e não update porque consulta sem pagamento confirmado não tem repasse nenhum.
+    await prisma.payout.updateMany({
+      where: { appointmentId: id, status: { in: ['PENDING', 'PROCESSING'] } },
+      data: { status: 'CANCELLED' },
     })
 
     // Cancelar depois de ter confirmado conta contra a confiabilidade do profissional; por isso

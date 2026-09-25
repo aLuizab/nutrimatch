@@ -20,13 +20,24 @@ export interface AppointmentEmailData {
   priceLabel: string
 }
 
-export function bookingConfirmedPatient(d: AppointmentEmailData) {
+/**
+ * `paymentConfirmed` existe porque este e-mail passou a ser o único que o paciente recebe
+ * quando o admin confere o extrato. Antes vinham dois — "pagamento confirmado" e depois
+ * "consulta confirmada", quando o profissional aceitava. Com a consulta sendo marcada pela
+ * própria confirmação do pagamento, mandar os dois seria contar a mesma novidade duas vezes.
+ */
+export function bookingConfirmedPatient(d: AppointmentEmailData & { paymentConfirmed?: boolean }) {
   return {
     subject: `Consulta confirmada com ${d.professionalName}`,
     html: wrap(
       'Sua consulta está confirmada! ✅',
       `<p>Olá, ${d.patientName}!</p>
-       <p>Sua consulta com <strong>${d.professionalName}</strong> foi agendada:</p>
+       ${
+         d.paymentConfirmed
+           ? `<p>Conferimos seu pagamento de <strong>${d.priceLabel}</strong> e sua consulta com
+              <strong>${d.professionalName}</strong> está marcada:</p>`
+           : `<p>Sua consulta com <strong>${d.professionalName}</strong> foi agendada:</p>`
+       }
        <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
           💻 ${d.modalityLabel}<br/>
           💰 ${d.priceLabel}</p>
@@ -37,14 +48,18 @@ export function bookingConfirmedPatient(d: AppointmentEmailData) {
 
 export function bookingReceivedProfessional(d: AppointmentEmailData) {
   return {
-    subject: `Novo agendamento: ${d.patientName} — ${d.dateLabel} às ${d.timeLabel}`,
+    subject: `Consulta marcada: ${d.patientName} — ${d.dateLabel} às ${d.timeLabel}`,
     html: wrap(
-      'Você recebeu um novo agendamento 🗓️',
-      `<p><strong>${d.patientName}</strong> agendou uma consulta com você:</p>
+      'Você tem uma consulta marcada 🗓️',
+      `<p><strong>${d.patientName}</strong> agendou e pagou uma consulta com você:</p>
        <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
           💻 ${d.modalityLabel}<br/>
           💰 ${d.priceLabel}</p>
-       <p>Veja os detalhes na sua <em>Agenda</em>.</p>`
+       <p>Ela <strong>já está confirmada</strong> — você não precisa aceitar nada. O valor menos a
+          taxa da plataforma aparece em <em>Repasses</em> assim que o pagamento é conferido.</p>
+       <p>Se não puder atender neste horário, cancele pela sua <em>Agenda</em> o quanto antes: o
+          paciente recebe o valor de volta e cancelamento em cima da hora pesa na sua
+          confiabilidade.</p>`
     ),
   }
 }
@@ -142,51 +157,13 @@ export function passwordResetEmail(name: string, link: string) {
   }
 }
 
-export function bookingRequestedPatient(d: AppointmentEmailData) {
-  return {
-    subject: `Solicitação enviada para ${d.professionalName}`,
-    html: wrap(
-      'Solicitação enviada ⏳',
-      `<p>Olá, ${d.patientName}!</p>
-       <p>Sua solicitação de consulta com <strong>${d.professionalName}</strong> foi enviada:</p>
-       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
-          💻 ${d.modalityLabel}<br/>
-          💰 ${d.priceLabel}</p>
-       <p>O horário está reservado para você. Assim que o profissional confirmar, avisamos por
-          e-mail. Se não houver confirmação em até 24 horas, o horário é liberado e você não
-          paga nada.</p>`
-    ),
-  }
-}
-
-export function bookingRequestProfessional(d: AppointmentEmailData) {
-  return {
-    subject: `⏳ Nova solicitação: ${d.patientName} — ${d.dateLabel} às ${d.timeLabel}`,
-    html: wrap(
-      'Você tem uma solicitação de consulta',
-      `<p><strong>${d.patientName}</strong> pediu uma consulta:</p>
-       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
-          💻 ${d.modalityLabel}<br/>
-          💰 ${d.priceLabel}</p>
-       <p><strong>Confirme em até 24 horas</strong>, na sua Agenda. Passado o prazo, o horário
-          volta a ficar disponível para outros pacientes.</p>
-       <p style="font-size: 13px; color: #6b7280;">
-         A rapidez das suas confirmações conta pontos no seu posicionamento nas buscas.
-       </p>`
-    ),
-  }
-}
-
 /**
  * Aviso de que alguém pediu um horário e está no meio do pagamento.
  *
- * Deliberadamente NÃO é um chamado para ação: enquanto a cobrança não é confirmada não há o
- * que o profissional possa aceitar, e pedir para ele confirmar agora só geraria confusão. O
- * pedido de verdade chega depois, em bookingRequestProfessional.
- *
- * Também não menciona prazo nem posicionamento na busca, ao contrário daquele: o relógio de
- * tempo de resposta só começa a correr em `paidAt` (ver lib/ranking.ts), então dizer "confirme
- * rápido" aqui cobraria pressa por um tempo que não está sendo medido.
+ * Deliberadamente NÃO é um chamado para ação, e agora por um motivo mais forte do que antes: o
+ * profissional não aceita consulta nenhuma. Quem marca é a confirmação do pagamento, então não
+ * existe nada que ele possa fazer neste momento além de saber que o horário está sendo
+ * reservado — e sem este e-mail ele veria o horário sumir da agenda sem explicação.
  */
 export function bookingPendingPaymentProfessional(d: AppointmentEmailData) {
   return {
@@ -197,9 +174,8 @@ export function bookingPendingPaymentProfessional(d: AppointmentEmailData) {
        <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
           💻 ${d.modalityLabel}<br/>
           💰 ${d.priceLabel}</p>
-       <p><strong>Você não precisa fazer nada agora.</strong> Assim que o pagamento for
-          confirmado, você recebe a solicitação para aceitar — é a partir dali que conta o
-          prazo de 24 horas.</p>
+       <p><strong>Você não precisa fazer nada.</strong> Assim que conferirmos o pagamento, a
+          consulta é marcada automaticamente e você recebe o aviso com os detalhes.</p>
        <p style="font-size: 13px; color: #6b7280;">
          Este é só um aviso para você não ser pego de surpresa. Se o pagamento não sair, o
          horário volta a ficar livre e nada mais chega.
@@ -246,23 +222,6 @@ export function appointmentReminderProfessional(d: AppointmentEmailData & { meet
     ),
   }
 }
-
-export function confirmationNudge(d: AppointmentEmailData & { hoursLeft: number }) {
-  return {
-    subject: `Ainda aguardando sua confirmação: ${d.patientName} — ${d.dateLabel}`,
-    html: wrap(
-      'Um agendamento está esperando você ⏳',
-      `<p>Olá, ${d.professionalName}!</p>
-       <p><strong>${d.patientName}</strong> pediu uma consulta e ela ainda não foi confirmada:</p>
-       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
-          💻 ${d.modalityLabel}</p>
-       <p>Faltam cerca de <strong>${d.hoursLeft}h</strong> para o prazo. Passando disso, o horário
-          volta a ficar disponível para outros pacientes.</p>
-       <p>Confirme pela <em>Agenda</em> na plataforma.</p>`
-    ),
-  }
-}
-
 export function packageRefunded(d: {
   patientName: string
   planName: string
@@ -283,23 +242,6 @@ export function packageRefunded(d: {
           <strong>${d.amountLabel}</strong> na forma de pagamento original.</p>
        <p>O valor costuma aparecer na fatura em até 10 dias úteis, conforme o banco emissor.</p>
        <p>Se quiser continuar o acompanhamento, é só contratar um novo pacote pela plataforma.</p>`
-    ),
-  }
-}
-
-export function paymentAuthorizedPatient(d: AppointmentEmailData) {
-  return {
-    subject: `Pagamento reservado: consulta com ${d.professionalName}`,
-    html: wrap(
-      'Recebemos seu pagamento 🔒',
-      `<p>Olá, ${d.patientName}!</p>
-       <p>O valor de <strong>${d.priceLabel}</strong> foi <strong>reservado</strong> no seu cartão para a
-          consulta com <strong>${d.professionalName}</strong>:</p>
-       <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
-          💻 ${d.modalityLabel}</p>
-       <p><strong>Ainda não houve cobrança.</strong> O valor só sai do seu cartão quando o profissional
-          confirmar a consulta, o que costuma acontecer em até 24h. Se ele não confirmar, a reserva
-          é liberada e nada é cobrado.</p>`
     ),
   }
 }
@@ -331,8 +273,9 @@ export function paymentPendingAdmin(d: { what: string; amountLabel: string; who:
       `<p><strong>${d.who}</strong> avisou que pagou <strong>${d.amountLabel}</strong> referente a
           ${d.what}.</p>
        ${d.note ? `<p>Observação de quem pagou: <em>${d.note}</em></p>` : ''}
-       <p>Confira o extrato e libere em <em>Financeiro</em> no painel administrativo. Enquanto
-          isso, a consulta segue presa aguardando.</p>`
+       <p>Confira o extrato e confirme em <em>Financeiro</em> no painel administrativo. Confirmar
+          <strong>marca a consulta</strong> e abre o repasse ao profissional. Enquanto isso, o
+          horário segue preso e o paciente está esperando.</p>`
     ),
   }
 }
@@ -344,8 +287,7 @@ export function paymentConfirmedPatient(d: { patientName: string; what: string; 
       'Pagamento confirmado ✅',
       `<p>Olá, ${d.patientName}!</p>
        <p>Confirmamos o recebimento de <strong>${d.amountLabel}</strong> referente a ${d.what}.</p>
-       <p>Está tudo certo do seu lado. Você recebe um aviso quando o profissional confirmar o
-          horário.</p>`
+       <p>Está tudo certo do seu lado — não precisa fazer mais nada.</p>`
     ),
   }
 }

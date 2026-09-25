@@ -15,8 +15,37 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 <!-- Entradas novas entram aqui. No release, viram uma seção com número e data. -->
 
+### Alterado
+
+- **O nutricionista não aceita mais consulta.** Conferido o pagamento, a consulta
+  fica marcada na hora, nos três painéis. Ele continua podendo cancelar o que não
+  puder atender — o valor volta integralmente ao paciente e o cancelamento pesa na
+  confiabilidade dele. `AWAITING_CONFIRMATION` passou a significar apenas
+  "aguardando pagamento".
+- Sem o aceite não há tempo de resposta a medir: a componente saiu do ranking
+  (0.25) e da reputação (0.15). O peso foi para avaliações e, principalmente, para
+  confiabilidade, que dobrou por virar o único sinal de comportamento. A coluna
+  `medianResponseSecs` parou de ser alimentada e o selo "responde em ~Xh" saiu da
+  busca e do perfil.
+- Consulta **expirada deixou de pesar** contra o nutricionista. Antes expirar era
+  ele não responder; hoje é o paciente não pagar, e descontar isso dele seria
+  cobrar a desistência de outra pessoa.
+- A chave Pix do nutricionista não depende mais de a plataforma ter chave própria
+  configurada. A dependência escondia o campo inteiro de quem mais precisava dele:
+  a chave da plataforma serve para cobrar, a dele para receber.
+- Política de Cancelamento, Termos de Uso e a página "como funciona" reescritos
+  para o fluxo novo. Saíram também as menções a pagamento com cartão, que esta
+  plataforma nunca teve.
+
 ### Adicionado
 
+- Repasse em três etapas — **a repassar**, **em processamento** e **repassado** —
+  com listagem em `/repasses` para o nutricionista e em `/admin/financeiro` para a
+  administração. O nutricionista vê a receita por consulta, já líquida.
+- **Comprovante obrigatório para concluir um repasse.** Sem o arquivo anexado o
+  repasse não passa de "em processamento": sem documento, "já te paguei" é só a
+  palavra de quem pagou. O arquivo fica no banco (`StoredFile`) e é servido por
+  `/api/arquivos/[id]`, visível só para a administração e para o dono do repasse.
 - Campanha de lançamento: as **200 primeiras pacientes** a se cadastrar ganham
   10% de desconto na consulta. O cupom (`NUTRI10-042`) vai no e-mail de
   boas-vindas e fica visível em `/admin/pacientes`, com o contador de vagas no
