@@ -2,7 +2,6 @@ import ProfessionalSidebar from '../components/ProfessionalSidebar'
 import ConfiguracoesClient from './ConfiguracoesClient'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { initials } from '@/lib/format'
-import { photoUploadsEnabled } from '@/lib/cloudinary'
 import { prisma } from '@/lib/prisma'
 import { payoutTotals } from '@/lib/payouts'
 import { BOOKING_HORIZON_DAYS } from '@/lib/availability'
@@ -73,7 +72,6 @@ export default async function Configuracoes() {
 
       <ConfiguracoesClient
         initialProfile={profile}
-        photoUploadsEnabled={photoUploadsEnabled()}
         initialAvailability={availability}
         excecoesDeData={excecoes}
         janelaDeAgenda={{ primeiroDia: hoje, ultimoDia }}

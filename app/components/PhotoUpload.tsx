@@ -4,22 +4,64 @@ import React, { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Trash2, Upload } from 'lucide-react'
 
-const MAX_BYTES = 2 * 1024 * 1024
+/** O que o seletor de arquivos sugere. O servidor confere de novo — isto é só uma dica. */
 const ACCEPTED = 'image/jpeg,image/png,image/webp'
 
+/** Tamanho máximo do arquivo ORIGINAL que a pessoa escolhe, antes de ser reduzido. */
+const MAX_BYTES = 12 * 1024 * 1024
+
+/** Lado maior da imagem depois de reduzida. 512px cobre com folga o maior avatar exibido (80px
+ *  em telas 2x), e é o que faz uma foto de 6MB do celular virar uns 60KB no banco. */
+const MAX_DIMENSION = 512
+
 /**
- * Validates size and type before the upload starts, so the common mistake — a 6MB photo
- * straight from a phone camera — fails instantly instead of after a long upload on mobile data.
- * The server checks the same things again; this is about the wait, not about trust.
+ * Reduz a imagem no navegador, antes de subir.
+ *
+ * Sem um serviço de imagens no meio, é aqui que a foto ganha tamanho de avatar. Fazer isso no
+ * cliente também é o que torna o upload rápido no 4G: sobe um arquivo de 60KB, não os 6MB que
+ * saíram da câmera. O servidor continua recusando o que passar do limite dele — reduzir aqui é
+ * conveniência, nunca a validação.
+ *
+ * Cai de volta no arquivo original se algo der errado: uma foto grande que sobe é melhor que uma
+ * foto que não sobe.
+ */
+async function reduzir(file: File): Promise<File> {
+  try {
+    const bitmap = await createImageBitmap(file)
+    const escala = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
+    const largura = Math.max(1, Math.round(bitmap.width * escala))
+    const altura = Math.max(1, Math.round(bitmap.height * escala))
+
+    const canvas = document.createElement('canvas')
+    canvas.width = largura
+    canvas.height = altura
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return file
+    ctx.drawImage(bitmap, 0, 0, largura, altura)
+    bitmap.close?.()
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, 'image/webp', 0.85)
+    )
+    if (!blob) return file
+    return new File([blob], 'foto.webp', { type: 'image/webp' })
+  } catch {
+    return file
+  }
+}
+
+/**
+ * Foto de perfil: escolher, trocar e remover.
+ *
+ * A validação de tipo e tamanho acontece antes de qualquer trabalho, para o erro mais comum — uma
+ * foto enorme direto da câmera — falhar na hora em vez de no fim de um upload longo.
  */
 export default function PhotoUpload({
   name,
   photoUrl,
-  enabled,
 }: {
   name: string
   photoUrl: string | null
-  enabled: boolean
 }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -37,7 +79,7 @@ export default function PhotoUpload({
       return
     }
     if (file.size > MAX_BYTES) {
-      setError('A imagem precisa ter no máximo 2MB.')
+      setError('Escolha uma imagem de até 12MB.')
       return
     }
 
@@ -46,7 +88,7 @@ export default function PhotoUpload({
     setBusy(true)
     try {
       const body = new FormData()
-      body.append('file', file)
+      body.append('file', await reduzir(file))
       const res = await fetch('/api/profile/photo', { method: 'POST', body })
       const data = await res.json().catch(() => ({}) as { error?: string; photoUrl?: string })
       if (!res.ok) {
@@ -117,7 +159,7 @@ export default function PhotoUpload({
         <div className="flex items-center gap-2">
           <button
             type="button"
-            disabled={!enabled || busy}
+            disabled={busy}
             onClick={() => inputRef.current?.click()}
             className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 border border-emerald-200 px-4 py-2 rounded-xl hover:bg-emerald-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -139,11 +181,9 @@ export default function PhotoUpload({
 
         {error ? (
           <p className="text-xs text-red-600 mt-1.5">{error}</p>
-        ) : enabled ? (
-          <p className="text-xs text-gray-400 mt-1.5">JPG, PNG ou WebP. Máximo 2MB.</p>
         ) : (
-          <p className="text-xs text-amber-600 mt-1.5">
-            O envio de fotos ainda não foi configurado neste servidor.
+          <p className="text-xs text-gray-400 mt-1.5">
+            JPG, PNG ou WebP. A imagem é reduzida automaticamente antes de subir.
           </p>
         )}
       </div>

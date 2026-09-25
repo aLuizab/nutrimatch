@@ -4,6 +4,7 @@ import { ArrowLeft, Calendar, Video, MapPin, FileText, Target } from 'lucide-rea
 import DashboardShell from '../../components/DashboardShell'
 import ProfessionalSidebar from '../../components/ProfessionalSidebar'
 import WeightChart from '../../patient/evolucao/WeightChart'
+import { getHabits } from '@/lib/habits'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { avatarColor, formatDateBR, formatPrice, formatTimeBR, initials } from '@/lib/format'
@@ -48,10 +49,17 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
   const firstConsultation = confirmed[confirmed.length - 1].scheduledAt
   const windowStart = new Date(firstConsultation.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-  const progressEntries = await prisma.progressEntry.findMany({
-    where: { patientId: patient.id, recordedAt: { gte: windowStart } },
-    orderBy: { recordedAt: 'asc' },
-  })
+  const [progressEntries, habits] = await Promise.all([
+    prisma.progressEntry.findMany({
+      where: { patientId: patient.id, recordedAt: { gte: windowStart } },
+      orderBy: { recordedAt: 'asc' },
+    }),
+    // Hábitos entram na mesma tela porque respondem à pergunta que a consulta faz — "como foi a
+    // semana?" — melhor que qualquer medida isolada. Só os ativos, e só a faixa de 7 dias que a
+    // própria paciente vê: o histórico inteiro não é necessário para conduzir a consulta, e o que
+    // não é necessário não deve ser entregue (LGPD Art. 6, necessidade).
+    getHabits(patient.id),
+  ])
 
   // Records that this professional opened this patient's health data (LGPD Art. 37).
   audit({
@@ -59,7 +67,7 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
     actorRole: user.role,
     action: 'PATIENT_HEALTH_DATA_VIEWED',
     subjectId: patient.id,
-    metadata: { entries: progressEntries.length },
+    metadata: { entries: progressEntries.length, habits: habits.length },
   })
 
   const withWeight = progressEntries.filter((e) => e.weightKg !== null)
@@ -67,6 +75,10 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
   const firstWeight = withWeight[0]?.weightKg ?? null
   const currentWeight = withWeight[withWeight.length - 1]?.weightKg ?? null
   const totalDelta = firstWeight !== null && currentWeight !== null ? currentWeight - firstWeight : null
+
+  // A última entrada com alguma medida, que é o retrato do momento. O gráfico acima conta a
+  // trajetória; este bloco conta onde a pessoa está hoje.
+  const ultimaMedida = progressEntries[progressEntries.length - 1] ?? null
 
   const program = patient.enrollments[0] ?? null
   const used = program?._count.appointments ?? 0
@@ -153,6 +165,64 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
           )}
         </div>
 
+        {ultimaMedida && (
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-1">Últimas medidas</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Registradas pela paciente em {formatDateBR(ultimaMedida.recordedAt)}
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {medidasDaEntrada(ultimaMedida).map((m) => (
+                <div key={m.label}>
+                  <p className="text-xs text-gray-500">{m.label}</p>
+                  <p className="text-lg font-bold text-gray-900 mt-0.5" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                    {m.valor}
+                  </p>
+                </div>
+              ))}
+            </div>
+            {ultimaMedida.note && (
+              <p className="text-sm text-gray-600 mt-4 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                {ultimaMedida.note}
+              </p>
+            )}
+          </div>
+        )}
+
+        {habits.length > 0 && (
+          <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-1">Hábitos</h2>
+            <p className="text-xs text-gray-500 mb-4">
+              Os últimos 7 dias, marcados pela paciente. Somente leitura.
+            </p>
+            <div className="space-y-3">
+              {habits.map((h) => (
+                <div key={h.id} className="flex items-center justify-between gap-4 flex-wrap">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-900">{h.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {h.doneInWindow} de 7 dias
+                      {h.targetPerWeek != null && ` · meta de ${h.targetPerWeek}x por semana`}
+                      {h.streak > 0 && ` · ${h.streak} ${h.streak === 1 ? 'dia' : 'dias'} seguidos`}
+                    </p>
+                  </div>
+                  <div className="flex gap-1 shrink-0">
+                    {h.days.map((d) => (
+                      <span
+                        key={d.dateStr}
+                        title={`${d.dateStr.split('-').reverse().join('/')}${d.done ? ' — cumprido' : ''}`}
+                        className={`w-6 h-6 rounded-md border ${
+                          d.done ? 'border-emerald-500 bg-emerald-500' : 'border-gray-200 bg-gray-50'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="bg-surface rounded-2xl border border-gray-100 shadow-sm p-6">
           <h2 className="text-base font-bold text-gray-900 mb-5">Histórico de consultas</h2>
           <div className="space-y-3">
@@ -193,4 +263,31 @@ export default async function PacienteDetalhe({ params }: { params: Promise<{ id
       </div>
     </DashboardShell>
   )
+}
+
+/** As medidas preenchidas numa entrada, com rótulo e unidade. Vazias ficam de fora — mostrar
+ *  "Coxa —" seis vezes esconde as três medidas que a pessoa de fato tomou. */
+function medidasDaEntrada(e: {
+  weightKg: number | null
+  bodyFatPercent: number | null
+  leanMassKg: number | null
+  waistCm: number | null
+  hipCm: number | null
+  chestCm: number | null
+  armCm: number | null
+  thighCm: number | null
+}): { label: string; valor: string }[] {
+  const campos: [string, number | null, string][] = [
+    ['Peso', e.weightKg, 'kg'],
+    ['Gordura', e.bodyFatPercent, '%'],
+    ['Massa magra', e.leanMassKg, 'kg'],
+    ['Cintura', e.waistCm, 'cm'],
+    ['Quadril', e.hipCm, 'cm'],
+    ['Tórax', e.chestCm, 'cm'],
+    ['Braço', e.armCm, 'cm'],
+    ['Coxa', e.thighCm, 'cm'],
+  ]
+  return campos
+    .filter(([, v]) => v !== null)
+    .map(([label, v, unidade]) => ({ label, valor: `${v} ${unidade}` }))
 }
