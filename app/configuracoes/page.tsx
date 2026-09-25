@@ -22,6 +22,8 @@ export default async function Configuracoes() {
     city: user.professional.city,
     price: user.professional.price,
     bio: user.professional.bio,
+    modality: user.professional.modality,
+    officeAddress: user.professional.officeAddress ?? '',
     initials: initials(user.name),
     photoUrl: user.photoUrl ?? null,
   }

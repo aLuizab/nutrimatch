@@ -290,7 +290,7 @@ export default function PatientConsultasClient({ upcoming, past }: { upcoming: C
                       </a>
                     ) : (
                       <span
-                        title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes do horário`}
+                        title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes, e o link chega por e-mail no mesmo momento`}
                         className="text-sm font-medium text-gray-400 border border-gray-200 px-4 py-2.5 rounded-xl cursor-default"
                       >
                         {appt.minutesUntilMeeting > 60

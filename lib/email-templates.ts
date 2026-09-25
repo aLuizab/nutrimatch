@@ -41,6 +41,8 @@ export function bookingConfirmedPatient(d: AppointmentEmailData & { paymentConfi
        <p>📅 <strong>${d.dateLabel}</strong> às <strong>${d.timeLabel}</strong><br/>
           💻 ${d.modalityLabel}<br/>
           💰 ${d.priceLabel}</p>
+       <p>Se for online, <strong>o link da sala chega por e-mail 5 minutos antes</strong> — para
+          você e para o profissional. Não precisa procurar nada na hora.</p>
        <p>Se precisar, você pode cancelar em <em>Minhas Consultas</em> na plataforma.</p>`
     ),
   }
@@ -57,6 +59,8 @@ export function bookingReceivedProfessional(d: AppointmentEmailData) {
           💰 ${d.priceLabel}</p>
        <p>Ela <strong>já está confirmada</strong> — você não precisa aceitar nada. O valor menos a
           taxa da plataforma aparece em <em>Repasses</em> assim que o pagamento é conferido.</p>
+       <p>Se for online, <strong>o link da sala chega por e-mail 5 minutos antes</strong>, para você
+          e para o paciente.</p>
        <p>Se não puder atender neste horário, cancele pela sua <em>Agenda</em> o quanto antes: o
           paciente recebe o valor de volta e cancelamento em cima da hora pesa na sua
           confiabilidade.</p>`
@@ -195,7 +199,8 @@ export function appointmentReminderPatient(d: AppointmentEmailData & { meetingUr
           💻 ${d.modalityLabel}</p>
        ${
          d.meetingUrl
-           ? `<p>O link da chamada abre 15 minutos antes do horário:<br/>
+           ? `<p><strong>Você recebe o link por e-mail 5 minutos antes da consulta</strong>, então
+                 não precisa guardar este. Se preferir deixar salvo:<br/>
               <a href="${d.meetingUrl}" style="color: #10b981;">${d.meetingUrl}</a></p>`
            : ''
        }
@@ -362,6 +367,45 @@ export function appointmentExpiredPatient(d: AppointmentEmailData) {
           ${d.professionalName} expirou sem confirmação, e foi liberado.</p>
        <p>Se você pagou, o valor será devolvido — nenhuma ação sua é necessária.</p>
        <p>Você pode escolher outro horário ou outro profissional na plataforma quando quiser.</p>`
+    ),
+  }
+}
+
+/**
+ * O link da sala, minutos antes de começar. Vai para os dois lados.
+ *
+ * É o e-mail mais importante de uma consulta online, e por isso é o mais curto: quem o abre está
+ * de pé, a caminho do computador, e precisa de uma coisa só — o botão. Tudo o que estiver em
+ * volta dele compete com ele.
+ *
+ * Não respeita preferência de notificação de nenhum dos dois. Silenciar isto é silenciar o
+ * endereço da consulta que a pessoa já pagou.
+ */
+export function meetingStartingSoon(d: {
+  recipientName: string
+  otherName: string
+  timeLabel: string
+  minutesLabel: string
+  meetingUrl: string
+}) {
+  return {
+    subject: `Sua consulta começa em instantes — ${d.timeLabel}`,
+    html: wrap(
+      'Sua consulta está começando 🎥',
+      `<p>Olá, ${d.recipientName}!</p>
+       <p>Sua consulta com <strong>${d.otherName}</strong> começa às <strong>${d.timeLabel}</strong>,
+          daqui a ${d.minutesLabel}.</p>
+       <p style="margin: 20px 0;">
+         <a href="${d.meetingUrl}"
+            style="background: #10b981; color: #ffffff; text-decoration: none; font-weight: 700;
+                   padding: 14px 28px; border-radius: 12px; display: inline-block; font-size: 15px;">
+           Entrar na consulta
+         </a>
+       </p>
+       <p style="font-size: 13px; color: #6b7280;">
+         Se o botão não funcionar, copie este endereço no navegador:<br/>
+         <span style="word-break: break-all;">${d.meetingUrl}</span>
+       </p>`
     ),
   }
 }

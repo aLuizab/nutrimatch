@@ -11,14 +11,22 @@ export const dynamic = 'force-dynamic'
 export default async function LinksDePagamento() {
   const user = await requireRoleOrRedirect('ADMIN')
 
-  const professionals = await prisma.professional.findMany({
-    where: { status: { in: ['ACTIVE', 'PENDING'] } },
-    include: {
-      user: { select: { name: true, email: true } },
-      carePlans: { where: { active: true }, orderBy: { createdAt: 'asc' } },
-    },
-    orderBy: { createdAt: 'asc' },
-  })
+  // As duas em paralelo: não dependem uma da outra, e em série cada uma paga a própria ida e
+  // volta ao banco.
+  const [professionals, plano] = await Promise.all([
+    prisma.professional.findMany({
+      where: { status: { in: ['ACTIVE', 'PENDING'] } },
+      include: {
+        user: { select: { name: true, email: true } },
+        carePlans: { where: { active: true }, orderBy: { createdAt: 'asc' } },
+      },
+      orderBy: { createdAt: 'asc' },
+    }),
+    prisma.subscriptionPlan.findFirst({
+      where: { active: true, monthlyPrice: { gt: 0 } },
+      orderBy: { sortOrder: 'asc' },
+    }),
+  ])
 
   const rows = professionals.map((p) => ({
     id: p.id,
@@ -42,11 +50,6 @@ export default async function LinksDePagamento() {
 
   // O plano pago da plataforma. monthlyPrice já é em centavos, ao contrário de Professional.price
   // e do total de um pacote, que estão em reais — por isso este não passa por reaisToCents.
-  const plano = await prisma.subscriptionPlan.findFirst({
-    where: { active: true, monthlyPrice: { gt: 0 } },
-    orderBy: { sortOrder: 'asc' },
-  })
-
   return (
     <DashboardShell sidebar={<AdminSidebar name={user.name} />}>
       <LinksClient

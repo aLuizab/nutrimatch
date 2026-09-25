@@ -7,6 +7,7 @@ import { SPECIALTY_NAMES } from '@/lib/specialties'
 import PagamentosTab, { type PixStatus } from './PagamentosTab'
 import SegurancaTab from './SegurancaTab'
 import DisponibilidadePorData, { type ExcecaoDeData } from './DisponibilidadePorData'
+import { ENDERECO_MINIMO, requiresOffice } from '@/lib/office'
 import LocationPicker from '../components/LocationPicker'
 import PricingGuide from '../components/PricingGuide'
 import PhotoUpload from '../components/PhotoUpload'
@@ -42,6 +43,8 @@ export interface ProfileData {
   city: string
   price: number
   bio: string
+  modality: 'ONLINE' | 'PRESENCIAL' | 'AMBOS'
+  officeAddress: string
   initials: string
   photoUrl: string | null
 }
@@ -77,6 +80,11 @@ export default function ConfiguracoesClient({
   const [city, setCity] = useState(initialProfile.city)
   const [price, setPrice] = useState(String(initialProfile.price))
   const [bio, setBio] = useState(initialProfile.bio)
+  const [modality, setModality] = useState(initialProfile.modality)
+  const [officeAddress, setOfficeAddress] = useState(initialProfile.officeAddress)
+
+  const precisaEndereco = requiresOffice(modality)
+  const enderecoOk = officeAddress.trim().length >= ENDERECO_MINIMO
 
   function toggleSpecialty(s: string) {
     setSpecialties((prev) => {
@@ -94,7 +102,17 @@ export default function ConfiguracoesClient({
       const res = await fetch('/api/professional/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, crn, phone, specialties, city, price: Number(price), bio }),
+        body: JSON.stringify({
+          name,
+          crn,
+          phone,
+          specialties,
+          city,
+          price: Number(price),
+          bio,
+          modality,
+          officeAddress: officeAddress.trim() || undefined,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -328,6 +346,45 @@ export default function ConfiguracoesClient({
               </div>
             </div>
 
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                  Modalidade de atendimento
+                </label>
+                <select
+                  value={modality}
+                  onChange={(e) => setModality(e.target.value as typeof modality)}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm bg-surface focus:outline-none focus:border-emerald-500"
+                >
+                  <option value="AMBOS">Online e Presencial</option>
+                  <option value="ONLINE">Apenas Online</option>
+                  <option value="PRESENCIAL">Apenas Presencial</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                  Endereço do consultório
+                  {!precisaEndereco && <span className="font-normal text-gray-400"> (opcional)</span>}
+                </label>
+                <input
+                  value={officeAddress}
+                  onChange={(e) => setOfficeAddress(e.target.value)}
+                  placeholder="Rua, número, complemento, bairro"
+                  maxLength={300}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500"
+                />
+                {precisaEndereco && !enderecoOk ? (
+                  <p className="text-xs text-amber-600 mt-1.5">
+                    Sem endereço, o formato presencial não fica disponível para o paciente escolher.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    É para cá que o paciente vai na consulta presencial. Aparece no seu perfil.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="mt-4">
               <label className="text-xs font-bold text-gray-700 block mb-1.5">Bio profissional</label>
               <textarea
@@ -343,7 +400,11 @@ export default function ConfiguracoesClient({
             <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium">
               {saved && <><CheckCircle size={16} /> Salvo com sucesso!</>}
             </div>
-            <button type="submit" disabled={loading} className="bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60">
+            <button
+              type="submit"
+              disabled={loading || (precisaEndereco && !enderecoOk)}
+              className="bg-emerald-500 text-white font-bold px-6 py-2.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+            >
               {loading ? 'Salvando...' : 'Salvar alterações'}
             </button>
           </div>

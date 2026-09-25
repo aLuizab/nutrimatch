@@ -107,6 +107,17 @@ model User {
   role         Role
   createdAt    DateTime @default(now())
 
+  // ── Aceite dos Termos de Uso ─────────────────────────────────────────────────────────
+  // Quando a pessoa aceitou, e qual texto ela aceitou. As duas colunas, e não um booleano:
+  // "aceitou" sem data e sem versão não prova nada no dia em que alguém contesta — e os termos
+  // mudam. Sem a versão, uma alteração futura faria parecer que todo mundo concordou com um
+  // texto que nunca leu.
+  //
+  // Anuláveis porque as contas criadas antes desta mudança existem e não podem ser apagadas.
+  // Elas ficam com null, que é a verdade: não há registro de aceite para elas.
+  termsAcceptedAt DateTime?
+  termsVersion    String?
+
   // Session revocation epoch: lib/session.ts rejects any token issued before this instant,
   // so changing the password logs out every other device. Without it a stolen cookie is
   // valid for its full 7-day life with no way to kill it.
@@ -148,19 +159,25 @@ model User {
 }
 
 model Professional {
-  id          String             @id @default(cuid())
-  userId      String             @unique
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   crn         String
   specialties String[]
   bio         String
   city        String
   modality    Modality
   price       Int
-  status      ProfessionalStatus @default(ACTIVE)
-  rating      Float              @default(0)
-  reviewCount Int                @default(0)
-  createdAt   DateTime           @default(now())
+
+  /// Onde o profissional atende presencialmente. É **pré-requisito** do formato presencial: sem
+  /// endereço, `modality` não pode ser PRESENCIAL nem AMBOS (ver lib/office.ts). A regra existe
+  /// porque um paciente que marca presencial sem saber para onde ir descobre isso no dia da
+  /// consulta, e nesse momento não há mais o que fazer.
+  officeAddress String?
+  status        ProfessionalStatus @default(ACTIVE)
+  rating        Float              @default(0)
+  reviewCount   Int                @default(0)
+  createdAt     DateTime           @default(now())
 
   // Weighted ranking score, materialised because Postgres can't ORDER BY / paginate over a
   // score computed in application memory. Recomputed by lib/ranking.ts whenever an input
@@ -219,6 +236,7 @@ model Professional {
   payouts               Payout[]
   availabilityRules     AvailabilityRule[]
   availabilityOverrides AvailabilityOverride[]
+  agendaEntries         AgendaEntry[]
   appointments          Appointment[]
   reviews               Review[]
   carePlans             CarePlan[]
@@ -258,6 +276,48 @@ model Patient {
 
 /// A grade que se repete toda semana. É o padrão; uma data específica pode fugir dele —
 /// ver AvailabilityOverride.
+/// O que o profissional tem na agenda que a plataforma não marcou.
+///
+/// Duas coisas cabem aqui, e a distinção importa para quem lê a agenda depois: uma consulta
+/// combinada fora da plataforma (paciente antigo, convênio, indicação) e um compromisso que
+/// simplesmente ocupa o horário (almoço, supervisão, médico). As duas bloqueiam o horário do
+/// mesmo jeito — a diferença é o que a agenda mostra e o que ele consegue relembrar dali a um mês.
+///
+/// Separado de Appointment de propósito. Appointment carrega paciente da plataforma, pagamento,
+/// repasse, avaliação e comparecimento; nada disso existe numa consulta que a plataforma não
+/// intermediou. Enfiar as duas na mesma tabela encheria metade das colunas de null e faria toda
+/// consulta de receita, reputação e repasse precisar lembrar de excluir estas linhas — que é
+/// exatamente o tipo de filtro que alguém esquece.
+model AgendaEntry {
+  id             String          @id @default(cuid())
+  professionalId String
+  professional   Professional    @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  kind           AgendaEntryKind
+
+  /// Como aparece na agenda. Para consulta externa, o nome de quem ele vai atender costuma ser
+  /// o título mais útil — e é ele quem escreve, porque a plataforma não conhece essa pessoa.
+  title String
+
+  /// Só faz sentido em consulta externa: um compromisso pessoal não tem modalidade.
+  modality Modality?
+
+  startsAt DateTime
+  endsAt   DateTime
+
+  note String?
+
+  createdAt DateTime @default(now())
+
+  @@index([professionalId, startsAt])
+}
+
+enum AgendaEntryKind {
+  /// Consulta combinada fora da plataforma.
+  CONSULTA_EXTERNA
+  /// Qualquer outra coisa que ocupa o horário e não é consulta.
+  COMPROMISSO
+}
+
 model AvailabilityRule {
   id             String       @id @default(cuid())
   professionalId String

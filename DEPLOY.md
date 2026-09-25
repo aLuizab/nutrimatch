@@ -114,11 +114,24 @@ não por processo de fundo.
    ```
    Sem essa variável a rota responde 503 e não envia nada — é o padrão seguro, já que uma rota
    aberta aqui dispararia e-mail para todas as consultas futuras.
-2. No Railway, crie um **cron job** chamando a rota a cada 6 horas:
+2. No Railway, crie um **cron job** chamando a rota **a cada 5 minutos**:
    ```
    curl -fsS -X POST https://seudominio.com.br/api/cron/reminders \
      -H "Authorization: Bearer $CRON_SECRET"
    ```
+
+   > ⚠ **De 5 em 5 minutos, não de 6 em 6 horas.** A rota manda duas coisas: o lembrete da
+   > véspera, que tolera qualquer intervalo, e **o link da sala, 5 minutos antes da consulta** —
+   > esse não tolera. Num cron de 6 horas o link chegaria horas depois da consulta ter começado,
+   > ou nunca.
+   >
+   > O código assume esse intervalo: `CRON_INTERVALO_MINUTOS` em `lib/reminders.ts` é 5, e a
+   > janela de busca é calculada a partir dele. **Mudando o cron, mude a constante junto** — se o
+   > cron ficar mais lento que a janela, consultas passam entre duas execuções e ninguém recebe o
+   > link, em silêncio.
+   >
+   > Rodar de 5 em 5 minutos não gera e-mail repetido: cada lembrete é registrado em
+   > `SentReminder` antes de sair, e a chave única barra a segunda tentativa.
 
 3. Crie um **segundo cron, diário**, para acertar os pacotes vencidos — é o que devolve o valor
    das consultas não usadas. Fica separado dos lembretes porque mexe em dinheiro, e um job de
@@ -178,3 +191,59 @@ extrato.
       saúde é dado sensível pela LGPD; publicar sem essa revisão não é recomendado.
   - [ ] Nomear e publicar o encarregado de dados (DPO) real em `/privacidade` — hoje está marcado
         como pendente.
+
+## Velocidade da navegação
+
+Medido em 25/09/2026, do banco de produção (Neon, `sa-east-1`):
+
+| | tempo |
+|---|---|
+| Primeira consulta numa conexão nova (fria) | **~1.870ms** |
+| Consulta depois (quente) | ~19ms |
+| Quatro consultas em série | ~64ms |
+
+O banco não é o gargalo quando está quente. O que fazia a plataforma parecer travada eram duas
+coisas, e as duas já estão tratadas ou têm o caminho descrito aqui.
+
+### 1. Faltava `loading.tsx` (corrigido)
+
+Eram 37 das 38 páginas sem estado de carregamento. No App Router isso tem dois efeitos, e o
+primeiro é o que a pessoa sente: **a navegação para uma página dinâmica bloqueia** — o clique não
+muda nada na tela até o servidor terminar de renderizar. O segundo é silencioso: o Next só
+pré-busca uma rota dinâmica até a fronteira do `loading.tsx`, então sem o arquivo **não havia
+prefetch nenhum** e cada navegação começava do zero.
+
+Hoje são 14 arquivos cobrindo todas as áreas (`app/admin/loading.tsx` vale para as onze telas de
+admin, e assim por diante). Ao criar uma área nova, **crie o `loading.tsx` junto** — é a diferença
+entre uma tela que responde ao clique e uma que parece ter travado.
+
+### 2. A conexão fria de ~1,9s (depende de você)
+
+Dois motivos somados, e vale atacar os dois:
+
+**O Neon suspende a computação por inatividade.** No plano gratuito o banco desliga depois de
+alguns minutos sem uso, e a primeira consulta seguinte paga o religamento. Numa feira ou numa
+demonstração é exatamente o pior caso: ninguém acessa por vinte minutos, aí chega a primeira
+pessoa e espera dois segundos. Opções, em ordem de esforço: manter o *Autosuspend* desligado (plano
+pago), ou bater na rota `/api/health` de cinco em cinco minutos com o mesmo cron dos lembretes.
+
+**A `DATABASE_URL` não usa o endpoint com pool.** O host atual não tem o sufixo `-pooler`, então
+cada conexão nova faz o handshake completo contra a computação. O Neon oferece um endpoint com
+PgBouncer na frente:
+
+```
+# antes
+postgresql://user:senha@ep-xxxx.sa-east-1.aws.neon.tech/neondb
+# depois
+postgresql://user:senha@ep-xxxx-pooler.sa-east-1.aws.neon.tech/neondb
+```
+
+Trocar isso no Railway reduz o custo de abrir conexão e é o que sustenta vários acessos ao mesmo
+tempo — que é o cenário da feira. **Atenção:** migrations devem continuar rodando pelo endpoint
+direto, sem `-pooler`; o PgBouncer em modo transação não suporta tudo o que o `prisma migrate`
+faz. Se separar, use `DIRECT_URL` no bloco `datasource` para as migrations.
+
+### O que não era problema
+
+Consultas em série pelas páginas: só duas telas tinham mais de uma consulta sem `Promise.all`, e
+uma delas foi paralelizada. A soma disso é dezenas de milissegundos, não os segundos que se sentia.
