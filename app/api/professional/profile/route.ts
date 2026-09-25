@@ -5,6 +5,7 @@ import { AuthError, requireRole } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
 import { extractUf, isCrnValidationError, validateCrn } from '@/lib/crn'
+import { validateOffice } from '@/lib/office'
 
 const profileSchema = z.object({
   name: z.string().trim().min(2, 'Nome é obrigatório'),
@@ -18,6 +19,10 @@ const profileSchema = z.object({
   city: z.string().trim().min(2, 'Cidade é obrigatória'),
   price: z.coerce.number().int().min(1, 'Valor inválido'),
   bio: z.string().trim().optional(),
+  // Modalidade e endereço não estavam aqui, e a ausência era um buraco: o profissional escolhia
+  // o formato no cadastro e nunca mais podia mudá-lo. Entram juntos porque um valida o outro.
+  modality: z.enum(['ONLINE', 'PRESENCIAL', 'AMBOS']),
+  officeAddress: z.string().trim().max(300, 'Endereço muito longo').optional(),
 })
 
 export async function PATCH(request: Request) {
@@ -44,6 +49,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: crn.error }, { status: 400 })
   }
 
+  // A mesma regra do cadastro, conferida de novo: mudar o formato para presencial depois, sem
+  // endereço, produziria exatamente o problema que a regra existe para impedir.
+  const semEndereco = validateOffice(data.modality, data.officeAddress)
+  if (semEndereco) {
+    return NextResponse.json({ error: semEndereco }, { status: 400 })
+  }
+
   // Changing the CRN after approval invalidates the verification and sends the profile back
   // for review — otherwise someone could get approved with a real CRN and then swap it.
   const crnChanged = crn.formatted !== user.professional!.crn
@@ -59,6 +71,10 @@ export async function PATCH(request: Request) {
         city: data.city,
         price: data.price,
         bio: data.bio || '',
+        modality: data.modality,
+        // Guardado mesmo quando o formato é só online: quem volta a atender presencialmente não
+        // precisa redigitar o endereço que já tinha informado.
+        officeAddress: data.officeAddress || null,
         ...(needsReview
           ? { status: 'PENDING', crnVerifiedAt: null, crnVerifiedBy: null }
           : {}),

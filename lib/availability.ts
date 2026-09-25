@@ -4,12 +4,19 @@ import { slotOccupiedWhere } from './appointment-status'
 
 // Que horários um profissional tem livres, e até quando dá para marcar.
 //
-// Duas fontes de verdade, nesta ordem de precedência:
+// Duas fontes de verdade sobre QUANDO ele atende, nesta ordem de precedência:
 //
 //   1. **Exceção da data** (AvailabilityOverride) — férias, feriado, um sábado fora do comum.
 //      Uma exceção `closed` fecha o dia; blocos de horário numa data SUBSTITUEM a grade semanal
 //      naquele dia, nunca somam.
 //   2. **Grade semanal** (AvailabilityRule) — o padrão, para toda data sem exceção.
+//
+// E duas coisas que ocupam horário dentro do que ele atende:
+//
+//   - **Consulta da plataforma** (Appointment) — marcada por um paciente aqui.
+//   - **Agenda própria** (AgendaEntry) — consulta combinada fora da plataforma, ou compromisso
+//     pessoal. Bloqueia igual: um horário já ocupado não fica livre só porque o dinheiro dele não
+//     passou por aqui. Sem isto, a plataforma marcaria por cima do consultório dele.
 //
 // Nada disso roda em cron. O que está livre é derivado na leitura, do mesmo jeito que o resto
 // do estado baseado em tempo neste projeto: uma reserva não confirmada deixa de ocupar o horário
@@ -74,11 +81,22 @@ export async function getAvailableSlots(professionalId: string, daysWanted = 5):
   const todayStr = spDateString(now)
   const lastDateStr = addDaysToDateString(todayStr, BOOKING_HORIZON_DAYS)
 
-  const [rules, overrides, existing] = await Promise.all([
+  const [rules, overrides, ocupados, existing] = await Promise.all([
     prisma.availabilityRule.findMany({ where: { professionalId } }),
     prisma.availabilityOverride.findMany({
       where: { professionalId, date: { gte: todayStr, lte: lastDateStr } },
       select: { date: true, closed: true, startTime: true, endTime: true },
+    }),
+    // Tudo o que ele mesmo pôs na agenda e que toca a janela. A condição de sobreposição é
+    // frouxa de propósito (começa antes do fim / termina depois do começo): um compromisso que
+    // atravessa a meia-noite do último dia precisa aparecer.
+    prisma.agendaEntry.findMany({
+      where: {
+        professionalId,
+        endsAt: { gt: now },
+        startsAt: { lte: instantAt(lastDateStr, '23:59') },
+      },
+      select: { startsAt: true, endsAt: true },
     }),
     prisma.appointment.findMany({
       where: {
@@ -105,6 +123,8 @@ export async function getAvailableSlots(professionalId: string, daysWanted = 5):
   }
 
   const bookedTimes = new Set(existing.map((a) => a.scheduledAt.getTime()))
+  // Intervalos em milissegundos, para a comparação no laço não repetir getTime() milhares de vezes.
+  const bloqueios = ocupados.map((e) => [e.startsAt.getTime(), e.endsAt.getTime()] as const)
   // Duração que as exceções herdam. As regras semanais continuam usando a sua própria — elas
   // sempre carregaram uma por linha, e trocar isso por um valor global mudaria a agenda de quem
   // porventura tenha linhas com durações diferentes.
@@ -125,11 +145,16 @@ export async function getAvailableSlots(professionalId: string, daysWanted = 5):
       // The whole slot must fit inside the block — a slot that merely *starts* before the
       // block ends would spill into the next block and allow overlapping bookings.
       while (cursor.getTime() + step <= end.getTime()) {
-        if (cursor.getTime() > now.getTime() && !bookedTimes.has(cursor.getTime()) && !seen.has(cursor.getTime())) {
-          seen.add(cursor.getTime())
+        const inicio = cursor.getTime()
+        const fim = inicio + step
+        // Sobreposição de intervalos, e não igualdade de horário: um compromisso das 10h30 às
+        // 11h30 tem de derrubar a vaga das 11h, que nem começa no mesmo minuto que ele.
+        const ocupado = bloqueios.some(([de, ate]) => inicio < ate && fim > de)
+        if (inicio > now.getTime() && !ocupado && !bookedTimes.has(inicio) && !seen.has(inicio)) {
+          seen.add(inicio)
           times.push(new Date(cursor))
         }
-        cursor = new Date(cursor.getTime() + step)
+        cursor = new Date(fim)
       }
     }
     times.sort((a, b) => a.getTime() - b.getTime())

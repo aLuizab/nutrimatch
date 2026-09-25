@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { ChevronLeft, ChevronRight, Video, MapPin, FileText, Clock, UserCheck } from 'lucide-react'
 import { addDaysToDateString, mondayOfWeek, spDateString, spHour } from '@/lib/spdate'
 import CalendarioMeses from '../components/CalendarioMeses'
+import NovoCompromisso, { type AgendaEntryView } from './NovoCompromisso'
+import { BOOKING_HORIZON_DAYS } from '@/lib/availability'
 import { initials, avatarColor, formatDateBR, formatTimeBR } from '@/lib/format'
 import { OPEN_BEFORE_MINUTES } from '@/lib/meeting'
 import type { AttendanceStatus, Modality } from '@prisma/client'
@@ -206,7 +208,15 @@ function semanasEntre(deStr: string, paraStr: string) {
   return Math.round((segunda(paraStr) - segunda(deStr)) / (7 * 86400_000))
 }
 
-export default function AgendaGrid({ appointments }: { appointments: AgendaAppointment[] }) {
+export default function AgendaGrid({
+  appointments,
+  entries,
+  hoje,
+}: {
+  appointments: AgendaAppointment[]
+  entries: AgendaEntryView[]
+  hoje: string
+}) {
   const router = useRouter()
   const [weekOffset, setWeekOffset] = useState(0)
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -233,6 +243,21 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
     return map
   }, [appointments])
 
+  // Os compromissos próprios ocupam a célula da hora em que começam. Um bloco de duas horas
+  // aparece uma vez, na primeira: esticá-lo por várias células exigiria uma grade posicionada em
+  // pixels, e o que o profissional precisa saber — "este horário está ocupado, e com o quê" — já
+  // está dito. O intervalo completo aparece no rótulo.
+  const entriesByCell = useMemo(() => {
+    const map = new Map<string, AgendaEntryView[]>()
+    for (const e of entries) {
+      const key = `${spDateString(e.startsAt)}|${spHour(e.startsAt)}`
+      const list = map.get(key) ?? []
+      list.push(e)
+      map.set(key, list)
+    }
+    return map
+  }, [entries])
+
   // Base range 8h–18h, stretched to cover any booked hour (evening blocks etc.) so no
   // appointment is ever outside the grid.
   const hours = useMemo(() => {
@@ -243,8 +268,15 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
       if (h < min) min = h
       if (h > max) max = h
     }
+    // Compromissos entram na mesma conta: um almoço às 7h fora da faixa sumiria da grade, e um
+    // horário ocupado que não aparece é pior que não ter a funcionalidade.
+    for (const e of entries) {
+      const h = spHour(e.startsAt)
+      if (h < min) min = h
+      if (h > max) max = h
+    }
     return Array.from({ length: max - min + 1 }, (_, i) => min + i)
-  }, [appointments])
+  }, [appointments, entries])
 
   const selected = appointments.find((a) => a.id === selectedId) ?? null
 
@@ -323,9 +355,15 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
       </div>
 
       <div className="p-8">
-        <div className="flex gap-4 mb-5 text-xs font-medium text-gray-500">
+        <div className="flex gap-4 mb-5 text-xs font-medium text-gray-500 flex-wrap">
           <div className="flex items-center gap-1.5"><Video size={12} className="text-blue-500" /> Online</div>
           <div className="flex items-center gap-1.5"><MapPin size={12} className="text-emerald-500" /> Presencial</div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded border border-purple-300 bg-purple-50" /> Fora da plataforma
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded border border-gray-300 bg-gray-50" /> Compromisso
+          </div>
         </div>
 
         {modo === 'mes' && (
@@ -373,6 +411,23 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                   const appts = byCell.get(`${dateStr}|${h}`) ?? []
                   return (
                     <div key={dateStr} className={`border-r border-gray-50 last:border-0 p-1.5 space-y-1 ${dateStr === todayStr ? 'bg-emerald-50/30' : ''}`}>
+                      {(entriesByCell.get(`${dateStr}|${h}`) ?? []).map((e) => (
+                        <div
+                          key={e.id}
+                          title={e.note ?? undefined}
+                          className={`w-full text-left p-2 rounded-lg border text-xs font-medium ${
+                            e.kind === 'CONSULTA_EXTERNA'
+                              ? 'border-purple-300 text-purple-800 bg-purple-50'
+                              : 'border-gray-300 text-gray-600 bg-gray-50'
+                          }`}
+                        >
+                          <p className="font-bold truncate">{e.title}</p>
+                          <p className="opacity-70 mt-0.5">
+                            {formatTimeBR(e.startsAt)}–{formatTimeBR(e.endsAt)} ·{' '}
+                            {e.kind === 'CONSULTA_EXTERNA' ? 'fora daqui' : 'ocupado'}
+                          </p>
+                        </div>
+                      ))}
                       {appts.map((appt) => (
                         <button
                           key={appt.id}
@@ -412,6 +467,14 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
           </div>
         </div>
 
+        <div className="mt-6">
+          <NovoCompromisso
+            entries={entries}
+            hoje={hoje}
+            ultimoDia={addDaysToDateString(hoje, BOOKING_HORIZON_DAYS)}
+          />
+        </div>
+
         {selected && (
           <div className="mt-4 bg-surface rounded-2xl border border-gray-100 shadow-sm p-5">
             <div className="flex items-center gap-4">
@@ -441,7 +504,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                 </a>
               ) : (
                 <span
-                  title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes do horário`}
+                  title={`A sala abre ${OPEN_BEFORE_MINUTES} minutos antes, e o link chega por e-mail no mesmo momento`}
                   className="inline-flex items-center gap-1.5 mt-3 text-sm font-medium text-gray-400 border border-gray-200 px-4 py-2.5 rounded-xl cursor-default"
                 >
                   <Video size={14} />

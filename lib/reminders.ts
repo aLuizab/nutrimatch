@@ -3,6 +3,7 @@ import { sendEmail } from './email'
 import {
   appointmentReminderPatient,
   appointmentReminderProfessional,
+  meetingStartingSoon,
   type AppointmentEmailData,
 } from './email-templates'
 import { formatDateBR, formatPrice, formatTimeBR, modalityLabel } from './format'
@@ -22,6 +23,8 @@ import { meetingUrl } from './meeting'
 // uma verdade por uma arrumação.
 export const REMINDER_KIND = {
   dayBefore: 'DAY_BEFORE',
+  /** O link da sala, minutos antes de começar. Vai para o paciente e para o profissional. */
+  meetingLink: 'MEETING_LINK',
 } as const
 
 /** How far ahead the day-before reminder looks, and how wide the window is. */
@@ -30,6 +33,20 @@ const REMINDER_LEAD_HOURS = 24
 // between two runs are never reminded. Six hours tolerates an hourly, four-hourly or six-hourly
 // schedule without changing this code — the unique key stops the overlap from double-sending.
 const WINDOW_HOURS = 6
+
+// ── O link da sala, pouco antes da consulta ──────────────────────────────────────────────
+//
+// A promessa ao usuário é "5 minutos antes". O que o código garante é **pelo menos** 5 minutos
+// antes, e a diferença vem do relógio do cron: ele roda a cada CRON_INTERVALO_MINUTOS, então a
+// janela precisa ser larga o bastante para nenhuma consulta cair entre duas execuções.
+//
+// Com janela de 10 e cron de 5 em 5, o e-mail sai entre 5 e 10 minutos antes — nunca depois. O
+// contrário (janela estreita) perderia consultas em silêncio, que é a falha que não se percebe.
+//
+// **Se o cron passar a rodar em outro intervalo, este número muda junto.** Ver DEPLOY.md.
+const CRON_INTERVALO_MINUTOS = 5
+export const MEETING_LINK_LEAD_MINUTES = 5
+const MEETING_LINK_WINDOW_MINUTES = MEETING_LINK_LEAD_MINUTES + CRON_INTERVALO_MINUTOS
 
 /** Claims the right to send. Returns false when this reminder already went out. */
 async function claim(appointmentId: string, kind: string): Promise<boolean> {
@@ -60,11 +77,13 @@ function emailData(a: {
 
 export interface ReminderRun {
   dayBefore: { considered: number; sent: number; skipped: number }
+  meetingLink: { considered: number; sent: number; skipped: number }
 }
 
 export async function runReminders(now: Date = new Date()): Promise<ReminderRun> {
   const result: ReminderRun = {
     dayBefore: { considered: 0, sent: 0, skipped: 0 },
+    meetingLink: { considered: 0, sent: 0, skipped: 0 },
   }
 
   // ── Day-before reminders ──────────────────────────────────────────────────
@@ -99,6 +118,59 @@ export async function runReminders(now: Date = new Date()): Promise<ReminderRun>
       })
     }
     result.dayBefore.sent++
+  }
+
+  // ── O link da sala, minutos antes ─────────────────────────────────────────
+  // Só consulta online e confirmada, e só se a sala existir: presencial não tem link, e sem
+  // meetingRoom não há o que mandar.
+  const linkWindowEnd = new Date(now.getTime() + MEETING_LINK_WINDOW_MINUTES * 60_000)
+  const começando = await prisma.appointment.findMany({
+    where: {
+      status: 'CONFIRMED',
+      modality: 'ONLINE',
+      meetingRoom: { not: null },
+      scheduledAt: { gt: now, lte: linkWindowEnd },
+    },
+    include: {
+      patient: { include: { user: { select: { name: true, email: true } } } },
+      professional: { include: { user: { select: { name: true, email: true } } } },
+    },
+  })
+  result.meetingLink.considered = começando.length
+
+  for (const a of começando) {
+    if (!(await claim(a.id, REMINDER_KIND.meetingLink))) {
+      result.meetingLink.skipped++
+      continue
+    }
+    const url = meetingUrl(a.meetingRoom!)
+    const minutos = Math.max(1, Math.round((a.scheduledAt.getTime() - now.getTime()) / 60_000))
+    const minutesLabel = minutos === 1 ? '1 minuto' : `${minutos} minutos`
+    const timeLabel = formatTimeBR(a.scheduledAt)
+
+    // Os dois recebem, e nenhum dos dois pode desligar: este e-mail É o endereço da consulta.
+    // Uma preferência de notificação que esconde a porta da sala não é preferência, é falha.
+    await sendEmail({
+      to: a.patient.user.email,
+      ...meetingStartingSoon({
+        recipientName: a.patient.user.name,
+        otherName: a.professional.user.name,
+        timeLabel,
+        minutesLabel,
+        meetingUrl: url,
+      }),
+    })
+    await sendEmail({
+      to: a.professional.user.email,
+      ...meetingStartingSoon({
+        recipientName: a.professional.user.name,
+        otherName: a.patient.user.name,
+        timeLabel,
+        minutesLabel,
+        meetingUrl: url,
+      }),
+    })
+    result.meetingLink.sent++
   }
 
   return result

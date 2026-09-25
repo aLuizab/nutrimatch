@@ -12,6 +12,7 @@ import { resolveActiveEnrollment } from '@/lib/enrollments'
 import { isWithinRescheduleWindow } from '@/lib/appointment-status'
 import BookingFlow from './BookingFlow'
 import { paymentRequirementFor } from '@/lib/payments'
+import { effectiveModality } from '@/lib/office'
 
 export default async function Agendamento({
   params,
@@ -97,7 +98,10 @@ export default async function Agendamento({
             name: professional.user.name,
             specialty: specialtyLabel(professional.specialties),
             price: professional.price,
-            modality: professional.modality,
+            // O formato que de fato pode acontecer. Oferecer "presencial" a quem não tem
+            // endereço cadastrado é oferecer uma consulta sem lugar.
+            modality: effectiveModality(professional),
+            officeAddress: professional.officeAddress,
             initials: initials(professional.user.name),
             color: avatarColor(professional.id),
           }}

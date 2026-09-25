@@ -17,6 +17,12 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Alterado
 
+- Os dados de demonstração passam a ter **10 nutricionistas** (eram 8), cobrindo
+  as sete especialidades, com uma, duas ou três cada, e os quatro níveis de
+  reputação. As avaliações subiram de 17 para 44, de nove pacientes diferentes:
+  com duas avaliações por perfil o encolhimento bayesiano puxava todo mundo para
+  a média e a busca saía embolada — quem tinha 3 consultas aparecia acima de quem
+  tinha 58.
 - **O nutricionista não aceita mais consulta.** Conferido o pagamento, a consulta
   fica marcada na hora, nos três painéis. Ele continua podendo cancelar o que não
   puder atender — o valor volta integralmente ao paciente e o cancelamento pesa na
@@ -39,6 +45,23 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Adicionado
 
+- **Aceite dos Termos de Uso no cadastro**, obrigatório para paciente e para
+  nutricionista, com data e versão gravadas. Caixa desmarcada por padrão — um
+  aceite pré-marcado é o site respondendo pela pessoa. Ao mudar o texto de
+  `/termos` ou `/privacidade`, mude `TERMS_VERSION` em `lib/terms.ts` junto.
+- **Endereço do consultório**, e a regra que vem com ele: sem endereço, o formato
+  presencial não fica disponível. Vale no cadastro, na edição do perfil e também
+  na leitura — um perfil antigo marcado como presencial sem endereço é tratado
+  como online na busca e no agendamento, em vez de oferecer uma consulta sem
+  lugar. O endereço aparece na hora de escolher o formato, não depois de marcar.
+- **Agenda própria do nutricionista**: consultas combinadas fora da plataforma e
+  compromissos pessoais, na mesma grade das consultas daqui. O horário sai da
+  disponibilidade, então ninguém marca por cima. Marcar algo sobre uma consulta
+  já vendida não é bloqueado, mas avisa.
+- **O link da sala chega por e-mail 5 minutos antes**, para o paciente e para o
+  nutricionista. Não respeita preferência de notificação de nenhum dos dois:
+  silenciar isso é silenciar o endereço da consulta que já foi paga. **Exige o
+  cron de lembretes rodando de 5 em 5 minutos** — ver DEPLOY.md.
 - **Mais medidas em Minha Evolução.** Além de peso e cintura, agora cabem
   composição corporal (percentual de gordura, massa magra) e circunferências
   (quadril, tórax, braço, coxa), atrás de um botão "mais medidas" — todas
@@ -137,6 +160,22 @@ ponta a ponta com dinheiro real: cobrança, confirmação e repasse. Até lá, `
 
 ### Corrigido
 
+- **A navegação parecia travada.** Eram 37 das 38 páginas sem `loading.tsx`, e no
+  App Router isso faz o clique não mudar nada na tela até o servidor terminar de
+  renderizar — além de desligar o prefetch da rota, porque não há fronteira até
+  onde pré-buscar. Agora são 14 arquivos cobrindo todas as áreas. Medindo o banco
+  de produção: consulta quente ~19ms, mas **primeira conexão ~1.870ms** (o Neon
+  suspende a computação por inatividade, e a `DATABASE_URL` não usa o endpoint com
+  pool). As duas coisas estão descritas em DEPLOY.md com o que fazer.
+- Um e-mail de lembrete afirmava que a sala abre **15 minutos** antes; o código
+  sempre usou 5. O texto passou a sair da mesma constante que a regra.
+- O nutricionista não conseguia mudar a modalidade de atendimento depois do
+  cadastro — o campo simplesmente não existia na rota de edição de perfil.
+- **`npm run seed` apagava o banco de produção.** A trava olhava `NODE_ENV`, que
+  não é `production` na máquina de quem desenvolve — e o `.env` local aponta para
+  o banco de produção. Agora a trava olha para onde a `DATABASE_URL` aponta de
+  fato: banco remoto exige `SEED_CONFIRM_REMOTE=yes`, e o host a ser apagado
+  aparece na mensagem.
 - **A foto de perfil volta a funcionar.** Ela nunca funcionou: dependia de três
   credenciais do Cloudinary que jamais foram configuradas, e o botão ficava
   desabilitado dizendo "não configurado neste servidor". A imagem passa a ser

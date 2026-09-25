@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Calendar, Clock, Video, Users, CheckCircle } from 'lucide-react'
+import { Calendar, Clock, Video, Users, CheckCircle, MapPin } from 'lucide-react'
 import { formatDateBR, formatPrice, formatTimeBR } from '@/lib/format'
 import { RESCHEDULE_CUTOFF_HOURS } from '@/lib/appointment-status'
 import CalendarioMeses from '../../components/CalendarioMeses'
@@ -24,6 +24,8 @@ interface ProfessionalSummary {
   id: string
   name: string
   specialty: string
+  /** Onde a consulta presencial acontece. Mostrado antes de marcar, nao depois. */
+  officeAddress?: string | null
   price: number
   modality: Modality
   initials: string
@@ -237,6 +239,17 @@ export default function BookingFlow({
                 <Users size={16} /> Presencial
               </button>
             </div>
+            {/* O endereço aparece na hora de escolher, não depois de marcar: é o que decide se o
+                presencial faz sentido para esta pessoa. Sem endereço o formato nem chega aqui
+                (ver effectiveModality em lib/office.ts), então o `&&` é só a leitura segura. */}
+            {modality === 'PRESENCIAL' && professional.officeAddress && (
+              <p className="flex items-start gap-1.5 text-xs text-gray-500 mt-3 leading-relaxed">
+                <MapPin size={13} className="text-emerald-500 shrink-0 mt-0.5" />
+                <span>
+                  A consulta acontece em <strong className="text-gray-700">{professional.officeAddress}</strong>
+                </span>
+              </p>
+            )}
           </div>
         )}
 

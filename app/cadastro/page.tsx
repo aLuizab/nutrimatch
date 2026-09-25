@@ -7,6 +7,7 @@ import { ArrowLeft, User, Stethoscope, Check } from 'lucide-react'
 import { SPECIALTY_NAMES } from '@/lib/specialties'
 import LocationPicker from '../components/LocationPicker'
 import PricingGuide from '../components/PricingGuide'
+import { ENDERECO_MINIMO, requiresOffice } from '@/lib/office'
 
 type Role = 'PATIENT' | 'PROFESSIONAL'
 
@@ -37,7 +38,12 @@ export default function Cadastro() {
     })
   }
   const [modality, setModality] = useState<'AMBOS' | 'ONLINE' | 'PRESENCIAL'>('AMBOS')
+  const [officeAddress, setOfficeAddress] = useState('')
   const [professionalCity, setProfessionalCity] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
+
+  const precisaEndereco = requiresOffice(modality)
+  const enderecoOk = officeAddress.trim().length >= ENDERECO_MINIMO
 
   const handleStep1 = (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,8 +57,29 @@ export default function Cadastro() {
     try {
       const body =
         role === 'PATIENT'
-          ? { role, name, email, password, birthDate: birthDate || undefined, goal, city: patientCity }
-          : { role, name, email, password, crn, specialties, city: professionalCity, price: Number(price), modality }
+          ? {
+              role,
+              name,
+              email,
+              password,
+              birthDate: birthDate || undefined,
+              goal,
+              city: patientCity,
+              acceptedTerms,
+            }
+          : {
+              role,
+              name,
+              email,
+              password,
+              crn,
+              specialties,
+              city: professionalCity,
+              price: Number(price),
+              modality,
+              officeAddress: precisaEndereco ? officeAddress.trim() : undefined,
+              acceptedTerms,
+            }
 
       const res = await fetch('/api/register', {
         method: 'POST',
@@ -278,6 +305,26 @@ export default function Cadastro() {
                       <option value="PRESENCIAL">Apenas Presencial</option>
                     </select>
                   </div>
+                  {/* Só aparece quando é exigido. Um campo de endereço visível para quem atende
+                      só online é um campo que a pessoa para para decidir se preenche. */}
+                  {precisaEndereco && (
+                    <div>
+                      <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                        Endereço do consultório
+                      </label>
+                      <input
+                        value={officeAddress}
+                        onChange={(e) => setOfficeAddress(e.target.value)}
+                        placeholder="Rua, número, complemento, bairro"
+                        maxLength={300}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-emerald-500"
+                      />
+                      <p className="text-xs text-gray-400 mt-1.5">
+                        Obrigatório para atender presencialmente — é para cá que o paciente vai. Sem
+                        endereço, só o formato online fica disponível.
+                      </p>
+                    </div>
+                  )}
                   <p className="text-xs text-gray-400">
                     Seu perfil ficará em análise até ser aprovado pela nossa equipe e não aparecerá nas buscas até lá.
                   </p>
@@ -313,22 +360,46 @@ export default function Cadastro() {
                   </div>
                 </>
               )}
+              {/* Caixa desmarcada por padrão, e é obrigatório que seja: um aceite pré-marcado
+                  não é aceite — é o site respondendo pela pessoa. */}
+              <label className="flex items-start gap-3 border border-gray-200 rounded-xl p-4 cursor-pointer hover:border-gray-300 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={(e) => setAcceptedTerms(e.target.checked)}
+                  className="mt-0.5 w-4 h-4 accent-emerald-500 shrink-0"
+                />
+                <span className="text-sm text-gray-600 leading-relaxed">
+                  Li e aceito os{' '}
+                  <Link href="/termos" target="_blank" className="text-emerald-600 font-medium hover:underline">
+                    Termos de Uso
+                  </Link>{' '}
+                  e a{' '}
+                  <Link href="/privacidade" target="_blank" className="text-emerald-600 font-medium hover:underline">
+                    Política de Privacidade
+                  </Link>
+                  .
+                </span>
+              </label>
+
               <div className="flex gap-3">
                 <button type="button" onClick={() => setStep(1)} className="flex-1 border border-gray-200 text-gray-700 font-medium py-3.5 rounded-xl hover:bg-gray-50 transition-colors">
                   Voltar
                 </button>
-                <button type="submit" disabled={loading} className="flex-1 bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60">
+                <button
+                  type="submit"
+                  disabled={loading || !acceptedTerms || (role === 'PROFESSIONAL' && precisaEndereco && !enderecoOk)}
+                  className="flex-1 bg-emerald-500 text-white font-bold py-3.5 rounded-xl hover:bg-emerald-600 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                >
                   {loading ? 'Criando...' : 'Criar conta'}
                 </button>
               </div>
             </form>
           )}
 
-          <p className="text-center text-xs text-gray-400 mt-6">
-            Ao criar sua conta, você concorda com nossos{' '}
-            <Link href="/termos" target="_blank" className="text-emerald-600 hover:underline">Termos de Uso</Link> e{' '}
-            <Link href="/privacidade" target="_blank" className="text-emerald-600 hover:underline">Política de Privacidade</Link>
-          </p>
+          {/* O aviso de rodapé saiu: ele dizia que criar a conta já era concordar, o que
+              deixou de ser verdade agora que existe uma caixa para marcar. Manter os dois faria
+              o aceite parecer decorativo. */}
         </div>
       </div>
     </div>

@@ -6,6 +6,7 @@ import { guardMutation } from '@/lib/rate-limit'
 import { isSlotAvailable } from '@/lib/availability'
 import { notifyBookingConfirmed, notifyBookingPendingPayment } from '@/lib/notifications'
 import { generateMeetingRoom } from '@/lib/meeting'
+import { effectiveModality } from '@/lib/office'
 import { lockAndResolveEnrollment } from '@/lib/enrollments'
 import { paymentReviewDeadlineFor, staleHoldWhere } from '@/lib/appointment-status'
 import { paymentHoldDeadline, paymentRequirementFor } from '@/lib/payments'
@@ -56,7 +57,11 @@ export async function POST(request: Request) {
   if (professional.userId === user.id) {
     return NextResponse.json({ error: 'Você não pode agendar uma consulta com você mesmo' }, { status: 400 })
   }
-  if (professional.modality !== 'AMBOS' && professional.modality !== modality) {
+  // effectiveModality e não professional.modality: um perfil antigo pode estar marcado como
+  // PRESENCIAL sem endereço — a coluna nasceu depois dele. Aceitar o agendamento nesse caso
+  // marcaria uma consulta presencial num lugar que ninguém sabe qual é.
+  const formatoDoProfissional = effectiveModality(professional)
+  if (formatoDoProfissional !== 'AMBOS' && formatoDoProfissional !== modality) {
     return NextResponse.json({ error: 'Modalidade não disponível para este profissional' }, { status: 400 })
   }
   if (scheduledAtDate.getTime() <= Date.now()) {
