@@ -203,13 +203,14 @@ model Professional {
   // tipo, e isso não deveria custar uma migração.
   pixKeyType String?
 
-  subscription      ProfessionalSubscription?
-  payouts           Payout[]
-  availabilityRules AvailabilityRule[]
-  appointments      Appointment[]
-  reviews           Review[]
-  carePlans         CarePlan[]
-  enrollments       Enrollment[]
+  subscription          ProfessionalSubscription?
+  payouts               Payout[]
+  availabilityRules     AvailabilityRule[]
+  availabilityOverrides AvailabilityOverride[]
+  appointments          Appointment[]
+  reviews               Review[]
+  carePlans             CarePlan[]
+  enrollments           Enrollment[]
 
   @@index([status])
 }
@@ -242,6 +243,8 @@ model Patient {
   goals           Goal[]
 }
 
+/// A grade que se repete toda semana. É o padrão; uma data específica pode fugir dele —
+/// ver AvailabilityOverride.
 model AvailabilityRule {
   id             String       @id @default(cuid())
   professionalId String
@@ -252,6 +255,40 @@ model AvailabilityRule {
   slotMinutes    Int          @default(50)
 
   @@index([professionalId])
+}
+
+/// O que acontece numa data específica, quando ela não segue a semana: feriado, viagem,
+/// congresso, ou um sábado de mutirão que não existe na grade normal.
+///
+/// Existe como tabela separada, e não como mais linhas em AvailabilityRule, porque as duas
+/// respondem a perguntas diferentes e têm ciclos de vida diferentes: a grade semanal é
+/// permanente e reescrita inteira a cada salvamento, enquanto uma exceção vale para um dia só e
+/// deixa de importar quando aquele dia passa. Misturá-las faria "salvar meus horários" apagar as
+/// férias que a pessoa marcou três telas antes.
+///
+/// A data é `String` no formato 'YYYY-MM-DD', e não DateTime, pelo mesmo motivo que lib/spdate.ts
+/// existe: o que se quer guardar aqui é um dia do calendário de São Paulo, não um instante. Um
+/// DateTime obrigaria toda leitura a lembrar do fuso para não exibir o dia anterior.
+model AvailabilityOverride {
+  id             String       @id @default(cuid())
+  professionalId String
+  professional   Professional @relation(fields: [professionalId], references: [id], onDelete: Cascade)
+  date           String
+
+  /// Dia fechado: nenhum horário, mesmo que a grade semanal diga o contrário. Uma linha assim
+  /// vence qualquer outra da mesma data — é a forma de dizer "não atendo neste dia" sem
+  /// precisar apagar a grade da semana inteira.
+  closed Boolean @default(false)
+
+  /// Bloco de horário especial para esta data. Quando existe ao menos um, eles **substituem** a
+  /// grade semanal naquele dia, em vez de somar: quem abre um horário fora do comum quase sempre
+  /// quer só aquele horário, e somar criaria vagas que a pessoa não pediu. Nulos quando closed.
+  startTime String?
+  endTime   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([professionalId, date])
 }
 
 model Appointment {
@@ -597,13 +634,13 @@ enum PayoutStatus {
 /// Não há rota pública que liste isto. Comprovante de repasse é documento financeiro de duas
 /// pessoas específicas; quem pode ver cada arquivo é decidido em /api/arquivos/[id].
 model StoredFile {
-  id       String @id @default(cuid())
-  mimeType String
+  id         String   @id @default(cuid())
+  mimeType   String
   /// Guardado em coluna própria para a listagem mostrar o tamanho sem carregar os bytes.
-  sizeBytes Int
+  sizeBytes  Int
   /// Nome original, só para o download sair com algo reconhecível.
-  fileName String
-  bytes    Bytes
+  fileName   String
+  bytes      Bytes
   /// Quem enviou. Arquivo no banco sem responsável é arquivo que ninguém responde por.
   uploadedBy String
   createdAt  DateTime @default(now())

@@ -6,7 +6,8 @@ import { prisma } from '@/lib/prisma'
 import { getCurrentUser } from '@/lib/session'
 import { avatarColor, formatDateBR, formatTimeBR, initials } from '@/lib/format'
 import { specialtyLabel } from '@/lib/specialties'
-import { getAvailableSlots } from '@/lib/availability'
+import { BOOKING_HORIZON_DAYS, getAvailableSlots } from '@/lib/availability'
+import { addDaysToDateString, spDateString } from '@/lib/spdate'
 import { resolveActiveEnrollment } from '@/lib/enrollments'
 import { isWithinRescheduleWindow } from '@/lib/appointment-status'
 import BookingFlow from './BookingFlow'
@@ -57,7 +58,12 @@ export default async function Agendamento({
     }
   }
 
-  const days = await getAvailableSlots(id, 5)
+  // A janela inteira, não os próximos cinco dias: o calendário precisa saber quais dias dos três
+  // meses têm vaga para poder desenhá-los, e uma segunda requisição a cada troca de mês faria a
+  // navegação piscar. São ~65 dias com horário livre no pior caso, o que cabe folgado na página.
+  const hoje = spDateString(new Date())
+  const janela = { primeiroDia: hoje, ultimoDia: addDaysToDateString(hoje, BOOKING_HORIZON_DAYS) }
+  const days = await getAvailableSlots(id, BOOKING_HORIZON_DAYS)
 
   // Resolved against the first bookable slot via the same helper the booking API uses, so the
   // price shown here can't drift from the price actually charged.
@@ -106,6 +112,7 @@ export default async function Agendamento({
           }
           paymentRequired={paymentRequirementFor(professional, active != null).required}
           days={days}
+          janela={janela}
           initialHorario={horario}
           reschedule={reschedule}
         />

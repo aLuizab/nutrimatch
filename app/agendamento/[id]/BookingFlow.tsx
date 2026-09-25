@@ -3,14 +3,21 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Calendar, Clock, Video, Users, CheckCircle } from 'lucide-react'
-import { formatDateBR, formatPrice, formatTimeBR, formatWeekdayShortBR } from '@/lib/format'
+import { formatDateBR, formatPrice, formatTimeBR } from '@/lib/format'
 import { RESCHEDULE_CUTOFF_HOURS } from '@/lib/appointment-status'
+import CalendarioMeses from '../../components/CalendarioMeses'
 import type { Modality } from '@prisma/client'
 
 interface DayOption {
   dateStr: string
   date: Date
   times: Date[]
+}
+
+/** Primeiro e último dia navegáveis no calendário — a janela de BOOKING_HORIZON_DAYS. */
+export interface JanelaDeAgenda {
+  primeiroDia: string
+  ultimoDia: string
 }
 
 interface ProfessionalSummary {
@@ -40,6 +47,7 @@ export default function BookingFlow({
   program,
   paymentRequired,
   days,
+  janela,
   initialHorario,
   reschedule,
 }: {
@@ -47,6 +55,7 @@ export default function BookingFlow({
   program: ProgramSummary | null
   paymentRequired: boolean
   days: DayOption[]
+  janela: JanelaDeAgenda
   initialHorario?: string
   reschedule?: RescheduleTarget | null
 }) {
@@ -61,6 +70,20 @@ export default function BookingFlow({
     }
     return { dayIndex: 0, time: null as Date | null }
   }, [days, initialHorario])
+
+  // Só os dias com horário livre viram marca. O calendário trata data sem marca como não
+  // clicável, então esta é a própria regra de "este dia dá para marcar".
+  const marcasDoCalendario = useMemo(() => {
+    const marcas: Record<string, { tone: string; nota?: string; title?: string }> = {}
+    for (const d of days) {
+      marcas[d.dateStr] = {
+        tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+        nota: `${d.times.length}`,
+        title: `${d.times.length} ${d.times.length === 1 ? 'horário livre' : 'horários livres'}`,
+      }
+    }
+    return marcas
+  }, [days])
 
   const [selectedDay, setSelectedDay] = useState(initialSelection.dayIndex)
   const [selectedTime, setSelectedTime] = useState<Date | null>(initialSelection.time)
@@ -223,30 +246,27 @@ export default function BookingFlow({
           ) : (
             <>
               <h3 className="text-sm font-bold text-gray-700 mb-4 flex items-center gap-2">
-                <Calendar size={16} className="text-emerald-500" /> Próximos dias disponíveis
+                <Calendar size={16} className="text-emerald-500" /> Escolha o dia
               </h3>
-              <div className="flex gap-2 mb-5 overflow-x-auto no-scrollbar pb-1">
-                {days.map((d, i) => (
-                  <button
-                    type="button"
-                    key={d.dateStr}
-                    onClick={() => {
-                      setSelectedDay(i)
-                      setSelectedTime(null)
-                    }}
-                    className={`shrink-0 w-16 flex flex-col items-center py-3 rounded-xl border-2 text-xs font-medium transition-colors ${
-                      selectedDay === i ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-gray-200 text-gray-600 hover:border-emerald-300'
-                    }`}
-                  >
-                    <span>{formatWeekdayShortBR(d.date)}</span>
-                    <span className="text-lg font-bold mt-0.5">{d.dateStr.slice(8, 10)}</span>
-                    <span className="text-[10px] mt-0.5 opacity-70">{d.times.length} vagas</span>
-                  </button>
-                ))}
-              </div>
+              <CalendarioMeses
+                primeiroDia={janela.primeiroDia}
+                ultimoDia={janela.ultimoDia}
+                marcas={marcasDoCalendario}
+                selecionado={days[selectedDay]?.dateStr ?? null}
+                onSelecionar={(dateStr) => {
+                  const i = days.findIndex((d) => d.dateStr === dateStr)
+                  if (i < 0) return
+                  setSelectedDay(i)
+                  setSelectedTime(null)
+                }}
+              />
+              <p className="text-xs text-gray-400 mt-3 mb-5">
+                Os dias em verde têm horário livre. Dá para marcar com até 3 meses de antecedência.
+              </p>
 
               <h3 className="text-sm font-bold text-gray-700 mb-3 flex items-center gap-2">
-                <Clock size={16} className="text-emerald-500" /> Horários disponíveis
+                <Clock size={16} className="text-emerald-500" />
+                Horários de {formatDateBR(days[selectedDay].date)}
               </h3>
               <div className="grid grid-cols-4 gap-2">
                 {days[selectedDay].times.map((t) => (
