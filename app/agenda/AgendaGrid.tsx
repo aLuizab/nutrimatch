@@ -16,6 +16,9 @@ export interface AgendaAppointment {
   modality: Modality
   summary: string | null
   status: 'CONFIRMED' | 'AWAITING_CONFIRMATION'
+  // Distingue "o paciente ainda não pagou" de "ele avisou que pagou e a plataforma está
+  // conferindo". São duas esperas diferentes, e só a segunda tem alguém trabalhando nela.
+  paymentStatus: string
   confirmationDeadline: Date | null
   meetingUrl: string | null
   meetingOpen: boolean
@@ -105,67 +108,28 @@ function AttendancePanel({ appointment, onDone }: { appointment: AgendaAppointme
   )
 }
 
-function ConfirmPanel({ appointment, onDone }: { appointment: AgendaAppointment; onDone: () => void }) {
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'confirm' | 'decline' | null>(null)
-
-  async function act(status: 'CONFIRMED' | 'CANCELLED') {
-    setError(null)
-    setBusy(status === 'CONFIRMED' ? 'confirm' : 'decline')
-    try {
-      const res = await fetch(`/api/appointments/${appointment.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        setError(data.error ?? 'Não foi possível atualizar a consulta')
-        return
-      }
-      onDone()
-    } catch {
-      setError('Não foi possível conectar ao servidor. Tente novamente.')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const hoursLeft = appointment.confirmationDeadline
-    ? Math.max(0, Math.round((appointment.confirmationDeadline.getTime() - Date.now()) / 3600000))
-    : null
-
+/**
+ * O que o profissional vê quando uma consulta dele está com o pagamento em aberto.
+ *
+ * Informa, não pergunta. Antes aqui havia "Confirmar" e "Recusar": a consulta chegava como pedido
+ * e ele decidia. Não é mais assim — quem marca a consulta é a conferência do pagamento pela
+ * plataforma, e o horário só aparece aqui porque está preso enquanto o paciente paga. Deixar os
+ * botões seria oferecer uma decisão que não existe.
+ *
+ * Ele não fica sem saída: consulta já marcada pode ser cancelada, no painel normal.
+ */
+function AguardandoPagamentoPanel({ appointment }: { appointment: AgendaAppointment }) {
+  const declarado = appointment.paymentStatus === 'AWAITING_REVIEW'
   return (
     <div className="mt-4 border-t border-gray-100 pt-4">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <p className="flex items-center gap-1.5 text-sm font-bold text-orange-800">
-            <Clock size={14} /> Aguardando sua confirmação
-          </p>
-          <p className="text-xs text-gray-500 mt-1">
-            {hoursLeft !== null && hoursLeft > 0
-              ? `Restam ~${hoursLeft}h para confirmar. Depois disso o horário é liberado.`
-              : 'O prazo de confirmação está encerrando.'}
-          </p>
-        </div>
-        <div className="flex gap-2 shrink-0">
-          <button
-            onClick={() => act('CANCELLED')}
-            disabled={busy !== null}
-            className="px-4 py-2 text-sm border border-gray-200 rounded-xl font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            {busy === 'decline' ? 'Recusando...' : 'Recusar'}
-          </button>
-          <button
-            onClick={() => act('CONFIRMED')}
-            disabled={busy !== null}
-            className="px-4 py-2 text-sm bg-emerald-500 text-white rounded-xl font-medium hover:bg-emerald-600 transition-colors disabled:opacity-50"
-          >
-            {busy === 'confirm' ? 'Confirmando...' : 'Confirmar consulta'}
-          </button>
-        </div>
-      </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      <p className="flex items-center gap-1.5 text-sm font-bold text-orange-800">
+        <Clock size={14} /> {declarado ? 'Pagamento em conferência' : 'Aguardando o pagamento'}
+      </p>
+      <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+        {declarado
+          ? 'O paciente avisou que pagou e a plataforma está conferindo o extrato. Assim que o pagamento for confirmado, a consulta fica marcada automaticamente — você não precisa aceitar nada.'
+          : 'O paciente reservou este horário e está fazendo o pagamento. Se ele não pagar, o horário volta a ficar livre sozinho. Você não precisa fazer nada.'}
+      </p>
     </div>
   )
 }
@@ -335,8 +299,9 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                           key={appt.id}
                           onClick={() => setSelectedId(appt.id === selectedId ? null : appt.id)}
                           className={`w-full text-left p-2 rounded-lg border text-xs font-medium transition-all hover:shadow-sm bg-surface ${
-                            // Awaiting bookings get their own colour and a dashed edge: they
-                            // need action, and must not look like a settled appointment.
+                            // Horário preso enquanto o paciente paga: cor própria e borda
+                            // tracejada, porque ainda pode evaporar e não pode se parecer com
+                            // uma consulta marcada. Não pede ação nenhuma do profissional.
                             appt.status === 'AWAITING_CONFIRMATION'
                               ? 'border-orange-300 border-dashed text-orange-800 bg-orange-50'
                               : appt.modality === 'PRESENCIAL'
@@ -354,7 +319,9 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
                               <Video size={10} />
                             )}
                             {formatTimeBR(appt.scheduledAt)} ·{' '}
-                            {appt.status === 'AWAITING_CONFIRMATION' ? 'Confirmar' : (appt.reason ?? 'Consulta')}
+                            {appt.status === 'AWAITING_CONFIRMATION'
+                              ? 'Aguardando pagamento'
+                              : (appt.reason ?? 'Consulta')}
                           </p>
                         </button>
                       ))}
@@ -406,7 +373,7 @@ export default function AgendaGrid({ appointments }: { appointments: AgendaAppoi
               )
             )}
             {selected.status === 'AWAITING_CONFIRMATION' ? (
-              <ConfirmPanel appointment={selected} onDone={() => router.refresh()} />
+              <AguardandoPagamentoPanel appointment={selected} />
             ) : selected.scheduledAt.getTime() <= Date.now() ? (
               <>
                 <AttendancePanel appointment={selected} onDone={() => router.refresh()} />

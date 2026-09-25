@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import PublicHeader from '../components/PublicHeader'
 import { platformFeePercent } from '@/lib/fees'
-import { CONFIRMATION_WINDOW_HOURS } from '@/lib/appointment-status'
+import { PAYMENT_REVIEW_WINDOW_HOURS } from '@/lib/appointment-status'
 
 export const metadata = { title: 'Termos de Uso — NutriMatch' }
 
@@ -53,15 +53,20 @@ export default function Termos() {
           <section>
             <h2 className="text-base font-bold text-gray-900 mb-2">3. Agendamento e confirmação</h2>
             <p>
-              Ao agendar, o paciente reserva um horário na agenda do profissional. O pedido fica
-              aguardando confirmação por até {CONFIRMATION_WINDOW_HOURS} horas — se o profissional
-              não confirmar nem recusar dentro desse prazo, o horário é liberado automaticamente e
-              qualquer valor pago é revertido (ver a{' '}
+              Ao agendar, o paciente reserva um horário na agenda do profissional e faz o pagamento
+              pela plataforma. O horário fica reservado por até {PAYMENT_REVIEW_WINDOW_HOURS} horas
+              enquanto a equipe confere o recebimento; passado esse prazo sem conferência, o horário
+              é liberado e qualquer valor pago é devolvido (ver a{' '}
               <Link href="/politica-de-cancelamento" className="text-emerald-600 hover:underline">
                 Política de Cancelamento e Reembolso
               </Link>
-              ). O profissional pode recusar um pedido a qualquer momento dentro desse prazo, sem
-              necessidade de justificativa.
+              ).
+            </p>
+            <p className="mt-2">
+              <strong>Confirmado o pagamento, a consulta está marcada.</strong> Não há etapa de
+              aceite pelo profissional. Ele pode cancelar uma consulta marcada quando não tiver como
+              atendê-la, e nesse caso o valor é devolvido integralmente ao paciente; cancelamentos
+              entram no cálculo da confiabilidade exibida no perfil dele.
             </p>
           </section>
 
@@ -76,8 +81,8 @@ export default function Termos() {
               profissional, fora da plataforma.
             </p>
             <p>
-              As regras específicas de captura, autorização e devolução de cada forma de
-              pagamento (cartão e Pix) estão detalhadas na{' '}
+              As regras de confirmação do pagamento, de repasse ao profissional e de devolução ao
+              paciente estão detalhadas na{' '}
               <Link href="/politica-de-cancelamento" className="text-emerald-600 hover:underline">
                 Política de Cancelamento e Reembolso
               </Link>

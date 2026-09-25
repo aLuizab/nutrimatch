@@ -10,7 +10,9 @@ export default async function Agenda() {
   if (!user.professional) return null
 
   const rows = await prisma.appointment.findMany({
-    // Includes awaiting bookings: the agenda is where the professional acts on them.
+    // Inclui as que estão com o pagamento em aberto: o horário está preso, e o profissional
+    // precisa ver que aquele espaço não está livre. Ele não age sobre elas — ver
+    // AguardandoPagamentoPanel.
     where: { professionalId: user.professional.id, status: { in: ['CONFIRMED', 'AWAITING_CONFIRMATION'] } },
     include: { patient: { include: { user: { select: { name: true } } } } },
   })
@@ -23,6 +25,7 @@ export default async function Agenda() {
     modality: a.modality,
     summary: a.summary,
     status: a.status as 'CONFIRMED' | 'AWAITING_CONFIRMATION',
+    paymentStatus: a.paymentStatus,
     confirmationDeadline: a.confirmationDeadline,
     meetingUrl: a.meetingRoom ? meetingUrl(a.meetingRoom) : null,
     meetingOpen: a.meetingRoom != null && isMeetingOpen(a.scheduledAt),

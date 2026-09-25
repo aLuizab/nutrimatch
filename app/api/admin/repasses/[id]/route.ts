@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { prisma } from '@/lib/prisma'
 import { AuthError, requireRole } from '@/lib/session'
 import { guardMutation } from '@/lib/rate-limit'
 import { audit } from '@/lib/audit'
-import { notifyPayoutPaid } from '@/lib/notifications'
-import { formatCents } from '@/lib/money'
-import { maskPixKey } from '@/lib/pix'
+import { markPayoutSent } from '@/lib/payouts'
 
-// Marcar o repasse como pago. A transferência em si acontece fora daqui, no app do banco — o
-// que esta rota registra é que ela aconteceu, com data e responsável. Sem isso, "já paguei o
-// fulano?" só teria resposta no extrato, e o profissional não teria como acompanhar nada.
+// Registrar que a transferência saiu. A transferência em si acontece fora daqui, no app do
+// banco — o que esta rota grava é que ela aconteceu, com data e responsável.
+//
+// Ela **não** conclui o repasse. Concluir exige comprovante anexado, e isso é POST
+// .../comprovante: sem documento, "já te paguei" é só a palavra de quem pagou. O que existe aqui
+// é o estado do meio — "mandei, o comprovante vem" — que é justamente o que o profissional
+// precisa ver para não confundir uma transferência feita numa sexta à noite com uma que nunca
+// saiu.
 const bodySchema = z.object({
-  action: z.literal('MARK_PAID'),
+  action: z.literal('MARK_SENT'),
   note: z.string().trim().max(200).optional(),
 })
 
@@ -32,43 +34,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = bodySchema.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Ação inválida' }, { status: 400 })
 
-  const payout = await prisma.payout.findUnique({
-    where: { id },
-    include: { professional: { include: { user: { select: { name: true, email: true } } } } },
-  })
-  if (!payout) return NextResponse.json({ error: 'Repasse não encontrado' }, { status: 404 })
-  if (payout.status === 'PAID') return NextResponse.json({ ok: true, alreadyPaid: true })
-  if (payout.status === 'CANCELLED') {
-    return NextResponse.json({ error: 'Este repasse foi cancelado' }, { status: 409 })
-  }
+  const falha = await markPayoutSent(id, admin.id, parsed.data.note)
+  if (falha) return NextResponse.json({ error: falha.error }, { status: falha.status })
 
-  await prisma.payout.update({
-    where: { id },
-    data: { status: 'PAID', paidAt: new Date(), paidBy: admin.id, note: parsed.data.note ?? null },
-  })
-
-  // Dinheiro saindo daqui para a conta de alguém nunca sai em silêncio: sem este e-mail o
-  // profissional só descobre o repasse conferindo o extrato por conta própria.
-  notifyPayoutPaid({
-    professionalName: payout.professional.user.name,
-    professionalEmail: payout.professional.user.email,
-    amountLabel: formatCents(payout.netCents),
-    feeLabel: formatCents(payout.grossCents - payout.netCents),
-    grossLabel: formatCents(payout.grossCents),
-    // A chave do snapshot é a que valia quando o repasse foi criado — é para ela que o
-    // dinheiro foi, mesmo que o profissional tenha trocado a chave depois.
-    pixKeyMasked: maskPixKey(
-      payout.pixKeySnapshot ?? payout.professional.pixKey ?? '',
-      payout.professional.pixKeyType
-    ),
-  })
-
+  // Sem e-mail aqui, de propósito: o aviso ao profissional sai quando o repasse é concluído, com
+  // o comprovante anexado. Avisar duas vezes sobre o mesmo dinheiro — uma sem documento — é como
+  // o segundo aviso, que é o que importa, passa a ser ignorado.
   audit({
     actorId: admin.id,
     actorRole: 'ADMIN',
-    action: 'PAYOUT_MARKED_PAID',
-    subjectId: payout.professionalId,
-    metadata: { payoutId: id, netCents: payout.netCents },
+    action: 'PAYOUT_MARKED_SENT',
+    subjectId: id,
+    metadata: { payoutId: id },
   })
 
   return NextResponse.json({ ok: true })

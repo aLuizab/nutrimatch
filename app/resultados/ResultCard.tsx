@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import Avatar from '../components/Avatar'
-import { MapPin, Video, Users, Clock } from 'lucide-react'
+import { MapPin, Video, Users } from 'lucide-react'
 import RatingStat from '../components/RatingStat'
 import TierBadge from '../components/TierBadge'
 import type { ProfessionalCard } from '@/lib/professionals'
@@ -33,11 +33,6 @@ export default function ResultCard({ n, sponsored = false }: { n: ProfessionalCa
                 <div className="flex items-center gap-1 text-xs text-gray-500">
                   <MapPin size={12} /> {n.city}
                 </div>
-                {n.responseLabel && (
-                  <div className="flex items-center gap-1 text-xs text-emerald-600 font-medium">
-                    <Clock size={12} /> {n.responseLabel}
-                  </div>
-                )}
                 <div className="flex items-center gap-1 text-xs text-gray-500">
                   {n.modality !== 'PRESENCIAL' ? <Video size={12} /> : <Users size={12} />}
                   {n.modalityLabel}

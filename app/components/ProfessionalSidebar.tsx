@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Calendar, Users, Settings, Repeat, CreditCard } from 'lucide-react'
+import { LayoutDashboard, Calendar, Users, Settings, Repeat, CreditCard, Wallet } from 'lucide-react'
 import { initials } from '@/lib/format'
 import LogoutButton from './LogoutButton'
 import SeletorDeTema from './SeletorDeTema'
@@ -12,6 +12,7 @@ const navItems = [
   { href: '/agenda', label: 'Agenda', icon: Calendar },
   { href: '/pacientes', label: 'Pacientes', icon: Users },
   { href: '/programas', label: 'Programas', icon: Repeat },
+  { href: '/repasses', label: 'Repasses', icon: Wallet },
   { href: '/assinatura', label: 'Assinatura', icon: CreditCard },
   { href: '/configuracoes', label: 'Configurações', icon: Settings },
 ]

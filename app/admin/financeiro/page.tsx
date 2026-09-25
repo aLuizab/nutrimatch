@@ -1,6 +1,7 @@
 import AdminSidebar from '../../components/AdminSidebar'
 import DashboardShell from '../../components/DashboardShell'
-import FinanceiroClient, { type PendingCharge, type PendingPayout } from './FinanceiroClient'
+import FinanceiroClient, { type PendingCharge, type PayoutItem } from './FinanceiroClient'
+import { type PayoutPhase } from '@/lib/payouts'
 import { prisma } from '@/lib/prisma'
 import { requireRoleOrRedirect } from '@/lib/session'
 import { formatDateBR, formatTimeBR } from '@/lib/format'
@@ -43,12 +44,18 @@ export default async function AdminFinanceiro() {
         professional: { include: { user: { select: { name: true } } } },
       },
     }),
+    // Em aberto E os concluídos recentes. Os concluídos ficam aqui porque é onde se procura o
+    // comprovante de um repasse quando o profissional pergunta — mandar para outra tela
+    // significaria que ninguém acha. CANCELLED fica fora: consulta cancelada não tem repasse a
+    // discutir.
     prisma.payout.findMany({
-      where: { status: 'PENDING' },
-      orderBy: { createdAt: 'asc' },
+      where: { status: { in: ['PENDING', 'PROCESSING', 'PAID'] } },
+      orderBy: { createdAt: 'desc' },
+      take: 120,
       include: {
         professional: { include: { user: { select: { name: true } } } },
         appointment: { select: { scheduledAt: true } },
+        receiptFile: { select: { id: true, fileName: true } },
       },
     }),
   ])
@@ -88,8 +95,9 @@ export default async function AdminFinanceiro() {
     })),
   ]
 
-  const pendingPayouts: PendingPayout[] = payouts.map((p) => ({
+  const payoutItems: PayoutItem[] = payouts.map((p) => ({
     id: p.id,
+    status: p.status as PayoutPhase,
     professionalName: p.professional.user.name,
     description: p.appointment
       ? `Consulta em ${formatDateBR(p.appointment.scheduledAt)}`
@@ -102,6 +110,9 @@ export default async function AdminFinanceiro() {
     pixKey: p.professional.pixKey,
     pixKeyType: p.professional.pixKeyType,
     createdAtLabel: formatDateBR(p.createdAt),
+    sentAtLabel: p.sentAt ? `${formatDateBR(p.sentAt)} às ${formatTimeBR(p.sentAt)}` : null,
+    paidAtLabel: p.paidAt ? formatDateBR(p.paidAt) : null,
+    receipt: p.receiptFile ? { id: p.receiptFile.id, fileName: p.receiptFile.fileName } : null,
   }))
 
   return (
@@ -109,7 +120,7 @@ export default async function AdminFinanceiro() {
       <div className="bg-surface border-b border-gray-100 px-8 py-5">
         <h1 className="text-xl font-bold text-gray-900">Financeiro</h1>
         <p className="text-sm text-gray-500 mt-0.5">
-          Conferência dos Pix recebidos e repasses aos profissionais
+          Conferência dos pagamentos recebidos e repasses aos profissionais
         </p>
       </div>
 
@@ -137,7 +148,7 @@ export default async function AdminFinanceiro() {
           </div>
         )}
 
-        <FinanceiroClient charges={charges} payouts={pendingPayouts} />
+        <FinanceiroClient charges={charges} payouts={payoutItems} />
       </div>
     </DashboardShell>
   )

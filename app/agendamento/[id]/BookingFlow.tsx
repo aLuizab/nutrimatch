@@ -347,16 +347,16 @@ export default function BookingFlow({
             </p>
           ) : (
             <>
-              {/* The distinction the patient most needs, and it differs by method: card reserves
-                  now and charges later, Pix charges immediately and is refunded if declined.
-                  Saying "sem cobranças" alone would be false for Pix, and describing only the
-                  card's hold would be misleading for whoever pays with the other one. */}
+              {/* O que o paciente mais precisa saber antes de clicar: o valor sai da conta dele
+                  agora, e o que ele ganha em troca é a consulta marcada assim que a plataforma
+                  conferir o pagamento — não um pedido que alguém ainda pode recusar. Dizer
+                  "sem cobranças" aqui seria falso. */}
               <p className="text-center text-xs text-gray-400 leading-relaxed">
                 {program
                   ? 'Esta consulta já está paga no seu pacote.'
                   : paymentRequired
-                    ? 'No cartão, o valor fica reservado e só é cobrado quando o profissional confirmar. No Pix, o valor é debitado na hora e devolvido automaticamente se o profissional não confirmar.'
-                    : 'Sem cobranças até confirmar'}
+                    ? 'O valor é debitado na hora. Conferido o pagamento, sua consulta fica marcada — o profissional não precisa aceitar. Se o pagamento não for encontrado, o valor é devolvido integralmente.'
+                    : 'Sem cobrança pela plataforma: o valor é combinado direto com o profissional.'}
               </p>
               {paymentRequired && !program && (
                 <p className="text-center text-xs text-gray-400">

@@ -27,13 +27,18 @@ enum Modality {
 }
 
 enum AppointmentStatus {
-  // Booked by the patient, waiting for the professional to accept. Holds the slot, but is
-  // not a real booking yet — and the time it sits here is what "tempo de resposta" measures.
+  // Marcada pelo paciente e aguardando **o pagamento** — nunca mais aguardando o profissional.
+  // Segura o horário, mas ainda não é consulta de verdade. Quem a transforma em CONFIRMED é a
+  // conferência do extrato pelo admin (ver lib/pix-payments.ts), e não uma resposta dele.
   AWAITING_CONFIRMATION
   CONFIRMED
   CANCELLED
-  // The professional let the confirmation deadline pass. Distinct from CANCELLED so the
-  // ranking can tell "declined by inaction" apart from "cancelled by someone".
+  // O prazo passou sem o pagamento ser confirmado. Distinto de CANCELLED porque ninguém decidiu
+  // nada: o pedido simplesmente não virou consulta.
+  //
+  // **Não conta contra a confiabilidade de ninguém.** Quando existia o aceite, expirar era o
+  // profissional deixando o prazo correr, e pesava contra ele; hoje é o paciente que não pagou,
+  // ou a plataforma que não conferiu a tempo. Ver lib/reputation.ts.
   EXPIRED
 }
 
@@ -150,8 +155,13 @@ model Professional {
   // changes (new review, new confirmation). Paid subscriptions deliberately do NOT feed this
   // — sponsored placement is a separate, labelled slot, never a hidden boost.
   rankScore          Float     @default(0)
-  // Median seconds from booking to the professional accepting it, over recent bookings.
-  // Null until they have enough samples to be meaningful.
+  // ── Legado ───────────────────────────────────────────────────────────────────────────
+  // Media de segundos entre o agendamento e o profissional aceitar. Nada escreve mais aqui:
+  // desde que a confirmação passou a ser do admin (o profissional não aceita mais, só pode
+  // cancelar), o que este número mediria seria a demora do admin em conferir o extrato — e
+  // rankear o profissional por isso seria cobrar dele o tempo de outra pessoa. Continua
+  // declarada porque derrubar coluna é mudança de contração: só depois de nenhuma leitura
+  // sobrar. Ver CHANGELOG.
   medianResponseSecs Int?
   rankUpdatedAt      DateTime?
 
@@ -259,12 +269,16 @@ model Appointment {
   modality             Modality
   price                Int
   status               AppointmentStatus @default(AWAITING_CONFIRMATION)
-  // When the professional accepted. createdAt → confirmedAt is the response-time sample
-  // that feeds lib/ranking.ts.
+  // Quando a consulta passou a valer. Hoje é o instante em que o admin confirmou o pagamento,
+  // não uma resposta do profissional — ele não aceita mais consulta nenhuma.
   confirmedAt          DateTime?
-  // Past this instant with no confirmation, the slot is treated as free. Derived at read
-  // time (see lib/availability.ts) — no cron required, matching how the rest of this
-  // codebase handles time-based state.
+  // Prazo para a conferência do pagamento declarado. Passado ele sem confirmação, o horário é
+  // tratado como livre. Derivado na leitura (ver lib/availability.ts) — sem cron, como todo
+  // estado baseado em tempo neste projeto.
+  //
+  // O nome ficou do tempo em que este era o prazo do profissional aceitar. Renomear coluna é
+  // mudança de contração, e "até quando esta consulta pode ficar sem confirmação" continua
+  // descrevendo o que ela guarda. Ver paymentReviewDeadlineFor em lib/appointment-status.ts.
   confirmationDeadline DateTime?
   reason               String?
   phone                String?
@@ -540,20 +554,63 @@ model Payout {
   // Snapshot da chave no momento do repasse: se o profissional trocar a chave depois, o
   // histórico precisa continuar mostrando para onde o dinheiro realmente foi.
   pixKeySnapshot String?
+  // Quando o admin declarou ter feito a transferência (entrada em PROCESSING). Separado de
+  // paidAt porque são dois fatos com datas diferentes: "mandei" e "está comprovado".
+  sentAt         DateTime?
   paidAt         DateTime?
   paidBy         String?
   note           String?
   createdAt      DateTime     @default(now())
+
+  // Comprovante da transferência. É o que separa PROCESSING de PAID: sem arquivo aqui o
+  // repasse não é dado como concluído. SetNull e não Cascade — apagar o arquivo não pode
+  // apagar o registro do dinheiro que saiu.
+  receiptFileId String?     @unique
+  receiptFile   StoredFile? @relation("PayoutReceipt", fields: [receiptFileId], references: [id], onDelete: SetNull)
 
   @@index([professionalId, status])
   @@index([status, createdAt])
 }
 
 enum PayoutStatus {
+  // Devido e ainda não transferido. É também onde fica quem não tem chave Pix cadastrada: a
+  // consulta acontece, o dinheiro fica retido, e a dívida segue registrada.
   PENDING
+  // O admin declarou que fez a transferência e o comprovante ainda não foi anexado. Estado
+  // próprio, e não um bóóleano em PAID, porque é exatamente o que o profissional precisa ver
+  // para saber que o dinheiro saiu mas ainda não foi comprovado.
+  PROCESSING
+  // Transferido **e** comprovado. Sem comprovante anexado nada chega aqui — ver
+  // lib/payouts.ts: "pago" sem documento é só a palavra de quem pagou.
   PAID
   // A consulta foi cancelada e estornada antes do repasse sair — não há mais o que repassar.
   CANCELLED
+}
+
+/// Arquivo guardado no próprio banco: comprovante de repasse hoje, foto de perfil depois.
+///
+/// Bytes no Postgres em vez de um serviço de arquivos. É uma escolha de escala, não de
+/// preguiça: são poucos arquivos, pequenos, e a alternativa era uma credencial externa a mais
+/// para criar, girar e vazar. Quando o volume não couber mais aqui, é este model que troca de
+/// implementação — quem o usa referencia um id, nunca um caminho de arquivo.
+///
+/// Não há rota pública que liste isto. Comprovante de repasse é documento financeiro de duas
+/// pessoas específicas; quem pode ver cada arquivo é decidido em /api/arquivos/[id].
+model StoredFile {
+  id       String @id @default(cuid())
+  mimeType String
+  /// Guardado em coluna própria para a listagem mostrar o tamanho sem carregar os bytes.
+  sizeBytes Int
+  /// Nome original, só para o download sair com algo reconhecível.
+  fileName String
+  bytes    Bytes
+  /// Quem enviou. Arquivo no banco sem responsável é arquivo que ninguém responde por.
+  uploadedBy String
+  createdAt  DateTime @default(now())
+
+  payoutReceipt Payout? @relation("PayoutReceipt")
+
+  @@index([uploadedBy, createdAt])
 }
 
 model Review {
